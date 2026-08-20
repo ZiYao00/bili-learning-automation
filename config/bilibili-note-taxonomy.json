@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "notes_root": "notes/bilibili",
+  "navigation_dir": "99-导航",
+  "fallback": {
+    "path": ["00-待整理"],
+    "task": "待整理",
+    "tags": ["待整理"]
+  },
+  "models": [
+    {"canonical": "MiniMax-H3", "aliases": ["MiniMax-H3", "MiniMaxH3", "Minimax H3", "H3"]},
+    {"canonical": "Krea2", "aliases": ["Krea2", "Krea 2"]},
+    {"canonical": "Klein-9B", "aliases": ["Klein-9B", "Klein 9B", "Klein"]},
+    {"canonical": "SCAIL-2", "aliases": ["SCAIL-2", "SCAIL 2", "SCAIL"]},
+    {"canonical": "Qwen-Image", "aliases": ["Qwen-Image", "Qwen Image"]},
+    {"canonical": "Z-Image", "aliases": ["Z-Image", "Z Image"]},
+    {"canonical": "Flux", "aliases": ["Flux"]},
+    {"canonical": "Qwen3.8", "aliases": ["Qwen3.8", "Qwen 3.8"]}
+  ],
+  "routes": [
+    {"id": "minimax_h3_digital_human", "path": ["01-视频生成", "01-MiniMax-H3"], "all_patterns": ["H3", "数字人"], "task": "数字人", "tags": ["视频生成", "数字人"]},
+    {"id": "minimax_h3_segment", "path": ["01-视频生成", "01-MiniMax-H3"], "all_patterns": ["H3", "分段"], "task": "分段生成", "tags": ["视频生成", "工作流"]},
+    {"id": "minimax_h3_low_vram", "path": ["01-视频生成", "01-MiniMax-H3"], "all_patterns": ["H3", "低显"], "task": "低显存工作流", "tags": ["视频生成", "工作流"]},
+    {"id": "minimax_h3", "path": ["01-视频生成", "01-MiniMax-H3"], "any_patterns": ["H3", "MiniMax"], "task": "工作流", "tags": ["视频生成", "工作流"]},
+    {"id": "motion_transfer", "path": ["01-视频生成", "02-动作迁移"], "any_patterns": ["动作迁移", "动作转移"], "task": "动作迁移", "tags": ["视频生成", "动作迁移"]},
+    {"id": "image_enhance", "path": ["02-图像生成", "02-放大修复"], "any_patterns": ["放大", "高清", "修复", "8K", "分块"], "task": "图生图放大", "tags": ["图像生成", "图生图", "放大修复"]},
+    {"id": "image_reverse", "path": ["02-图像生成", "03-反推"], "any_patterns": ["反推", "提示词反推"], "task": "反推", "tags": ["图像生成", "反推"]},
+    {"id": "image_to_image", "path": ["02-图像生成", "01-图生图"], "any_patterns": ["图生图", "洗图"], "task": "图生图", "tags": ["图像生成", "图生图"]},
+    {"id": "image_control", "path": ["02-图像生成", "04-控制与一致性"], "any_patterns": ["一致性", "ControlNet", "控制"], "task": "控制与一致性", "tags": ["图像生成", "控制与一致性"]},
+    {"id": "local_model", "path": ["03-本地模型与编程"], "any_patterns": ["Codex", "本地模型", "本地推理", "LM Studio", "Qwen3.8"], "task": "本地接入", "tags": ["本地模型", "本地推理"]},
+    {"id": "writing", "path": ["04-写作与内容创作"], "any_patterns": ["网文", "小说", "写作"], "task": "开源网文写作", "tags": ["AI写作", "网文", "开源项目"]}
+  ]
+}

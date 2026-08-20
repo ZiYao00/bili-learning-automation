@@ -1,0 +1,26 @@
+# Local credentials and machine-specific overrides
+key/
+.env
+.env.*
+!*.example
+
+# Private learning content and generated navigation
+notes/**
+!notes/.gitkeep
+!notes/bilibili/.gitkeep
+archive/
+materials/
+.runtime/
+.backup/
+
+# Test outputs and Python cache
+tests/yt-dlp/
+**/__pycache__/
+*.py[cod]
+
+# Bundled or locally copied third-party dependencies
+bili-note/
+web-access/
+
+# Local source package and legacy input archive
+hermes-video-learning-docs-v1.0.0.zip
