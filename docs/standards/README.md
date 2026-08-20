@@ -9,7 +9,7 @@
 
 ```text
 程序确定性骨架
-→ Hermes 只填写 AI 内容区域
+→ 接入智能体只填写 AI 内容区域
 → finalizer 强校验
 ```
 
@@ -26,6 +26,6 @@ validator / schema
 
 - UP 主原始简介必须来自采集元数据，不能由 AI 改写或补造；
 - Frontmatter、H1、简介、iframe、tags、文件路径由程序负责；
-- Hermes 只生成先看结论、怎么做、容易踩坑和实践清单；
+- 接入智能体只生成先看结论、怎么做、容易踩坑和实践清单；
 - 文件名包含 BVID，H1 不包含 BVID；
 - 主笔记不展示 runtime 路径、证据编号或抓取状态。

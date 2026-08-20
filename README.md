@@ -1,6 +1,6 @@
 # B站视频转笔记
 
-将 Bilibili 视频自动整理为**字幕优先的 Obsidian 学习笔记**。默认流程只采集视频元数据、UP 主原始简介和可用中文字幕，不下载音视频；确定性内容由程序生成，Hermes 只负责根据字幕提炼结论、步骤、坑点和实践清单。
+将 Bilibili 视频自动整理为**字幕优先的 Obsidian 学习笔记**。默认流程只采集视频元数据、UP 主原始简介和可用中文字幕，不下载音视频；确定性内容由程序生成，接入的智能体只负责根据字幕提炼结论、步骤、坑点和实践清单。
 
 > 内部 Skill 标识保持 `bilibili-learning`，中文展示名统一为「B站视频转笔记」。
 
@@ -23,7 +23,7 @@
 → yt-dlp 仅采集 metadata / description / subtitles
 → taxonomy 分类
 → 程序生成确定性 Markdown 骨架
-→ Hermes 仅填写 AI 内容区域
+→ 接入智能体仅填写 AI 内容区域
 → finalizer 强校验
 → 刷新 Obsidian 导航
 → 清理临时 job
@@ -31,7 +31,7 @@
 
 ## 环境要求
 
-- Hermes 运行环境；
+- 可执行本地脚本的智能体运行环境；
 - Python 3.10+；
 - `yt-dlp`；
 - 本机 Bilibili Netscape Cookie 文件；
@@ -41,7 +41,7 @@
 
 ## 安装（Windows）
 
-普通使用者需要 Hermes、Python、yt-dlp、Cookie 和一个笔记目录。Hermes 运行 skill 不要求安装测试工具；如需在本机运行 CLI、开发或测试，再创建项目独立环境：
+普通使用者需要智能体运行环境、Python、yt-dlp、Cookie 和一个笔记目录。运行 skill 不要求安装测试工具；如需在本机运行 CLI、开发或测试，再创建项目独立环境：
 
 ```powershell
 git clone https://github.com/ZiYao00/bili-learning-automation.git
@@ -52,7 +52,15 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-`.venv` 仅用于当前机器，已被 Git 忽略。详细的 Hermes skill 安装位置与验收见 [Hermes skill 安装](docs/HERMES-SKILL-INSTALL.md)。
+`.venv` 仅用于当前机器，已被 Git 忽略。当前已提供 Hermes 适配层，安装位置与验收见 [Hermes skill 安装](docs/HERMES-SKILL-INSTALL.md)。
+
+## 多智能体使用
+
+核心脚本、taxonomy、笔记标准和 finalizer 是智能体无关的；任何能够运行本地脚本、读取临时字幕并写入 Markdown 的智能体都可接入。统一输入/输出、清理和内容边界见 [智能体接入协议](docs/AGENT-INTEGRATION.md)。
+
+- **Hermes**：已有微信私聊适配和已安装 skill。
+- **Codex**：当前在本项目目录中工作时读取 `AGENTS.md`、接入协议和标准即可使用核心流程；目前不安装独立 Codex skill。
+- **其他智能体**：只需增加薄适配层，不能复制或改写核心流程与标准。
 
 ## Quick Start
 
@@ -108,13 +116,13 @@ bili-learning doctor
 
 ### 5. 使用
 
-在 owner 的 Hermes 私聊中发送：
+在已接入智能体的允许入口中发送：
 
 ```text
 BV1xxxxxxxxxx
 ```
 
-或 Bilibili 的复制链接 / 受支持短链。
+或 Bilibili 的复制链接 / 受支持短链。Hermes 当前限定为 owner 私聊；其他智能体须遵守 [智能体接入协议](docs/AGENT-INTEGRATION.md) 的授权与输入边界。
 
 正式 collector 入口仍然是：
 

@@ -7,6 +7,8 @@ description: Turn a Bilibili copied link, supported Bilibili short link, or BV i
 
 把 owner 私聊中的 B站复制链接、受支持的 Bilibili 短链接或 BV 号视为生成一篇学习笔记的请求。
 
+本 skill 是 Hermes/微信适配层。所有智能体共用的输入、数据、笔记与 finalizer 约束见项目根目录 `docs\AGENT-INTEGRATION.md`；本文件只增加 Hermes 私聊、安装与回复规则。
+
 ## Hard boundaries
 
 - 只在 owner 私聊中运行；群聊或发送者范围不确定时先确认。

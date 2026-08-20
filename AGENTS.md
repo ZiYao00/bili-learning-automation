@@ -6,7 +6,7 @@
 - `docs\standards\STANDARD-VIDEO-NOTE-EXAMPLE.md`
 - `config\bilibili-note-taxonomy.json`
 
-当前正式流程采用“程序确定性骨架 + Hermes AI 内容区域”：
+当前正式流程采用“程序确定性骨架 + 智能体 AI 内容区域”：
 
 - Python 负责 Frontmatter、H1、UP 主原始简介、iframe、tags、文件路径和 BVID 唯一文件名；
 - Agent 只填写 `BILI_AI_*_START/END` 标记之间的先看结论、怎么做、容易踩坑和实践清单；

@@ -3,12 +3,12 @@
 ## 主链路
 
 ```text
-Hermes 私聊中的复制链接 / BV 号 / 受支持短链
+已授权智能体入口中的复制链接 / BV 号 / 受支持短链
 → input_resolver 规范化 BVID 与 canonical URL
 → yt-dlp 仅采集元数据、UP 主简介、ai-zh/zh 字幕
 → taxonomy 分类并生成唯一 note path
 → Python 写入确定性 Markdown 骨架
-→ Hermes 只填写四个 AI 内容区域
+→ 接入智能体只填写四个 AI 内容区域
 → finalizer 强校验真实元数据与结构
 → navigation 原子刷新
 → 清理临时 job
@@ -17,7 +17,8 @@ Hermes 私聊中的复制链接 / BV 号 / 受支持短链
 ## 代码分层
 
 - `src/bili_learning/`：可测试的核心逻辑。
-- `hermes-skills/bilibili-learning/SKILL.md`：Hermes 行为约束。
+- `docs/AGENT-INTEGRATION.md`：所有智能体共用的接入协议。
+- `hermes-skills/bilibili-learning/SKILL.md`：Hermes/微信专属适配约束。
 - `hermes-skills/bilibili-learning/scripts/`：保留原调用路径的兼容入口。
 - `config/bilibili-note-taxonomy.json`：分类规则、模型别名和默认 `notes_root`。
 - `docs/standards/`：人类可读的笔记质量标准。
@@ -36,7 +37,7 @@ Hermes 私聊中的复制链接 / BV 号 / 受支持短链
 - 输出路径；
 - 导航。
 
-Hermes 只负责根据字幕和原始简介生成：
+接入智能体只负责根据字幕和原始简介生成：
 
 - 先看结论；
 - 怎么做；
