@@ -1,22 +1,52 @@
 # 依赖说明
 
-## 必需
+## 运行时必需
 
-| 依赖 | 用途 | 本机覆盖方式 |
+| 依赖 | 用途 | 配置方式 |
 | --- | --- | --- |
-| Hermes | 接收链接、调用 skill、生成笔记 | 独立安装；本项目不复制 Hermes 本体 |
-| yt-dlp | 采集元数据、简介和字幕 | `BILI_LEARNING_YTDLP` |
-| Bilibili Cookie | 获取需登录的字幕 | `BILI_LEARNING_COOKIE_FILE` |
+| Python 3.10+ | 运行核心 package 和 Hermes 兼容脚本 | 使用 Hermes/本机已有 Python 环境 |
+| Hermes | 接收链接、调用 skill、填写 AI 内容区域 | 独立安装；本项目不复制 Hermes 本体 |
+| yt-dlp | 采集元数据、简介和字幕，不下载媒体 | `BILI_LEARNING_YTDLP` 或系统 PATH |
+| Bilibili Cookie | 获取需要登录态的字幕/元数据 | `BILI_LEARNING_COOKIE_FILE` |
 
-默认 Cookie 相对项目根目录为 `key/bilibili_cookies.txt`。Cookie 是凭据，不能提交或写入示例配置。
+默认 Cookie 相对项目根目录为 `key/bilibili_cookies.txt`。Cookie 是凭据，只允许把文件路径传给 yt-dlp；不要读取、打印或写入示例配置。
 
-## 项目默认配置
+## yt-dlp 查找顺序
 
-分类配置默认位于 `config/bilibili-note-taxonomy.json`，可通过 `BILI_LEARNING_TAXONOMY` 指向另一份本机配置。
+1. `BILI_LEARNING_YTDLP`；
+2. 系统 PATH 中的 `yt-dlp`；
 
-## 可选/历史依赖
+公开文档和新环境必须使用前两种方式之一。
 
-- [Rimagination/bili-note](https://github.com/Rimagination/bili-note)：MIT。旧 Chrome/CDP 流程使用；当前默认 yt-dlp 流程不调用。
-- [eze-is/web-access](https://github.com/eze-is/web-access)：旧 Chrome/CDP 流程使用；当前默认 yt-dlp 流程不调用。其许可证应在重新启用或重新分发前单独核对。
+## 项目配置
 
-不要把这两个本地副本当作项目源码提交；如未来需要重新启用，应记录获取版本与本地修改原因。
+默认 taxonomy：`config/bilibili-note-taxonomy.json`。
+
+可覆盖：
+
+- `BILI_LEARNING_TAXONOMY`
+- `BILI_LEARNING_NOTES_ROOT`
+- `BILI_LEARNING_YTDLP`
+- `BILI_LEARNING_COOKIE_FILE`
+
+## 开发依赖
+
+通过：
+
+```powershell
+python -m pip install -e ".[dev]"
+```
+
+安装：
+
+- `pytest`：自动测试；
+- `ruff`：静态检查。
+
+公共 CI 不需要 Cookie，也不访问真实 Bilibili 账号。
+
+## 可选 / 历史依赖
+
+- [Rimagination/bili-note](https://github.com/Rimagination/bili-note)：旧 Chrome/CDP 流程使用；当前默认 yt-dlp 路线不调用。
+- [eze-is/web-access](https://github.com/eze-is/web-access)：旧 Chrome/CDP 流程使用；当前默认路线不调用。
+
+这两个本地副本不属于当前项目源码。重新启用前应单独确认版本、许可证、接口和安全边界，不能作为默认流程的静默 fallback。

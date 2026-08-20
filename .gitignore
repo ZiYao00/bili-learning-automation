@@ -17,6 +17,12 @@ materials/
 tests/yt-dlp/
 **/__pycache__/
 *.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+*.egg-info/
+build/
+dist/
 
 # Bundled or locally copied third-party dependencies
 bili-note/

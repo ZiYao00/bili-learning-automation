@@ -1,71 +1,77 @@
 ---
 name: bilibili-learning
-description: Turn a Bilibili plain link or BV id received in an owner private WeChat conversation into a subtitle-first Obsidian learning note without downloading media. No command prefix is required.
+description: Turn a Bilibili copied link, supported Bilibili short link, or BV id received in the owner's private conversation into a subtitle-first Obsidian learning note without downloading media. No command prefix is required.
 ---
 
-# Bilibili Learning
+# B站视频转笔记
 
-Treat a **plain Bilibili link** or BV id in an owner private conversation as a request to create one learning note. WeChat share cards are not supported as an input channel; if the message has no usable BV id, ask the owner to use Bilibili's “复制链接” and send that text.
+把 owner 私聊中的 B站复制链接、受支持的 Bilibili 短链接或 BV 号视为生成一篇学习笔记的请求。
 
 ## Hard boundaries
 
-- Run only in the owner's private conversation. In groups or uncertain sender scope, ask for confirmation.
-- Never read, print, upload, edit, or commit Cookie values. The collector may only pass the configured local Cookie file to yt-dlp.
-- Default flow never downloads video or audio, never starts Chrome/CDP, and never falls back to ASR/transcription.
-- Subtitle selection must include `ai-zh` and `zh.*`.
-- Do not overwrite an existing note. A source-URL duplicate check happens before any network request.
-- Raw subtitles, metadata, descriptions, and logs are temporary job data only. Do not copy them to `materials`; finalization must remove the exact job directory even when the note is invalid. A 20-minute failsafe cleanup runs if the agent crashes before finalization.
+- 只在 owner 私聊中运行；群聊或发送者范围不确定时先确认。
+- 永远不要读取、打印、上传、编辑或提交 Cookie 内容；collector 只可把配置的 Cookie 文件路径传给 yt-dlp。
+- 默认流程不下载视频或音频，不启动 Chrome/CDP，不回退到 ASR。
+- 字幕只接受 `ai-zh` 和 `zh.*`。
+- 不覆盖现有笔记；同 source 先判重，不同 source 即使标题相同也必须写入不同 BVID 文件。
+- 原始字幕、元数据、简介和日志只存在于 `.runtime/bilibili-learning` 的临时 job 中，finalizer 无论成败都要清理。
 
 ## Mandatory workflow
 
-1. Run the collector with the received message verbatim:
+1. 原样把收到的消息交给 collector：
 
    ```powershell
    $project = 'G:\GitHub\bili-learning-automation'
    python "$project\hermes-skills\bilibili-learning\scripts\prepare_ytdlp_bilibili_note.py" '<received message text>'
    ```
 
-2. Read the JSON status.
+2. 读取 JSON 状态：
 
-   - `already_exists`: reply with the existing filename; do not continue.
-   - `subtitle_unavailable`: reply that no usable `ai-zh`/`zh` subtitle was obtained and no media was downloaded; do not generate a note.
-   - `failed`: reply with the short message; do not claim completion.
-   - Only `materials_ready` may continue.
+   - `already_exists`：回复已有文件名，不继续。
+   - `incomplete_note`：说明已有未完成骨架，不声称完成；先处理该笔记或等待当前任务结束。
+   - `subtitle_unavailable`：说明没有可用中文字幕，且没有下载媒体，不生成笔记。
+   - `failed`：回复短错误，不声称完成。
+   - 只有 `materials_ready` 才继续。
 
-3. For `materials_ready`, read `handoff_path`, then read both project standards:
+3. `materials_ready` 时读取 `handoff_path`、`job.json`、`subtitle_path`，并阅读：
 
    ```text
-   G:\GitHub\bili-learning-automation\docs\standards\CODEX-VIDEO-NOTE-GUIDE.md
-   G:\GitHub\bili-learning-automation\docs\standards\STANDARD-VIDEO-NOTE-EXAMPLE.md
-   G:\GitHub\bili-learning-automation\config\bilibili-note-taxonomy.json
+   docs\standards\CODEX-VIDEO-NOTE-GUIDE.md
+   docs\standards\STANDARD-VIDEO-NOTE-EXAMPLE.md
+   config\bilibili-note-taxonomy.json
    ```
 
-4. Read `job.json` and `subtitle_path`, then write the note at `note_path`. Use `canonical_title`, `category_path`, and `required_tags` exactly as returned; do not choose a new folder or title.
+4. `note_path` 已由程序写入确定性骨架。不要改动：
 
-   - Frontmatter has exactly `author`, `published`, `duration`, `source`, `tags`.
-   - Put the complete UP original description directly below the title and before the official iframe; preserve description URLs as clickable Markdown.
-   - Write a short `先看结论`, `## 怎么做`, `## 容易踩坑`, and a concise practice checklist.
-   - Only write claims supported by the subtitle or original description. Do not expose temporary paths, evidence IDs, or collection details in the note.
-   - A genuinely empty upstream description may say `> 本视频未提供简介。`; a capture failure is not an empty description and must stop the task.
-   - User-supplied resource links are not UP original description. Label them as `用户补充` if explicitly requested.
+   - Frontmatter：`author`、`published`、`duration`、`source`、`tags`
+   - H1
+   - UP 主原始简介
+   - Bilibili iframe
+   - 文件路径与文件名
+   - `BILI_AI_*_START/END` marker
 
-5. **Always finalize immediately after writing or on any writing failure.** This validates the note and deletes the exact temporary job directory:
+5. 只在四组 marker 内填写：
+
+   - `BILI_AI_SUMMARY`：短的“先看结论”；
+   - `BILI_AI_STEPS`：`## 怎么做`；
+   - `BILI_AI_PITFALLS`：`## 容易踩坑`；
+   - `BILI_AI_PRACTICE`：简短实践清单。
+
+   只写字幕或原始简介支持的事实。不要把临时路径、job 文件名、证据编号、采集状态写进主笔记。
+
+6. 写完后立即 finalizer：
 
    ```powershell
    python "$project\hermes-skills\bilibili-learning\scripts\finalize_ytdlp_bilibili_note.py" --job '<job_dir>' --note '<note_path>'
    ```
 
-6. Reply only after finalization.
+   即使写作失败，也必须运行 finalizer 清理 job。
 
-   - `note_ready`: `已完成：《标题》\n笔记：<文件名>\n已写入 Obsidian。`
-   - `note_invalid` / `failed`: state the short error. Never say completed.
+7. 只在 finalizer 返回后回复：
 
-## Maintenance document
+   - `note_ready`：`已完成：《标题》\n笔记：<文件名>\n已写入 Obsidian。`
+   - `note_invalid` / `failed`：只报告短错误，不能说已完成。
 
-The owner-facing operational guide, when it exists on this Windows machine, is:
+## Maintenance
 
-```text
-G:\ai_data\hermes\docs\bilibili-learning\HERMES-BILIBILI-LEARNING-RUNBOOK.md
-```
-
-It is optional local operational documentation and must not replace the project standards above.
+本机可选运维文档可在仓库外单独维护；它不是项目运行前置条件，也不能覆盖仓库内的正式标准。

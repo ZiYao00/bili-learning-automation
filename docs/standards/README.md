@@ -1,15 +1,31 @@
-# 视频学习笔记规范包
+# B站视频转笔记规范
 
-本压缩包包含两份核心文档：
+本目录定义最终笔记的人类可读标准：
 
-- `STANDARD-VIDEO-NOTE-EXAMPLE.md`：最终成品示例。Agent 和 Codex 生成笔记时先看这个。
-- `CODEX-VIDEO-NOTE-GUIDE.md`：生成规则，包含必填字段、视频简介、层级控制、iframe 与插件原则。
+- `CODEX-VIDEO-NOTE-GUIDE.md`：内容质量与结构规则；
+- `STANDARD-VIDEO-NOTE-EXAMPLE.md`：符合当前程序骨架的最终成品示例。
 
-最重要的一条：**视频简介必须获取并写入笔记；不能因为字幕抓到了就忽略简介。**
+当前正式实现采用：
 
-本规范面向 Obsidian 内的 Bilibili 学习笔记，默认采用：
+```text
+程序确定性骨架
+→ Hermes 只填写 AI 内容区域
+→ finalizer 强校验
+```
 
-- 原视频链接 + iframe 播放；
-- 视频简介紧跟标题；
-- 简短结论、怎么做、踩坑、实践清单；
-- 不把机器索引、证据 JSONL、抓取状态堆到正文。
+因此优先级为：
+
+```text
+validator / schema
+> SKILL.md
+> CODEX-VIDEO-NOTE-GUIDE.md
+> STANDARD-VIDEO-NOTE-EXAMPLE.md
+```
+
+最重要的边界：
+
+- UP 主原始简介必须来自采集元数据，不能由 AI 改写或补造；
+- Frontmatter、H1、简介、iframe、tags、文件路径由程序负责；
+- Hermes 只生成先看结论、怎么做、容易踩坑和实践清单；
+- 文件名包含 BVID，H1 不包含 BVID；
+- 主笔记不展示 runtime 路径、证据编号或抓取状态。

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare subtitle-first Bilibili learning materials for the Hermes skill."""
+"""DEPRECATED: legacy Chrome/CDP Bilibili collector; not used by the default Hermes flow."""
 
 from __future__ import annotations
 
