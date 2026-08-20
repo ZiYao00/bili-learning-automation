@@ -21,7 +21,9 @@ description: Turn a Bilibili copied link, supported Bilibili short link, or BV i
 1. 原样把收到的消息交给 collector：
 
    ```powershell
-   $project = 'G:\GitHub\bili-learning-automation'
+   $installedSkill = Get-Item "$env:LOCALAPPDATA\hermes\skills\bilibili-learning"
+   $skillSource = [string]$installedSkill.Target
+   $project = Split-Path (Split-Path $skillSource -Parent) -Parent
    python "$project\hermes-skills\bilibili-learning\scripts\prepare_ytdlp_bilibili_note.py" '<received message text>'
    ```
 
