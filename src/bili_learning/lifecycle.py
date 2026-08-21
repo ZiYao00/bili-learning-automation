@@ -225,5 +225,9 @@ def finalize_note(project_root: Path, job_path: Path, note_path: Path) -> tuple[
         payload["temporary_data_removed"] = False
         payload["cleanup_error"] = str(error)
         if code == 0:
-            payload, code = {"status": "failed", "message": "笔记已写入但临时数据清理失败", **payload}, 1
+            payload, code = {
+                **payload,
+                "status": "failed",
+                "message": "笔记已写入但临时数据清理失败",
+            }, 1
     return _status(payload, code)

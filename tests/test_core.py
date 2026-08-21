@@ -442,6 +442,16 @@ def test_reservation_spans_job_lifecycle_and_cleanup_releases_it(tmp_path: Path)
     assert claim_reservation(runtime, "BV1TXua68EYi").path.is_file()
 
 
+def test_claim_reservation_reclaims_missing_bound_job_without_waiting(tmp_path: Path) -> None:
+    runtime = tmp_path / ".runtime" / "bilibili-learning"
+    reservation = claim_reservation(runtime, "BV1TXua68EYi")
+    missing_job = runtime / "BV1TXua68EYi-missing"
+    bind_reservation(reservation, missing_job)
+
+    replacement = claim_reservation(runtime, "BV1TXua68EYi")
+    assert replacement.path.is_file()
+
+
 def test_core_prepare_dry_run_returns_versioned_status_and_releases_reservation(
     tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -520,6 +530,29 @@ def test_e2e_draft_publish_navigation_and_repeated_video(
     repeated, code = prepare_note(tmp_path, "BV1TXua68EYi")
     assert code == 0 and repeated["status"] == "materials_ready"
     assert Path(repeated["note_path"]).name == "H3 分段工作流（2）.md"
+
+
+def test_finalize_reports_failure_when_cleanup_fails(tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch) -> None:
+    _write_e2e_config(tmp_path, taxonomy)
+    monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", _fake_ytdlp)
+    monkeypatch.setattr("bili_learning.lifecycle._schedule_failsafe_cleanup", lambda *args: None)
+    prepared, code = prepare_note(tmp_path, "BV1TXua68EYi")
+    assert code == 0 and prepared["status"] == "materials_ready"
+    draft = Path(prepared["draft_path"])
+    draft.write_text(_complete_ai_regions(draft.read_text(encoding="utf-8")), encoding="utf-8")
+    _write_passed_analysis(Path(prepared["analysis_path"]))
+    monkeypatch.setattr(
+        "bili_learning.lifecycle.cleanup_job",
+        lambda *_args: (_ for _ in ()).throw(PermissionError("WinError 32")),
+    )
+
+    result, code = finalize_note(tmp_path, Path(prepared["job_dir"]), draft)
+
+    assert code == 1
+    assert result["status"] == "failed"
+    assert result["temporary_data_removed"] is False
+    assert result["note_path"] == prepared["note_path"]
+    assert "WinError 32" in result["cleanup_error"]
 
 
 def test_e2e_unfinished_draft_never_enters_navigation_and_invalid_draft_is_not_published(

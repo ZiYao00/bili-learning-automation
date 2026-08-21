@@ -30,7 +30,7 @@ description: Turn a Bilibili copied link, supported Bilibili short link, or BV i
    - `failed`：回复短错误，不声称完成。
    - 只有 `materials_ready` 才继续。
 
-3. `materials_ready` 时读取 `handoff_path`、`job.json`、`subtitle_path`、`analysis_path`，并遵循项目共享的 `docs\\AGENT-INTEGRATION.md` 与内容标准。先判断字幕/简介是否足以支撑可信学习笔记；来源不足时在 `analysis.json` 记录原因，不得靠常识补全。
+3. `materials_ready` 时读取 `handoff_path`、`job.json`、`subtitle_path`、`analysis_path`，并遵循项目共享的 `docs\\AGENT-INTEGRATION.md` 与内容标准。先判断字幕/简介是否足以支撑可信学习笔记；来源不足时在 `analysis.json` 记录原因，不得靠常识补全。直接读取原始 SRT；输出受限时分段读取，不得在 job 内生成 `_flat.txt`、缓存或任何临时副本。确需临时文件时只能使用系统 Temp，并在 `finally` 中立即删除。
 
 4. 来源充分时，先填写 `knowledge_outline`，再只编辑 `draft_path` 的两个 marker：
 
@@ -47,13 +47,13 @@ description: Turn a Bilibili copied link, supported Bilibili short link, or BV i
    python "$project\hermes-skills\bili-learning-automation\scripts\finalize_ytdlp_bilibili_note.py" --job '<job_dir>' --note '<draft_path>'
    ```
 
-   即使写作失败，也必须运行 finalizer 清理 job。
+   即使写作失败，也必须运行 finalizer 清理 job。不得手工删除 job、reservation 或锁文件。
 
 7. 只在 finalizer 返回后回复：
 
-   - `note_ready`：`已完成：《标题》\n笔记：<文件名>\n已写入 Obsidian。`
+   - `note_ready` 且 `temporary_data_removed: true`：`已完成：《标题》\n笔记：<文件名>\n已写入 Obsidian。`
    - `source_insufficient`：说明现有字幕/简介不足以支撑可靠学习笔记，本次未写入正式笔记。
-   - `note_invalid` / `failed`：只报告短错误，不能说已完成。
+   - `note_invalid` / `failed`，或 `temporary_data_removed: false`：只报告短错误，不能说已完成；不要手工清理现场。
 
 ## 学习后整理
 

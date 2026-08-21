@@ -16,7 +16,7 @@
 4. 来源充分时先形成 `knowledge_outline`，再编辑 `draft_path` 中的 `BILI_AI_SUMMARY` 与 `BILI_AI_BODY` 两个区域。
 5. 成稿后重新对照字幕或 `knowledge_outline` 做覆盖复核；确认无重要遗漏、无来源外补写后，将 `coverage_review.status` 设为 `passed` 并填写 notes。
 6. 无论写作成功、失败或中断，都必须运行 finalizer 清理 job。
-7. 只有 finalizer 返回 `note_ready` 才能报告完成。
+7. 只有 finalizer 返回 `note_ready` 且 `temporary_data_removed: true` 才能报告完成。
 
 `in_progress`、`subtitle_unavailable`、`source_insufficient`、`failed` 和 `note_invalid` 都不是完成状态。
 
@@ -33,6 +33,8 @@
 - `confirmed_empty` 仅代表 info-json 明确给出空字符串且（如存在）简介 sidecar 与其一致；字段缺失、`null`、类型异常或两者不一致都必须失败。
 - Cookie 内容不得读取、打印、上传、编辑、提交或写入笔记；collector 仅可把配置的 Cookie 文件路径传给 yt-dlp。
 - 原始字幕、元数据、简介、`analysis.json` 和日志只允许存在于 `.runtime/bilibili-learning` 的单个 job；finalizer 负责精确清理。
+- 智能体只可在 job 内编辑既定的 `analysis.json` 与草稿中的两个 AI 区域；不得创建字幕展平文件、缓存、临时副本或其他辅助文件。读取字幕应直接读取原始 SRT；工具输出受限时分段读取，确需临时文件时只能使用系统 Temp 并在 `finally` 中立即删除，不得依赖重启清理。
+- 智能体不得手工删除 job、reservation 或锁文件。finalizer 清理失败时必须如实报告失败状态，保留现场供后续诊断；只有用户明确授权后，才可对已核实的单个遗留文件执行回收站归档。
 - 不得覆盖已有笔记；同一 BVID 仅在**活动任务期间**由 reservation 防止并发处理，任务完成后允许再次转换。草稿只存在于 runtime，只有 finalizer 校验通过后才原子发布到 `note_path`。
 
 ## 来源充分性判断

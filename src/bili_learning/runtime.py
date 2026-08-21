@@ -54,8 +54,6 @@ def _reservation_age_seconds(path: Path, payload: dict[str, object]) -> int:
 
 def _remove_stale_reservation(path: Path, stale_seconds: int) -> None:
     payload = _read_reservation(path)
-    if _reservation_age_seconds(path, payload) <= stale_seconds:
-        return
     job_dir = payload.get("job_dir")
     if isinstance(job_dir, str) and job_dir:
         candidate = Path(job_dir)
@@ -64,6 +62,13 @@ def _remove_stale_reservation(path: Path, stale_seconds: int) -> None:
                 return
         except OSError:
             pass
+        # A reservation that has already been bound to a missing job cannot
+        # belong to an active task. Reclaim it immediately rather than
+        # blocking a retry until the generic one-hour stale timeout expires.
+    elif _reservation_age_seconds(path, payload) <= stale_seconds:
+        # Between claiming a reservation and binding its newly-created job,
+        # job_dir is intentionally empty. Keep that short-lived reservation.
+        return
     try:
         path.unlink()
     except FileNotFoundError:
