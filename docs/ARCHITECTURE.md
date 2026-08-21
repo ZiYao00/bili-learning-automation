@@ -19,8 +19,8 @@
 
 - `src/bili_learning/`：可测试的核心逻辑和 agent-neutral CLI（`prepare`、`finalize`、`organize`、`doctor`、`build-nav`）。
 - `docs/AGENT-INTEGRATION.md`：所有智能体共用的接入协议。
-- `hermes-skills/bilibili-learning/SKILL.md`：Hermes/微信专属适配约束。
-- `hermes-skills/bilibili-learning/scripts/`：只定位项目根目录并转发到核心 CLI 的兼容入口。
+- `hermes-skills/bili-learning-automation/SKILL.md`：Hermes/微信专属适配约束。
+- `hermes-skills/bili-learning-automation/scripts/`：只定位项目根目录并转发到核心 CLI 的兼容入口。
 - `config/bilibili-note-taxonomy.json`：模型别名、tags、后续整理建议和默认 `notes_root`。
 - `docs/standards/`：人类可读的笔记质量与版式语义标准。
 - `obsidian/snippets/`：随仓库提交、可直接安装到 Obsidian Vault 的 `learning-lab.css` Core 与 `video-note.css` Extension。

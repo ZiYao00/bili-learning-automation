@@ -85,7 +85,7 @@ Video Note Extension v0.1
 执行项目正式验证：
 
 ```powershell
-python -m compileall -q src hermes-skills/bilibili-learning/scripts
+python -m compileall -q src hermes-skills/bili-learning-automation/scripts
 python -m ruff check .
 python -m pytest -q
 git diff --check

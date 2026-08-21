@@ -56,8 +56,8 @@ $env:BILI_LEARNING_NOTES_ROOT = 'D:\YourObsidianVault\bilibili'
 ## 诊断
 
 ```powershell
-python .\hermes-skills\bilibili-learning\scripts\doctor_bilibili_learning.py
-python .\hermes-skills\bilibili-learning\scripts\doctor_bilibili_learning.py --json
+python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py
+python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py --json
 ```
 
 doctor 不访问 Bilibili、不读取 Cookie 内容，也不保留测试文件；它会在 notes/runtime 的可写位置创建并立即删除空探针，以确认该位置实际可写。

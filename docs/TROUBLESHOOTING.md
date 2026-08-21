@@ -3,7 +3,7 @@
 优先执行：
 
 ```powershell
-python .\hermes-skills\bilibili-learning\scripts\doctor_bilibili_learning.py
+python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py
 ```
 
 ## 未找到 yt-dlp

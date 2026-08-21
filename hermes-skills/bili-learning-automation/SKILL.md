@@ -1,5 +1,5 @@
 ---
-name: bilibili-learning
+name: bili-learning-automation
 description: Turn a Bilibili copied link, supported Bilibili short link, or BV id received in the owner's private conversation into a subtitle-first Obsidian learning note without downloading media. No command prefix is required.
 ---
 
@@ -16,10 +16,10 @@ description: Turn a Bilibili copied link, supported Bilibili short link, or BV i
 1. 原样把收到的消息交给 collector：
 
    ```powershell
-   $installedSkill = Get-Item "$env:LOCALAPPDATA\hermes\skills\bilibili-learning"
+   $installedSkill = Get-Item "$env:LOCALAPPDATA\hermes\skills\bili-learning-automation"
    $skillSource = [string]$installedSkill.Target
    $project = Split-Path (Split-Path $skillSource -Parent) -Parent
-   python "$project\hermes-skills\bilibili-learning\scripts\prepare_ytdlp_bilibili_note.py" '<received message text>'
+   python "$project\hermes-skills\bili-learning-automation\scripts\prepare_ytdlp_bilibili_note.py" '<received message text>'
    ```
 
 2. 读取 JSON 状态：
@@ -44,7 +44,7 @@ description: Turn a Bilibili copied link, supported Bilibili short link, or BV i
 6. 写完后立即 finalizer：
 
    ```powershell
-   python "$project\hermes-skills\bilibili-learning\scripts\finalize_ytdlp_bilibili_note.py" --job '<job_dir>' --note '<draft_path>'
+   python "$project\hermes-skills\bili-learning-automation\scripts\finalize_ytdlp_bilibili_note.py" --job '<job_dir>' --note '<draft_path>'
    ```
 
    即使写作失败，也必须运行 finalizer 清理 job。
@@ -60,7 +60,7 @@ description: Turn a Bilibili copied link, supported Bilibili short link, or BV i
 只有 owner 明确要求整理一篇已学习笔记时才执行；普通链接转笔记不进入此流程。先读取现有笔记，与 owner 的学习重点确认短标题和一句简介摘要，再调用统一入口：
 
 ```powershell
-python "$project\hermes-skills\bilibili-learning\scripts\organize_bilibili_learning.py" --note '<现有笔记路径>' --title '<短标题>' --intro '<一句简介摘要>'
+python "$project\hermes-skills\bili-learning-automation\scripts\organize_bilibili_learning.py" --note '<现有笔记路径>' --title '<短标题>' --intro '<一句简介摘要>'
 ```
 
 如 owner 未指定分类，省略 `--category`，由核心按 tags 放入 taxonomy 建议目录。禁止 Hermes 自行改名、移动文件或改写 UP 主资源链接；只以该命令的 `organized` 返回状态报告成功。

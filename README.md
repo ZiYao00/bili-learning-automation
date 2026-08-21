@@ -2,7 +2,7 @@
 
 将 Bilibili 视频自动整理为**字幕优先的 Obsidian 学习笔记**。默认流程只采集视频元数据、UP 主原始简介和可用中文字幕，不下载音视频；确定性内容由程序生成，Codex/Hermes 负责判断字幕是否足以支撑可靠笔记、提取高价值知识、动态组织正文并做覆盖复核。
 
-> 内部 Skill 标识保持 `bilibili-learning`，中文展示名统一为「B站视频转笔记」。
+> Hermes Skill 标识为 `bili-learning-automation`，中文展示名统一为「B站视频转笔记」。
 
 ## 核心特点
 
@@ -127,13 +127,13 @@ BILI_LEARNING_COOKIE_FILE
 无需安装 package，可直接运行：
 
 ```powershell
-python .\hermes-skills\bilibili-learning\scripts\doctor_bilibili_learning.py
+python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py
 ```
 
 供 Hermes、Codex 或其他自动化工具解析的 JSON 诊断：
 
 ```powershell
-python .\hermes-skills\bilibili-learning\scripts\doctor_bilibili_learning.py --json
+python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py --json
 ```
 
 开发环境也可以：
@@ -156,7 +156,7 @@ BV1xxxxxxxxxx
 正式 collector 入口仍然是：
 
 ```powershell
-python .\hermes-skills\bilibili-learning\scripts\prepare_ytdlp_bilibili_note.py "<复制链接或 BV>"
+python .\hermes-skills\bili-learning-automation\scripts\prepare_ytdlp_bilibili_note.py "<复制链接或 BV>"
 ```
 
 所有智能体也可直接使用核心 CLI：
@@ -259,7 +259,7 @@ python -m pytest -q
 
 ## Legacy
 
-`hermes-skills/bilibili-learning/scripts/prepare_bilibili_learning.py` 是旧的 Chrome/CDP / `bili-note` / `web-access` 路线，不是当前默认流程。本轮保留文件仅用于历史兼容，不应作为新集成入口。
+`hermes-skills/bili-learning-automation/scripts/prepare_bilibili_learning.py` 是旧的 Chrome/CDP / `bili-note` / `web-access` 路线，不是当前默认流程。本轮保留文件仅用于历史兼容，不应作为新集成入口。
 
 详见 [Legacy 说明](docs/LEGACY.md)。
 
@@ -268,7 +268,7 @@ python -m pytest -q
 优先运行：
 
 ```powershell
-python .\hermes-skills\bilibili-learning\scripts\doctor_bilibili_learning.py
+python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py
 ```
 
 常见问题见 [故障排查](docs/TROUBLESHOOTING.md)。
@@ -278,7 +278,7 @@ python .\hermes-skills\bilibili-learning\scripts\doctor_bilibili_learning.py
 ```text
 config/                         taxonomy
 src/bili_learning/              可测试的核心 Python package
-hermes-skills/bilibili-learning/ Hermes Skill 与兼容入口脚本
+hermes-skills/bili-learning-automation/ Hermes Skill 与兼容入口脚本
 obsidian/snippets/               可直接复制到 Vault 的 Core + Video Note CSS
 docs/                           架构、配置、标准和维护文档
 tests/                          无账号依赖的自动测试

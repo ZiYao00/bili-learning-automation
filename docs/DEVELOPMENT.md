@@ -16,7 +16,7 @@ python -m pip install -e ".[dev]"
 ## 本地验证
 
 ```powershell
-python -m compileall -q src hermes-skills/bilibili-learning/scripts
+python -m compileall -q src hermes-skills/bili-learning-automation/scripts
 python -m ruff check .
 python -m pytest -q
 ```
@@ -65,7 +65,7 @@ obsidian/snippets/
 准备 commit / push 前，先复核当前 diff，确认没有把 Cookie、`.runtime`、私人笔记、测试抓取材料或本机路径提交进去，然后运行：
 
 ```powershell
-python -m compileall -q src hermes-skills/bilibili-learning/scripts
+python -m compileall -q src hermes-skills/bili-learning-automation/scripts
 python -m ruff check .
 python -m pytest -q
 git diff --check
