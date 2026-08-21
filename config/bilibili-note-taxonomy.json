@@ -18,10 +18,12 @@
     {"canonical": "Qwen3.8", "aliases": ["Qwen3.8", "Qwen 3.8"]}
   ],
   "routes": [
-    {"id": "minimax_h3_digital_human", "path": ["01-视频生成", "01-MiniMax-H3"], "all_patterns": ["H3", "数字人"], "task": "数字人", "tags": ["视频生成", "数字人"]},
-    {"id": "minimax_h3_segment", "path": ["01-视频生成", "01-MiniMax-H3"], "all_patterns": ["H3", "分段"], "task": "分段生成", "tags": ["视频生成", "工作流"]},
-    {"id": "minimax_h3_low_vram", "path": ["01-视频生成", "01-MiniMax-H3"], "all_patterns": ["H3", "低显"], "task": "低显存工作流", "tags": ["视频生成", "工作流"]},
-    {"id": "minimax_h3", "path": ["01-视频生成", "01-MiniMax-H3"], "any_patterns": ["H3", "MiniMax"], "task": "工作流", "tags": ["视频生成", "工作流"]},
+    {"id": "minimax_h3_digital_human", "path": ["01-视频生成", "01-MiniMax-H3"], "all_patterns": ["H3", "数字人"], "task": "数字人", "title": "数字人", "tags": ["视频生成", "数字人"]},
+    {"id": "minimax_h3_segment", "path": ["01-视频生成", "01-MiniMax-H3"], "all_patterns": ["H3", "分段"], "task": "分段生成", "title": "分段生成", "tags": ["视频生成", "工作流"]},
+    {"id": "minimax_h3_low_vram", "path": ["01-视频生成", "01-MiniMax-H3"], "all_patterns": ["H3", "低显"], "task": "低显存工作流", "title": "低显存工作流", "tags": ["视频生成", "工作流"]},
+    {"id": "minimax_h3_grid", "path": ["01-视频生成", "01-MiniMax-H3"], "all_patterns": ["H3"], "any_patterns": ["9宫格", "九宫格"], "task": "9宫格", "title": "9宫格提示词模板", "tags": ["视频生成", "工作流", "9宫格"]},
+    {"id": "minimax_h3_node_prompt", "path": ["01-视频生成", "01-MiniMax-H3"], "all_patterns": ["H3", "节点", "提示词优化"], "task": "节点升级", "title": "节点升级与提示词优化", "tags": ["视频生成", "工作流", "节点", "提示词优化"]},
+    {"id": "minimax_h3", "path": ["01-视频生成", "01-MiniMax-H3"], "any_patterns": ["H3", "MiniMax"], "task": "工作流", "title": "工作流", "tags": ["视频生成", "工作流"]},
     {"id": "motion_transfer", "path": ["01-视频生成", "02-动作迁移"], "any_patterns": ["动作迁移", "动作转移"], "task": "动作迁移", "tags": ["视频生成", "动作迁移"]},
     {"id": "image_enhance", "path": ["02-图像生成", "02-放大修复"], "any_patterns": ["放大", "高清", "修复", "8K", "分块"], "task": "图生图放大", "tags": ["图像生成", "图生图", "放大修复"]},
     {"id": "image_reverse", "path": ["02-图像生成", "03-反推"], "any_patterns": ["反推", "提示词反推"], "task": "反推", "tags": ["图像生成", "反推"]},

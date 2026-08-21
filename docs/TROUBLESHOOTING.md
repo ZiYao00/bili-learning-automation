@@ -24,11 +24,15 @@ python .\hermes-skills\bilibili-learning\scripts\doctor_bilibili_learning.py
 
 ## `note_invalid`
 
-Finalizer 会检查真实 Frontmatter 值、H1、BVID 文件名、完整简介、iframe、规范 tags 和四个 AI 内容区域。当前 job 生成的无效笔记会改名为 `.md.invalid`（若重名则带时间戳）保留现场，同时释放正式 `.md` 路径，便于重新发起任务。不要绕过 finalizer。
+Finalizer 会检查真实 Frontmatter 值、原视频 H1、H1 下方 BVID 小字、完整简介结构、iframe、规范 tags 和四个 AI 内容区域。无效草稿不会发布；job 会在清理阶段从 runtime 精确删除，同时释放正式路径，便于重新发起任务。不要绕过 finalizer。
 
 ## `already_exists`
 
-系统按 canonical source URL 判重。旧笔记即使没有 BVID 文件名，只要 source 已存在，也会被识别。
+系统按 canonical source URL 判重，也兼容 H1 下方的 BVID 小字和旧的 BVID 文件名。
+
+## `organize` 失败
+
+确认 `--note` 是 notes root 内的正式笔记、`--title` 与 `--intro` 非空、`--category`（如提供）是项目内相对目录。不要手动移动文件；核心会在安全发布后删除旧位置并重建导航。
 
 ## 短链无法解析
 

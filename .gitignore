@@ -3,6 +3,7 @@ key/
 .env
 .env.*
 !*.example
+config/local.json
 
 # Private learning content and generated navigation
 notes/**
@@ -12,6 +13,7 @@ archive/
 materials/
 .runtime/
 .backup/
+.codex-backups/
 
 # Test outputs and Python cache
 tests/yt-dlp/

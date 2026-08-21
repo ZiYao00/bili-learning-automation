@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import html
 import re
 from pathlib import Path
 from typing import Any
 
-PLACEHOLDER_TEXT = "待 Hermes 根据字幕填写"
+from .frontmatter import render_frontmatter
+
+PLACEHOLDER_TEXT = "待智能体根据字幕填写"
 
 AI_MARKERS = {
     "summary": ("<!-- BILI_AI_SUMMARY_START -->", "<!-- BILI_AI_SUMMARY_END -->"),
@@ -14,13 +17,49 @@ AI_MARKERS = {
 }
 
 
+def strip_ai_markers(text: str) -> str:
+    """Remove runtime-only validation comments before publishing a note."""
+    for start, end in AI_MARKERS.values():
+        text = text.replace(start, "").replace(end, "")
+    return re.sub(r"\n{3,}", "\n\n", text)
+
+
 def safe_title(value: str) -> str:
     name = re.sub(r'[<>:"/\\|?*]', "", value).strip().rstrip(".")
     return name or "Bilibili 学习笔记"
 
 
-def note_filename(canonical_title: str, bvid: str) -> str:
-    return f"{safe_title(canonical_title)}__{bvid}.md"
+def note_filename(title: str, sequence: int = 1) -> str:
+    stem = safe_title(title)
+    return f"{stem}.md" if sequence == 1 else f"{stem}（{sequence}）.md"
+
+
+def bvid_line(bvid: str) -> str:
+    return f"<small>BV号：{bvid}</small>"
+
+
+_URL_PATTERN = re.compile(r"https?://[^\s<>()]+")
+
+
+def _resource_label(value: str) -> str:
+    return value.strip().strip("⏺️•*-—:： \t")
+
+
+def _description_resources(description: str) -> list[tuple[str, str]]:
+    resources: list[tuple[str, str]] = []
+    previous_label = ""
+    for raw_line in description.splitlines():
+        urls = _URL_PATTERN.findall(raw_line)
+        label = _resource_label(_URL_PATTERN.sub("", raw_line))
+        if not urls:
+            if label:
+                previous_label = label
+            continue
+        for index, url in enumerate(urls, start=1):
+            resource_name = label if label else previous_label
+            resources.append((resource_name or f"UP 主资源 {len(resources) + index}", url))
+        previous_label = ""
+    return resources
 
 
 def quote_description(description: str, status: str) -> str:
@@ -28,26 +67,43 @@ def quote_description(description: str, status: str) -> str:
         return "> **视频简介**\n>\n> 本视频未提供简介。"
     if status != "present":
         raise ValueError("简介状态不是可生成笔记的状态")
-    lines = description.splitlines() or [description]
-    quoted = ["> **视频简介**", ">"]
-    quoted.extend("> " + line if line else ">" for line in lines)
-    return "\n".join(quoted)
+    lines = [line.strip() for line in description.splitlines() if line.strip()]
+    overview = next((line for line in lines if not _URL_PATTERN.search(line) and not line.endswith(("：", ":"))), "UP 主原始简介见下方。")
+    resources = _description_resources(description)
+    result = ["## 视频简介", "", overview]
+    if resources:
+        result.extend(["", "## UP 主资源", ""])
+        result.extend(f"- [{label}]({url})" for label, url in resources)
+    result.extend(
+        [
+            "",
+            "<details>",
+            "<summary>UP 主原始简介</summary>",
+            "",
+            html.escape(description),
+            "",
+            "</details>",
+        ]
+    )
+    return "\n".join(result)
 
 
 def render_note_skeleton(job: dict[str, Any]) -> str:
-    tags = "\n".join(f"  - {tag}" for tag in job["required_tags"])
     description = quote_description(job["description"], job["description_status"])
     bvid = job["bvid"]
+    frontmatter = render_frontmatter(
+        {
+            "author": job["author"],
+            "published": job["published"],
+            "duration": job["duration"],
+            "source": job["canonical_url"],
+        },
+        job["required_tags"],
+    )
     return (
-        "---\n"
-        f"author: {job['author']}\n"
-        f"published: {job['published']}\n"
-        f"duration: {job['duration']}\n"
-        f"source: {job['canonical_url']}\n"
-        "tags:\n"
-        f"{tags}\n"
-        "---\n\n"
+        f"{frontmatter}\n\n"
         f"# {job['canonical_title']}\n\n"
+        f"{bvid_line(bvid)}\n\n"
         f"{description}\n\n"
         "<iframe\n"
         f"  src=\"https://player.bilibili.com/player.html?bvid={bvid}&autoplay=0&danmaku=0\"\n"
@@ -60,15 +116,15 @@ def render_note_skeleton(job: dict[str, Any]) -> str:
         f"{AI_MARKERS['summary'][1]}\n\n"
         f"{AI_MARKERS['steps'][0]}\n"
         "## 怎么做\n\n"
-        "待 Hermes 根据字幕填写。\n"
+        "待智能体根据字幕填写。\n"
         f"{AI_MARKERS['steps'][1]}\n\n"
         f"{AI_MARKERS['pitfalls'][0]}\n"
         "## 容易踩坑\n\n"
-        "待 Hermes 根据字幕填写。\n"
+        "待智能体根据字幕填写。\n"
         f"{AI_MARKERS['pitfalls'][1]}\n\n"
         f"{AI_MARKERS['practice'][0]}\n"
         "**我来实践**\n\n"
-        "- [ ] 待 Hermes 根据字幕填写。\n"
+        "- [ ] 待智能体根据字幕填写。\n"
         f"{AI_MARKERS['practice'][1]}\n"
     )
 

@@ -15,19 +15,19 @@
 
 当前正式流程采用确定性骨架。
 
-### 程序负责，Hermes 不得修改
+### 程序负责，智能体不得修改
 
 - Frontmatter；
-- H1；
+- 收集阶段的 H1、H1 下方 BVID 小字；
 - UP 主原始简介；
 - Bilibili iframe；
 - tags；
 - 文件路径和文件名；
-- `BILI_AI_*_START/END` marker。
+- runtime 草稿中的 `BILI_AI_*_START/END` marker。
 
-### Hermes 负责
+### 智能体负责
 
-只根据字幕与原始简介填写四个 marker 区域：
+只根据字幕与原始简介填写四个 runtime 草稿 marker 区域；finalizer 发布正式笔记时会移除这些 HTML 注释。
 
 1. `BILI_AI_SUMMARY`：先看结论；
 2. `BILI_AI_STEPS`：怎么做；
@@ -40,19 +40,27 @@
 
 一视频一笔记。
 
-文件名：
+收集阶段文件名：
 
 ```text
-{canonical_title}__{bvid}.md
+{原视频标题}.md
 ```
 
 H1：
 
 ```md
-# {canonical_title}
+# {原视频标题}
 ```
 
-BVID 只用于文件级唯一性，不放进 H1。
+BVID 不作为 tag 或文件名后缀，固定放在 H1 与视频简介之间：
+
+```html
+<small>BV号：BV...</small>
+```
+
+同名文件以 `（2）`、`（3）` 递增，避免覆盖。BVID 与规范化 `source` 用于判重。
+
+所有新笔记先进入 `00-待整理`。这是未阅读资料的统一收件箱，不代表已经完成分类。taxonomy 的模型/主题目录只作为阅读后的建议；智能体不得自行跳过 `00-待整理`。
 
 ## Frontmatter
 
@@ -64,7 +72,7 @@ BVID 只用于文件级唯一性，不放进 H1。
 - `source`
 - `tags`
 
-这些字段由程序从 job 数据生成。Hermes 不修正、不补写、不改格式。
+这些字段由程序从 job 数据生成。智能体不修正、不补写、不改格式。
 
 `source` 必须是规范化后的 Bilibili 原视频 URL，不保留分享追踪参数。
 
@@ -78,14 +86,14 @@ BVID 只用于文件级唯一性，不放进 H1。
 - `confirmed_empty`：上游明确提供 description 字段且确认为空；
 - `failed`：无法确认简介，任务停止。
 
-Hermes 不得：
+智能体不得：
 
 - 用 AI 摘要替代原简介；
 - 修改原简介语义；
 - 因字幕完整而省略简介；
 - 把抓取失败当作“视频无简介”。
 
-原始简介中的 URL 文本必须保留。Obsidian 可直接识别裸 URL；不要为了美化而改变目标地址。
+程序把简介显示为“视频简介 + UP 主资源链接 + 可折叠 UP 主原始简介”。链接的目标地址与原文必须完整保留；智能体不得改写资源名称、删去链接或伪造资源。
 
 ## 视频播放
 
@@ -183,13 +191,14 @@ Finalizer 是最终判定者。
 
 一篇完成笔记至少满足：
 
-- 路径和文件名符合 BVID 唯一规则；
+- 路径和文件名符合无覆盖规则，且 H1 下方保留正确 BVID；
 - Frontmatter 值与 job 元数据一致；
 - H1 正确；
 - 原始简介按采集结果完整保留；
 - iframe 使用正确 BVID；
 - required tags 齐全；
 - 四个 AI 区域均已填写；
+- 发布后的正式 Markdown 不含 `BILI_AI_*` marker；
 - 没有机器内部信息；
 - `finalize_ytdlp_bilibili_note.py` 返回 `note_ready`。
 

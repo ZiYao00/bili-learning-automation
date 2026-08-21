@@ -4,30 +4,10 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .note_template import AI_MARKERS, PLACEHOLDER_TEXT, note_filename, quote_description
+from .frontmatter import parse_frontmatter
+from .note_template import AI_MARKERS, PLACEHOLDER_TEXT, bvid_line, quote_description
 
 ALLOWED_FRONTMATTER_FIELDS = {"author", "published", "duration", "source", "tags"}
-
-
-def _parse_frontmatter(text: str) -> tuple[dict[str, str], list[str]]:
-    match = re.match(r"^---\r?\n(.*?)\r?\n---\r?\n", text, re.DOTALL)
-    if not match:
-        return {}, []
-    block = match.group(1)
-    values: dict[str, str] = {}
-    tags: list[str] = []
-    active_key: str | None = None
-    for raw in block.splitlines():
-        if raw.startswith("  - ") and active_key == "tags":
-            tags.append(raw[4:].strip())
-            continue
-        field = re.match(r"^([A-Za-z_][A-Za-z0-9_-]*):\s*(.*)$", raw)
-        if field:
-            active_key = field.group(1)
-            values[active_key] = field.group(2).strip()
-        elif raw.strip():
-            active_key = None
-    return values, tags
 
 
 def validate_note(note: Path, job: dict[str, Any]) -> list[str]:
@@ -36,18 +16,23 @@ def validate_note(note: Path, job: dict[str, Any]) -> list[str]:
     text = note.read_text(encoding="utf-8")
     errors: list[str] = []
 
-    expected_path = Path(job["note_path"])
+    if job.get("schema_version") != 1:
+        errors.append("不支持的 job schema_version")
+
+    expected_path = Path(job.get("draft_path", job["note_path"]))
     if note.resolve() != expected_path.resolve():
         errors.append("笔记路径不符合分类规范")
-    expected_name = note_filename(job["canonical_title"], job["bvid"])
+    expected_name = job["note_filename"]
     if note.name != expected_name:
         errors.append("文件名不符合唯一命名规范")
 
     title_match = re.search(r"^#\s+(.+)$", text, re.MULTILINE)
     if not title_match or title_match.group(1).strip() != job["canonical_title"]:
-        errors.append("H1 不符合标准短标题")
+        errors.append("H1 不符合原视频标题")
+    if bvid_line(job["bvid"]) not in text:
+        errors.append("缺少 BVID 小字标识")
 
-    values, tags = _parse_frontmatter(text)
+    values, tags = parse_frontmatter(text)
     actual_fields = set(values)
     if actual_fields != ALLOWED_FRONTMATTER_FIELDS:
         missing = sorted(ALLOWED_FRONTMATTER_FIELDS - actual_fields)

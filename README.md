@@ -9,8 +9,8 @@
 - 支持 BV 号、标准 Bilibili 视频链接、包含 BV 的复制文本，以及受控的 `b23.tv` 短链解析。
 - 默认使用 `yt-dlp --skip-download`，不下载视频或音频。
 - 保留 UP 主原始简介；简介获取状态区分 `present`、`confirmed_empty`、`failed`。
-- 一视频一笔记，文件名带 BVID，避免同分类视频互相覆盖。
-- Python 生成 Frontmatter、H1、简介、iframe、tags 和输出路径，Hermes 只填写四个 AI 内容区域。
+- 一视频一笔记；BVID 以 H1 下方的小字记录，文件名保持干净，同名时自动使用序号防覆盖。
+- Python 生成 Frontmatter、H1、简介、iframe、tags 和输出路径；所有新笔记先进入 `00-待整理`，接入智能体只填写四个 AI 内容区域。
 - Finalizer 校验真实元数据、简介、iframe、文件名和 AI 区域后才刷新导航。
 - 临时字幕和元数据只保存在 `.runtime/bilibili-learning`，任务结束后清理。
 - Cookie 内容不进入日志、笔记或 Git。
@@ -21,10 +21,10 @@
 复制链接 / BV / b23.tv
 → 输入解析与规范化
 → yt-dlp 仅采集 metadata / description / subtitles
-→ taxonomy 分类
-→ 程序生成确定性 Markdown 骨架
+→ taxonomy 给出标签与后续整理建议
+→ 程序在 runtime 生成确定性 Markdown 草稿
 → 接入智能体仅填写 AI 内容区域
-→ finalizer 强校验
+→ finalizer 强校验后原子发布
 → 刷新 Obsidian 导航
 → 清理临时 job
 ```
@@ -79,9 +79,10 @@ $env:BILI_LEARNING_NOTES_ROOT = 'D:\YourObsidianVault\bilibili'
 优先顺序：
 
 1. 环境变量 `BILI_LEARNING_YTDLP`；
-2. 系统 `PATH` 中的 `yt-dlp`；
+2. Git 忽略的本机配置 `config/local.json`；
+3. 系统 `PATH` 中的 `yt-dlp`；
 
-建议优先把 `yt-dlp` 加入 PATH，或显式设置环境变量。
+新机器建议优先把 `yt-dlp` 加入 PATH，或显式设置环境变量。已部署机器可将本机路径写入 `config/local.json`，该文件不会进入 Git。详见 [配置说明](docs/CONFIGURATION.md)。
 
 ### 3. 配置 Cookie
 
@@ -107,6 +108,12 @@ BILI_LEARNING_COOKIE_FILE
 python .\hermes-skills\bilibili-learning\scripts\doctor_bilibili_learning.py
 ```
 
+供 Hermes、Codex 或其他自动化工具解析的 JSON 诊断：
+
+```powershell
+python .\hermes-skills\bilibili-learning\scripts\doctor_bilibili_learning.py --json
+```
+
 开发环境也可以：
 
 ```powershell
@@ -130,27 +137,49 @@ BV1xxxxxxxxxx
 python .\hermes-skills\bilibili-learning\scripts\prepare_ytdlp_bilibili_note.py "<复制链接或 BV>"
 ```
 
-## 笔记命名
+所有智能体也可直接使用核心 CLI：
 
-采用一视频一笔记：
+```powershell
+bili-learning prepare "<复制链接或 BV>"
+bili-learning finalize --job '<job_dir>' --note '<draft_path>'
+bili-learning organize --note '<已学习笔记>' --title '<短标题>' --intro '<一句简介摘要>'
+```
+
+Hermes 保留原脚本路径作为兼容启动壳，调用的是同一核心 CLI。
+
+## 收件箱、命名与后续整理
+
+所有新笔记先发布到：
 
 ```text
-{canonical_title}__{bvid}.md
+notes/bilibili/00-待整理/
+```
+
+这里是“尚未阅读”的统一收件箱。taxonomy 不再自动把新笔记直接放进模型/主题目录；它只决定 tags 与建议分类，供学习后整理。这样不会把未学习的资料伪装成已整理知识。
+
+收集阶段保留 B站原视频标题，不做 AI 标题改写。采用一视频一笔记：
+
+```text
+{原视频标题}.md
 ```
 
 例如：
 
 ```text
-MiniMax-H3 分段生成__BV1TXua68EYi.md
+H3智能一体化节点重磅升级.md
 ```
 
-H1 仍保持简短：
+H1 默认使用原视频标题，BVID 以小字显示：
 
 ```md
-# MiniMax-H3 分段生成
+# H3智能一体化节点重磅升级
+
+<small>BV号：BV16g8J6AEZD</small>
 ```
 
-这样同类视频不会因为 taxonomy 得到相同短标题而互相覆盖。
+若同目录出现相同原视频标题，系统使用 `（2）`、`（3）` 等无语义序号，绝不覆盖。BVID 不作为 tag 或文件名后缀；判重仍使用 `source` 和 H1 下方的小字。
+
+学习后可通过统一 `organize` 命令一次完成短标题、简介摘要和目录归档；默认按 tags 推断 taxonomy 建议目录，也可显式指定目标目录。详见 [智能体接入协议](docs/AGENT-INTEGRATION.md)。
 
 ## 配置
 
