@@ -9,6 +9,8 @@ description: Turn a Bilibili copied link, supported Bilibili short link, or BV i
 
 本 skill 是 Hermes/微信适配层。通用输入、数据、笔记和 finalizer 约束的唯一来源是项目根目录 `docs\AGENT-INTEGRATION.md`；本文件只保留 Hermes 私聊的触发、调用和回复规则。
 
+`--allow-existing-for-test` 是 Codex 本地回归测试开关；Hermes 入口明确禁止使用，日常链接始终先判重。
+
 只在 owner 私聊中运行；群聊或发送者范围不确定时先确认。
 
 ## Mandatory workflow
