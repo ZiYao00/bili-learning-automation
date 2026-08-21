@@ -7,17 +7,16 @@ from pathlib import Path
 from typing import Any
 
 from .config import Settings
+from .frontmatter import parse_frontmatter
+from .runtime import waiting_file_lock
+
+NAVIGATION_LOCK_TIMEOUT_SECONDS = 30.0
 
 
 def load_note_metadata(path: Path) -> dict[str, object]:
     text = path.read_text(encoding="utf-8")
     title_match = re.search(r"^#\s+(.+)$", text, re.MULTILINE)
-    frontmatter = re.match(r"^---\r?\n(.*?)\r?\n---\r?\n", text, re.DOTALL)
-    tags: list[str] = []
-    if frontmatter:
-        tags_match = re.search(r"(?ms)^tags:\s*\n((?:\s+-\s+.*\r?\n?)*)", frontmatter.group(1))
-        if tags_match:
-            tags = [item.strip() for item in re.findall(r"(?m)^\s+-\s+(.+)$", tags_match.group(1))]
+    _, tags = parse_frontmatter(text)
     return {"title": title_match.group(1).strip() if title_match else path.stem, "tags": tags}
 
 
@@ -29,6 +28,12 @@ def atomic_write(path: Path, content: str) -> None:
 
 
 def build_navigation(settings: Settings) -> None:
+    lock_path = settings.runtime_root / "locks" / "navigation.lock"
+    with waiting_file_lock(lock_path, timeout_seconds=NAVIGATION_LOCK_TIMEOUT_SECONDS):
+        _build_navigation(settings)
+
+
+def _build_navigation(settings: Settings) -> None:
     root = settings.notes_root
     nav_dir = root / settings.navigation_dir
     nav_dir.mkdir(parents=True, exist_ok=True)
@@ -60,12 +65,16 @@ def build_navigation(settings: Settings) -> None:
             if tag in model_names:
                 by_model[tag].append(entry)
 
+    inbox_category = settings.taxonomy["fallback"]["path"][0]
     index_lines = ["# B站视频转笔记导航", "", "## 按领域", ""]
-    for category in sorted(by_top):
+    for category in sorted(set(by_top) | {inbox_category}):
         index_lines.append(f"- [[{settings.navigation_dir}/{category}|{category}]]（{len(by_top[category])}）")
         lines = [f"# {category}", ""]
-        for entry in by_top[category]:
-            lines.append(f"- [[{entry['path']}|{entry['title']}]]")
+        if by_top[category]:
+            for entry in by_top[category]:
+                lines.append(f"- [[{entry['path']}|{entry['title']}]]")
+        else:
+            lines.append("暂无待整理笔记。")
         atomic_write(nav_dir / f"{category}.md", "\n".join(lines) + "\n")
 
     index_lines.extend(["", "## 按模型", ""])

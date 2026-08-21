@@ -1,0 +1,81 @@
+/*
+ * Video Note — Learning Lab Extension v0.1
+ * Requires: learning-lab.css Core v0.3+
+ * Scope: notes with cssclasses: [learning-page, video-note]
+ * Namespace: --vn-* / video-note-*
+ * Goal: keep long source-driven video notes easy to scan without changing their Markdown semantics.
+ */
+
+.learning-page.video-note {
+  --vn-player-radius: var(--ll-radius-lg);
+  --vn-source-surface: var(--ll-surface-soft);
+}
+
+/* ---------- Long video titles ---------- */
+
+.learning-page.video-note h1 {
+  max-width: 26ch;
+  font-size: clamp(1.7rem, 3.3vw, 2.35rem);
+  line-height: 1.12;
+  letter-spacing: -0.028em;
+}
+
+/* ---------- Bilibili player ---------- */
+
+.learning-page.video-note iframe[src*="player.bilibili.com"] {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  margin: 1.15rem 0 1.8rem;
+  border: 1px solid var(--ll-border) !important;
+  border-radius: var(--vn-player-radius);
+  background: #000;
+  overflow: hidden;
+}
+
+/* ---------- Source appendix ---------- */
+
+.learning-page.video-note details.video-note-source-details {
+  margin: 1rem 0 1.5rem;
+  padding: 0.8rem 0.95rem;
+  border: 1px solid var(--ll-border);
+  border-radius: var(--ll-radius-md);
+  background: var(--vn-source-surface);
+  color: var(--ll-muted);
+  font-size: 0.88rem;
+  line-height: 1.62;
+}
+
+.learning-page.video-note details.video-note-source-details > summary {
+  cursor: pointer;
+  color: var(--ll-text);
+  font-weight: 680;
+}
+
+.learning-page.video-note details.video-note-source-details[open] > summary {
+  margin-bottom: 0.7rem;
+}
+
+/* ---------- Dense knowledge pages ---------- */
+
+.learning-page.video-note .callout[data-callout="summary"] {
+  margin-top: 0.9rem;
+}
+
+.learning-page.video-note .callout[data-callout="risk"],
+.learning-page.video-note .callout[data-callout="resource"],
+.learning-page.video-note .callout[data-callout="meta"] {
+  max-width: 100%;
+}
+
+@media (max-width: 720px) {
+  .learning-page.video-note h1 {
+    max-width: none;
+    font-size: clamp(1.55rem, 7vw, 2rem);
+  }
+
+  .learning-page.video-note iframe[src*="player.bilibili.com"] {
+    margin-block: 0.95rem 1.45rem;
+    border-radius: var(--ll-radius-md);
+  }
+}

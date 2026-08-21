@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "bili-learning-automation"
 version = "0.1.0"
-description = "Subtitle-first Bilibili-to-Obsidian learning-note automation for Hermes, without downloading media."
+description = "Subtitle-first Bilibili-to-Obsidian learning-note automation for local agents, without downloading media."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = []
@@ -32,7 +32,7 @@ testpaths = ["tests"]
 [tool.ruff]
 target-version = "py310"
 line-length = 120
-exclude = ["hermes-skills/bilibili-learning/scripts/prepare_bilibili_learning.py"]
+exclude = ["hermes-skills/bili-learning-automation/scripts/prepare_bilibili_learning.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]

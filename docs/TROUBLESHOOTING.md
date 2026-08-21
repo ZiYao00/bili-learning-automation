@@ -3,7 +3,7 @@
 优先执行：
 
 ```powershell
-python .\hermes-skills\bilibili-learning\scripts\doctor_bilibili_learning.py
+python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py
 ```
 
 ## 未找到 yt-dlp
@@ -24,11 +24,24 @@ python .\hermes-skills\bilibili-learning\scripts\doctor_bilibili_learning.py
 
 ## `note_invalid`
 
-Finalizer 会检查真实 Frontmatter 值、H1、BVID 文件名、完整简介、iframe、规范 tags 和四个 AI 内容区域。当前 job 生成的无效笔记会改名为 `.md.invalid`（若重名则带时间戳）保留现场，同时释放正式 `.md` 路径，便于重新发起任务。不要绕过 finalizer。
+Finalizer 会检查真实 Frontmatter 值、原视频 H1、H1 下方 BVID 小字、完整简介结构、iframe、规范 tags、两个 AI 内容区域和质量流程状态。无效草稿不会发布；job 会在清理阶段从 runtime 精确删除，同时释放正式路径，便于重新发起任务。不要绕过 finalizer。
 
-## `already_exists`
+## `organize` 失败
 
-系统按 canonical source URL 判重。旧笔记即使没有 BVID 文件名，只要 source 已存在，也会被识别。
+确认 `--note` 是 notes root 内的正式笔记、`--title` 与 `--intro` 非空、`--category`（如提供）是项目内相对目录。不要手动移动文件；核心会在安全发布后删除旧位置并重建导航。
+
+## Obsidian 笔记有内容但没有新版样式
+
+先确认本仓库的两个文件：
+
+```text
+obsidian/snippets/learning-lab.css
+obsidian/snippets/video-note.css
+```
+
+已经复制到**当前打开 Vault 根目录**的 `.obsidian/snippets/`，并在 **设置 → 外观 → CSS 代码片段** 中同时启用。`video-note.css` 依赖 `learning-lab.css`，只启用扩展文件不完整。
+
+如果 `BILI_LEARNING_NOTES_ROOT` 是 Vault 内的子目录，不要把 CSS 放到这个子目录下；应放到真正包含 `.obsidian` 的 Vault 根目录。新生成笔记应自动带有 `learning-page` 与 `video-note` 两个 cssclasses。完整教程见 `docs/OBSIDIAN-STYLING.md`。
 
 ## 短链无法解析
 

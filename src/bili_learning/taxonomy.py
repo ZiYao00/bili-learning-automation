@@ -31,11 +31,11 @@ def classify(info: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
         ),
         config["fallback"],
     )
-    task = route["task"]
-    title = f"{model} {task}" if model else task
     required_tags = list(dict.fromkeys([*route["tags"], *([model] if model else [])]))
     return {
-        "category_path": route["path"],
-        "canonical_title": title,
+        "category_path": config["fallback"]["path"],
+        "suggested_category_path": route["path"],
+        "suggested_route_id": route.get("id", "fallback"),
+        "suggested_title": route.get("title", route["task"]),
         "required_tags": required_tags,
     }

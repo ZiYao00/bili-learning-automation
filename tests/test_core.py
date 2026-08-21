@@ -2,16 +2,37 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
 
-from bili_learning.collector import cleanup_stale_jobs, create_job, description_state, run_ytdlp
-from bili_learning.config import Settings, load_settings, validate_taxonomy
+import bili_learning.navigation as navigation
+from bili_learning.collector import (
+    cleanup_stale_jobs,
+    create_job,
+    description_state,
+    run_ytdlp,
+    select_subtitle,
+)
+from bili_learning.config import ExecutableResolution, Settings, find_ytdlp, load_settings, validate_taxonomy
+from bili_learning.doctor import doctor_report
+from bili_learning.frontmatter import parse_frontmatter, parse_frontmatter_list
 from bili_learning.input_resolver import resolve_input
-from bili_learning.note_template import note_filename, render_note_skeleton
-from bili_learning.runtime import file_lock, safe_job_path
+from bili_learning.lifecycle import finalize_note, prepare_note
+from bili_learning.note_template import bvid_line, note_filename, quote_description, render_note_skeleton
+from bili_learning.organizer import organize_note
+from bili_learning.publisher import publish_validated_draft
+from bili_learning.runtime import (
+    ReservationBusyError,
+    bind_reservation,
+    claim_reservation,
+    cleanup_job,
+    file_lock,
+    safe_job_path,
+)
 from bili_learning.taxonomy import classify
 from bili_learning.validator import validate_note
 
@@ -54,23 +75,89 @@ def test_reject_non_bilibili_url_without_bvid() -> None:
 
 def test_taxonomy_classification(taxonomy: dict) -> None:
     filing = classify({"title": "H3 分段工作流", "description": "", "tags": []}, taxonomy)
-    assert filing["canonical_title"] == "MiniMax-H3 分段生成"
-    assert filing["category_path"] == ["01-视频生成", "01-MiniMax-H3"]
+    assert filing["suggested_title"] == "分段生成"
+    assert filing["category_path"] == ["00-待整理"]
+    assert filing["suggested_category_path"] == ["01-视频生成", "01-MiniMax-H3"]
+    assert filing["suggested_route_id"] == "h3_segment"
 
 
-def test_note_filename_is_unique_per_bvid() -> None:
-    first = note_filename("MiniMax-H3 分段生成", "BV1TXua68EYi")
-    second = note_filename("MiniMax-H3 分段生成", "BV1os8G6zEnU")
-    assert first != second
-    assert first.endswith("__BV1TXua68EYi.md")
+def test_note_filename_uses_a_clean_title_and_collision_sequence() -> None:
+    assert note_filename("MiniMax-H3 分段生成") == "MiniMax-H3 分段生成.md"
+    assert note_filename("MiniMax-H3 分段生成", 2) == "MiniMax-H3 分段生成（2）.md"
+
+
+def test_taxonomy_uses_a_specific_topic_title_in_the_inbox(taxonomy: dict) -> None:
+    taxonomy["routes"].insert(
+        0,
+        {
+            "id": "h3_grid",
+            "path": ["01-视频生成", "01-MiniMax-H3"],
+            "all_patterns": ["H3"],
+            "any_patterns": ["9宫格"],
+            "task": "9宫格",
+            "title": "9宫格提示词模板",
+            "tags": ["视频生成", "工作流", "9宫格"],
+        },
+    )
+    filing = classify({"title": "MiniMax H3 9宫格实测", "description": "", "tags": []}, taxonomy)
+    assert filing["suggested_title"] == "9宫格提示词模板"
+    assert filing["category_path"] == ["00-待整理"]
+
+
+def test_taxonomy_uses_node_prompt_topic_title_in_the_inbox(taxonomy: dict) -> None:
+    taxonomy["routes"].insert(
+        0,
+        {
+            "id": "h3_node_prompt",
+            "path": ["01-视频生成", "01-MiniMax-H3"],
+            "all_patterns": ["H3", "节点", "提示词优化"],
+            "task": "节点升级",
+            "title": "节点升级与提示词优化",
+            "tags": ["视频生成", "工作流", "节点", "提示词优化"],
+        },
+    )
+    filing = classify(
+        {"title": "H3智能一体化节点重磅升级，支持本地提示词优化", "description": "", "tags": []}, taxonomy
+    )
+    assert filing["suggested_title"] == "节点升级与提示词优化"
+    assert filing["required_tags"] == ["视频生成", "工作流", "节点", "提示词优化", "MiniMax-H3"]
 
 
 def test_description_states() -> None:
     assert description_state({"description": "hello"}) == ("present", "hello")
     assert description_state({"description": ""}) == ("confirmed_empty", "")
-    assert description_state({"description": None}) == ("confirmed_empty", "")
+    assert description_state({"description": None}) == ("failed", "")
     assert description_state({}) == ("failed", "")
     assert description_state({"description": 123}) == ("failed", "")
+    assert description_state({"description": "info"}, "sidecar") == ("failed", "")
+    assert description_state({"description": "info\n"}, "info") == ("present", "info")
+
+
+def test_description_renders_compact_resources_and_preserves_raw_source() -> None:
+    description = "节点升级说明\n工作流地址：\nhttps://example.com/workflow\n仓库：https://example.com/repo"
+    rendered = quote_description(description, "present")
+    assert "## 视频资料" in rendered
+    assert "### 视频简介" in rendered
+    assert "- [工作流地址](https://example.com/workflow)" in rendered
+    assert "- [仓库](https://example.com/repo)" in rendered
+    assert '<details class="video-note-source-details">' in rendered
+    assert "<summary>UP 主原始简介</summary>" in rendered
+    assert description in rendered
+
+
+def test_description_resource_labels_include_section_type_and_platform() -> None:
+    description = (
+        "涉及插件：\n"
+        "MieNodes: https://github.com/MieMieeeee/ComfyUI-MieNodes\n"
+        "资料：\n"
+        "MiniMax H3 模型提示词指令：https://example.feishu.cn/wiki/prompt\n"
+        "工作流：https://pan.quark.cn/s/workflow"
+    )
+    rendered = quote_description(description, "present")
+    assert "[GitHub 插件 · MieNodes](https://github.com/MieMieeeee/ComfyUI-MieNodes)" in rendered
+    assert "[MiniMax H3 模型提示词指令（飞书）](https://example.feishu.cn/wiki/prompt)" in rendered
+    assert "[工作流（夸克网盘）](https://pan.quark.cn/s/workflow)" in rendered
+    assert description in rendered
 
 
 def test_taxonomy_rejects_duplicate_route_ids(taxonomy: dict) -> None:
@@ -92,16 +179,34 @@ def test_notes_root_comes_from_taxonomy(tmp_path: Path, taxonomy: dict, monkeypa
 
 def _complete_ai_regions(text: str) -> str:
     return (
-        text.replace("> 待 Hermes 根据字幕填写。", "> 这是结论。")
-        .replace("待 Hermes 根据字幕填写。", "1. 这是步骤。", 1)
-        .replace("待 Hermes 根据字幕填写。", "- 这是坑点。", 1)
-        .replace("- [ ] 待 Hermes 根据字幕填写。", "- [ ] 完成一次最小测试。")
+        text.replace("> 待智能体根据字幕填写。", "> 这是结论。")
+        .replace(
+            "待智能体根据字幕填写。根据视频实际内容组织知识正文；不要套固定章节。",
+            "## 核心知识\n\n这是根据字幕整理的动态正文。",
+        )
+    )
+
+
+def _write_passed_analysis(path: Path) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "source_assessment": {"status": "sufficient", "reason": "字幕连续且足以支撑示例笔记。"},
+                "knowledge_outline": ["核心知识"],
+                "coverage_review": {"status": "passed", "notes": "已对照知识清单复核正文。"},
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
     )
 
 
 def test_validator_checks_real_metadata_and_markers(tmp_path: Path) -> None:
-    note = tmp_path / "MiniMax-H3 分段生成__BV1TXua68EYi.md"
+    note = tmp_path / "H3 分段工作流.md"
     job = {
+        "schema_version": 1,
         "bvid": "BV1TXua68EYi",
         "canonical_url": "https://www.bilibili.com/video/BV1TXua68EYi/",
         "author": "UP",
@@ -109,14 +214,83 @@ def test_validator_checks_real_metadata_and_markers(tmp_path: Path) -> None:
         "duration": "07:05",
         "description": "原始简介",
         "description_status": "present",
-        "canonical_title": "MiniMax-H3 分段生成",
+        "canonical_title": "H3 分段工作流",
+        "note_filename": note.name,
         "required_tags": ["视频生成", "MiniMax-H3"],
         "note_path": str(note),
+        "analysis_path": str(tmp_path / "analysis.json"),
     }
+    _write_passed_analysis(Path(job["analysis_path"]))
     note.write_text(_complete_ai_regions(render_note_skeleton(job)), encoding="utf-8")
     assert validate_note(note, job) == []
-    note.write_text(note.read_text(encoding="utf-8").replace("author: UP", "author: OTHER"), encoding="utf-8")
+    note.write_text(
+        note.read_text(encoding="utf-8").replace('author: "UP"', 'author: "OTHER"'), encoding="utf-8"
+    )
     assert any("author" in error for error in validate_note(note, job))
+
+
+def test_validator_rejects_a_card_without_grid_nesting(tmp_path: Path) -> None:
+    note = tmp_path / "卡片嵌套.md"
+    analysis = tmp_path / "analysis.json"
+    job = {
+        "schema_version": 1,
+        "bvid": "BV1TXua68EYi",
+        "canonical_url": "https://www.bilibili.com/video/BV1TXua68EYi/",
+        "author": "UP",
+        "published": "2026-08-11",
+        "duration": "07:05",
+        "description": "原始简介",
+        "description_status": "present",
+        "canonical_title": "卡片嵌套",
+        "note_filename": note.name,
+        "required_tags": ["视频生成"],
+        "note_path": str(note),
+        "analysis_path": str(analysis),
+    }
+    _write_passed_analysis(analysis)
+    base = _complete_ai_regions(render_note_skeleton(job))
+    note.write_text(base + "\n> [!card] 错误\n> 单层卡片\n", encoding="utf-8")
+    assert any("Card 必须嵌套" in error for error in validate_note(note, job))
+
+    note.write_text(
+        base + "\n> [!grid-2]\n>\n> > [!card] 正确\n> > 嵌套卡片\n",
+        encoding="utf-8",
+    )
+    assert validate_note(note, job) == []
+
+
+def test_validator_rejects_unfinished_quality_review(tmp_path: Path) -> None:
+    note = tmp_path / "质量复核.md"
+    analysis = tmp_path / "analysis.json"
+    job = {
+        "schema_version": 1,
+        "bvid": "BV1TXua68EYi",
+        "canonical_url": "https://www.bilibili.com/video/BV1TXua68EYi/",
+        "author": "UP",
+        "published": "2026-08-11",
+        "duration": "07:05",
+        "description": "原始简介",
+        "description_status": "present",
+        "canonical_title": "质量复核",
+        "note_filename": note.name,
+        "required_tags": ["视频生成"],
+        "note_path": str(note),
+        "analysis_path": str(analysis),
+    }
+    note.write_text(_complete_ai_regions(render_note_skeleton(job)), encoding="utf-8")
+    analysis.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "source_assessment": {"status": "sufficient", "reason": "字幕足够。"},
+                "knowledge_outline": ["核心知识"],
+                "coverage_review": {"status": "pending", "notes": ""},
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    assert any("coverage_review" in error for error in validate_note(note, job))
 
 
 def test_safe_job_path_blocks_escape(tmp_path: Path) -> None:
@@ -146,11 +320,12 @@ def _settings(tmp_path: Path, taxonomy: dict) -> Settings:
         navigation_dir="99-导航",
         runtime_root=runtime_root,
         cookie_file=cookie_file,
-        ytdlp=ytdlp,
+        ytdlp=ExecutableResolution(ytdlp, "test", ("test",)),
+        local_config_path=tmp_path / "config" / "local.json",
     )
 
 
-def test_create_job_writes_bvid_skeleton(tmp_path: Path, taxonomy: dict) -> None:
+def test_create_job_writes_runtime_draft_without_publishing_note(tmp_path: Path, taxonomy: dict) -> None:
     settings = _settings(tmp_path, taxonomy)
     job_dir = settings.runtime_root / "job"
     job_dir.mkdir(parents=True)
@@ -171,10 +346,70 @@ def test_create_job_writes_bvid_skeleton(tmp_path: Path, taxonomy: dict) -> None
         subtitle,
         job_dir,
     )
-    note = Path(payload["note_path"])
-    assert note.name == "MiniMax-H3 分段生成__BV1TXua68EYi.md"
-    assert note.is_file()
-    assert "source: https://www.bilibili.com/video/BV1TXua68EYi/" in note.read_text(encoding="utf-8")
+    note_path = Path(payload["note_path"])
+    draft_path = Path(payload["draft_path"])
+    assert note_path.name == "H3 分段工作流.md"
+    assert not note_path.exists()
+    assert draft_path.parent == job_dir
+    assert draft_path.name == note_path.name
+    analysis_path = Path(payload["analysis_path"])
+    assert analysis_path.parent == job_dir
+    assert json.loads(analysis_path.read_text(encoding="utf-8"))["source_assessment"]["status"] == "pending"
+    draft_text = draft_path.read_text(encoding="utf-8")
+    assert 'source: "https://www.bilibili.com/video/BV1TXua68EYi/"' in draft_text
+    assert bvid_line("BV1TXua68EYi") in draft_text
+    assert parse_frontmatter_list(draft_text, "cssclasses") == ["learning-page", "video-note"]
+    assert (
+        draft_text.find("<!-- BILI_AI_SUMMARY_START -->")
+        < draft_text.find("https://player.bilibili.com/player.html")
+        < draft_text.find("<!-- BILI_AI_BODY_START -->")
+        < draft_text.find("## 视频资料")
+    )
+
+
+def test_frontmatter_quotes_yaml_special_characters_round_trip() -> None:
+    job = {
+        "author": "A: # [creator]",
+        "published": "2026-08-20",
+        "duration": "07:05",
+        "canonical_url": "https://www.bilibili.com/video/BV1TXua68EYi/?a=b#c",
+        "required_tags": ["true", "[模型]", "a: b"],
+    }
+    text = render_note_skeleton(
+        {
+            **job,
+            "bvid": "BV1TXua68EYi",
+            "description": "简介",
+            "description_status": "present",
+            "canonical_title": "测试",
+        }
+    )
+    values, tags = parse_frontmatter(text)
+    assert values["author"] == job["author"]
+    assert values["source"] == job["canonical_url"]
+    assert tags == job["required_tags"]
+    assert parse_frontmatter_list(text, "cssclasses") == ["learning-page", "video-note"]
+
+
+def test_publish_validated_draft_is_no_overwrite(tmp_path: Path) -> None:
+    draft = tmp_path / "runtime" / "MiniMax-H3 分段生成__BV1TXua68EYi.md"
+    target = tmp_path / "notes" / draft.name
+    draft.parent.mkdir(parents=True)
+    draft.write_text("validated note", encoding="utf-8")
+    publish_validated_draft(draft, target)
+    assert target.read_text(encoding="utf-8") == "validated note"
+    assert draft.is_file()
+    with pytest.raises(FileExistsError):
+        publish_validated_draft(draft, target)
+
+
+def test_publish_removes_runtime_only_ai_markers(tmp_path: Path) -> None:
+    draft = tmp_path / "runtime" / "draft.md"
+    target = tmp_path / "notes" / "published.md"
+    draft.parent.mkdir(parents=True)
+    draft.write_text("<!-- BILI_AI_SUMMARY_START -->\n内容\n<!-- BILI_AI_SUMMARY_END -->\n", encoding="utf-8")
+    publish_validated_draft(draft, target)
+    assert target.read_text(encoding="utf-8") == "\n内容\n\n"
 
 
 def test_cleanup_stale_jobs_keeps_locks(tmp_path: Path, taxonomy: dict) -> None:
@@ -190,6 +425,237 @@ def test_cleanup_stale_jobs_keeps_locks(tmp_path: Path, taxonomy: dict) -> None:
     assert cleanup_stale_jobs(settings) == 1
     assert not stale_job.exists()
     assert locks.is_dir()
+
+
+def test_reservation_spans_job_lifecycle_and_cleanup_releases_it(tmp_path: Path) -> None:
+    runtime = tmp_path / ".runtime" / "bilibili-learning"
+    reservation = claim_reservation(runtime, "BV1TXua68EYi")
+    with pytest.raises(ReservationBusyError):
+        claim_reservation(runtime, "BV1TXua68EYi")
+
+    job = runtime / "BV1TXua68EYi-job"
+    job.mkdir()
+    (job / "job.json").write_text(json.dumps({"bvid": "BV1TXua68EYi"}), encoding="utf-8")
+    bind_reservation(reservation, job)
+    cleanup_job(runtime, job)
+    assert not job.exists()
+    assert claim_reservation(runtime, "BV1TXua68EYi").path.is_file()
+
+
+def test_core_prepare_dry_run_returns_versioned_status_and_releases_reservation(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "bilibili-note-taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
+    monkeypatch.delenv("BILI_LEARNING_NOTES_ROOT", raising=False)
+    payload, code = prepare_note(tmp_path, "BV1TXua68EYi", dry_run=True)
+    assert code == 0
+    assert payload["schema_version"] == 1
+    assert payload["status"] == "ready_to_process"
+    locks = tmp_path / ".runtime" / "bilibili-learning" / "locks"
+    assert not list(locks.glob("*.reservation.json"))
+
+
+def test_prepare_allows_a_new_note_for_an_existing_source(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_e2e_config(tmp_path, taxonomy)
+    existing = tmp_path / "notes" / "bilibili" / "archived.md"
+    existing.parent.mkdir(parents=True)
+    existing.write_text(
+        '---\nsource: "https://www.bilibili.com/video/BV1TXua68EYi/"\n---\n\n# 已归档\n', encoding="utf-8"
+    )
+    monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", _fake_ytdlp)
+    monkeypatch.setattr("bili_learning.lifecycle._schedule_failsafe_cleanup", lambda *args: None)
+    payload, code = prepare_note(tmp_path, "BV1TXua68EYi")
+    assert code == 0 and payload["status"] == "materials_ready"
+    assert Path(payload["note_path"]).name == "H3 分段工作流.md"
+
+
+def _write_e2e_config(project_root: Path, taxonomy: dict) -> None:
+    config_dir = project_root / "config"
+    config_dir.mkdir()
+    (config_dir / "bilibili-note-taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
+
+
+def _fake_ytdlp(_settings: Settings, job_dir: Path, canonical_url: str) -> None:
+    bvid = canonical_url.rstrip("/").rsplit("/", 1)[-1]
+    info = {
+        "title": "H3 分段工作流",
+        "description": "原始简介",
+        "tags": [],
+        "uploader": "UP",
+        "upload_date": "20260811",
+        "duration": 425,
+    }
+    (job_dir / f"{bvid}.info.json").write_text(json.dumps(info), encoding="utf-8")
+    (job_dir / f"{bvid}.description").write_text("原始简介", encoding="utf-8")
+    (job_dir / f"{bvid}.ai-zh.srt").write_text("1\n00:00:00,000 --> 00:00:01,000\n字幕\n", encoding="utf-8")
+
+
+def test_e2e_draft_publish_navigation_and_repeated_video(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_e2e_config(tmp_path, taxonomy)
+    monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", _fake_ytdlp)
+    monkeypatch.setattr("bili_learning.lifecycle._schedule_failsafe_cleanup", lambda *args: None)
+
+    first, code = prepare_note(tmp_path, "BV1TXua68EYi")
+    assert code == 0 and first["status"] == "materials_ready"
+    draft = Path(first["draft_path"])
+    target = Path(first["note_path"])
+    assert draft.is_file() and not target.exists()
+
+    draft.write_text(_complete_ai_regions(draft.read_text(encoding="utf-8")), encoding="utf-8")
+    _write_passed_analysis(Path(first["analysis_path"]))
+    completed, code = finalize_note(tmp_path, Path(first["job_dir"]), draft)
+    assert code == 0 and completed["status"] == "note_ready"
+    assert target.is_file()
+    assert "BILI_AI_" not in target.read_text(encoding="utf-8")
+    assert not Path(first["job_dir"]).exists()
+    nav = tmp_path / "notes" / "bilibili" / "99-导航" / "首页.md"
+    assert nav.is_file()
+
+    repeated, code = prepare_note(tmp_path, "BV1TXua68EYi")
+    assert code == 0 and repeated["status"] == "materials_ready"
+    assert Path(repeated["note_path"]).name == "H3 分段工作流（2）.md"
+
+
+def test_e2e_unfinished_draft_never_enters_navigation_and_invalid_draft_is_not_published(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_e2e_config(tmp_path, taxonomy)
+    monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", _fake_ytdlp)
+    monkeypatch.setattr("bili_learning.lifecycle._schedule_failsafe_cleanup", lambda *args: None)
+
+    unfinished, code = prepare_note(tmp_path, "BV1TXua68EYi")
+    assert code == 0 and unfinished["status"] == "materials_ready"
+    finished, code = prepare_note(tmp_path, "BV1os8G6zEnU")
+    assert code == 0 and finished["status"] == "materials_ready"
+    finished_draft = Path(finished["draft_path"])
+    finished_draft.write_text(_complete_ai_regions(finished_draft.read_text(encoding="utf-8")), encoding="utf-8")
+    _write_passed_analysis(Path(finished["analysis_path"]))
+    completed, code = finalize_note(tmp_path, Path(finished["job_dir"]), finished_draft)
+    assert code == 0 and completed["status"] == "note_ready"
+    nav_text = (tmp_path / "notes" / "bilibili" / "99-导航" / "00-待整理.md").read_text(encoding="utf-8")
+    assert "H3 分段工作流" in nav_text
+
+    invalid, code = finalize_note(tmp_path, Path(unfinished["job_dir"]), Path(unfinished["draft_path"]))
+    assert code == 2 and invalid["status"] == "note_invalid"
+    assert Path(unfinished["note_path"]).name == "H3 分段工作流.md"
+    assert Path(finished["note_path"]).name == "H3 分段工作流（2）.md"
+    assert Path(finished["note_path"]).exists()
+    assert not Path(unfinished["job_dir"]).exists()
+
+
+def test_source_insufficient_is_cleaned_without_publishing(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_e2e_config(tmp_path, taxonomy)
+    monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", _fake_ytdlp)
+    monkeypatch.setattr("bili_learning.lifecycle._schedule_failsafe_cleanup", lambda *args: None)
+
+    prepared, code = prepare_note(tmp_path, "BV1TXua68EYi")
+    assert code == 0 and prepared["status"] == "materials_ready"
+    analysis = Path(prepared["analysis_path"])
+    analysis.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "source_assessment": {"status": "insufficient", "reason": "关键参数只能从画面确认。"},
+                "knowledge_outline": [],
+                "coverage_review": {"status": "not_applicable", "notes": ""},
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    result, code = finalize_note(tmp_path, Path(prepared["job_dir"]), Path(prepared["draft_path"]))
+    assert code == 2
+    assert result["status"] == "source_insufficient"
+    assert not Path(prepared["note_path"]).exists()
+    assert not Path(prepared["job_dir"]).exists()
+
+
+def test_organize_note_updates_title_intro_moves_and_rebuilds_navigation(tmp_path: Path, taxonomy: dict) -> None:
+    settings = _settings(tmp_path, taxonomy)
+    source = settings.notes_root / "00-待整理" / "H3 分段工作流.md"
+    source.parent.mkdir(parents=True)
+    job = {
+        "bvid": "BV1TXua68EYi",
+        "author": "UP",
+        "published": "2026-08-11",
+        "duration": "07:05",
+        "canonical_url": "https://www.bilibili.com/video/BV1TXua68EYi/",
+        "required_tags": ["视频生成", "工作流", "MiniMax-H3"],
+        "description": "原始说明\n工作流：\nhttps://example.com/workflow",
+        "description_status": "present",
+        "canonical_title": "H3 分段工作流",
+    }
+    source.write_text(
+        _complete_ai_regions(render_note_skeleton(job)).replace("<!-- BILI_AI_SUMMARY_START -->", "").replace("<!-- BILI_AI_SUMMARY_END -->", "").replace("<!-- BILI_AI_BODY_START -->", "").replace("<!-- BILI_AI_BODY_END -->", ""),
+        encoding="utf-8",
+    )
+    target = organize_note(settings, source, "H3 分段生成", "将长视频拆成连续片段生成。")
+    assert target == settings.notes_root / "01-视频生成" / "01-MiniMax-H3" / "H3 分段生成.md"
+    assert not source.exists()
+    organized = target.read_text(encoding="utf-8")
+    assert organized.startswith("---")
+    assert "# H3 分段生成" in organized
+    assert "将长视频拆成连续片段生成。" in organized
+    assert bvid_line("BV1TXua68EYi") in organized
+    assert (settings.notes_root / "99-导航" / "01-视频生成.md").is_file()
+    assert "00-待整理]]（0）" in (settings.notes_root / "99-导航" / "首页.md").read_text(encoding="utf-8")
+
+
+def test_organize_note_migrates_a_legacy_description_and_bvid_filename(tmp_path: Path, taxonomy: dict) -> None:
+    settings = _settings(tmp_path, taxonomy)
+    source = settings.notes_root / "00-待整理" / "旧标题__BV1TXua68EYi.md"
+    source.parent.mkdir(parents=True)
+    source.write_text(
+        "---\nsource: \"https://www.bilibili.com/video/BV1TXua68EYi/\"\ntags:\n  - \"视频生成\"\n  - \"工作流\"\n---\n\n"
+        "# 旧标题\n\n> **视频简介**\n>\n> 原始说明\n> 工作流：\n> https://example.com/workflow\n\n"
+        "<iframe src=\"https://player.bilibili.com/player.html?bvid=BV1TXua68EYi\"></iframe>\n",
+        encoding="utf-8",
+    )
+    target = organize_note(settings, source, "整理后标题", "整理后的简介摘要。")
+    text = target.read_text(encoding="utf-8")
+    assert target.name == "整理后标题.md"
+    assert bvid_line("BV1TXua68EYi") in text
+    assert "## 视频资料" in text
+    assert "### UP 主资源" in text
+    assert "[工作流](https://example.com/workflow)" in text
+    assert '<details class="video-note-source-details">' in text
+    assert "<summary>UP 主原始简介</summary>" in text
+
+
+def test_navigation_rebuilds_are_serialized(tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = _settings(tmp_path, taxonomy)
+    active = 0
+    maximum_active = 0
+    entered = threading.Event()
+    state_lock = threading.Lock()
+
+    def slow_build(_settings: Settings) -> None:
+        nonlocal active, maximum_active
+        with state_lock:
+            active += 1
+            maximum_active = max(maximum_active, active)
+            entered.set()
+        time.sleep(0.15)
+        with state_lock:
+            active -= 1
+
+    monkeypatch.setattr(navigation, "_build_navigation", slow_build)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first = executor.submit(navigation.build_navigation, settings)
+        assert entered.wait(timeout=1)
+        second = executor.submit(navigation.build_navigation, settings)
+        first.result(timeout=2)
+        second.result(timeout=2)
+    assert maximum_active == 1
 
 
 def test_ytdlp_command_never_downloads_media(
@@ -215,7 +681,58 @@ def test_ytdlp_command_never_downloads_media(
     assert "--skip-download" in command
     assert "--write-subs" in command
     assert "--write-auto-subs" in command
+    assert command[command.index("--sub-format") + 1] == "srt"
     assert captured["timeout"] == 180
+
+
+def test_select_subtitle_only_accepts_supported_srt_languages(tmp_path: Path) -> None:
+    (tmp_path / "video.zh-Hans.srt").write_text("字幕", encoding="utf-8")
+    (tmp_path / "video.ai-zh.srt").write_text("AI 字幕", encoding="utf-8")
+    (tmp_path / "video.zh-Hans.json").write_text("{}", encoding="utf-8")
+    assert select_subtitle(tmp_path) == tmp_path / "video.ai-zh.srt"
+
+
+def test_ytdlp_resolution_prefers_environment_then_local_then_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("BILI_LEARNING_YTDLP", "C:/configured/yt-dlp.exe")
+    assert find_ytdlp(tmp_path, {"ytdlp": "local/yt-dlp"}).source == "environment"
+    monkeypatch.delenv("BILI_LEARNING_YTDLP")
+    local = find_ytdlp(tmp_path, {"ytdlp": "local/yt-dlp"})
+    assert local.source == "local_config"
+    assert local.path == tmp_path / "local" / "yt-dlp"
+    monkeypatch.setattr("bili_learning.config.shutil.which", lambda _: "C:/PATH/yt-dlp.exe")
+    assert find_ytdlp(tmp_path, {}).source == "path"
+
+
+def test_load_settings_reads_ignored_local_config(tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "bilibili-note-taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
+    (config_dir / "local.json").write_text(json.dumps({"ytdlp": "tools/yt-dlp.exe"}), encoding="utf-8")
+    monkeypatch.delenv("BILI_LEARNING_YTDLP", raising=False)
+    monkeypatch.setattr("bili_learning.config.shutil.which", lambda _: None)
+    settings = load_settings(tmp_path)
+    assert settings.ytdlp.source == "local_config"
+    assert settings.ytdlp.path == tmp_path / "tools" / "yt-dlp.exe"
+
+
+def test_doctor_reports_ytdlp_source_and_version(tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = _settings(tmp_path, taxonomy)
+
+    class Completed:
+        returncode = 0
+        stdout = "2026.08.20\n"
+        stderr = ""
+
+    monkeypatch.setattr("bili_learning.doctor.subprocess.run", lambda *args, **kwargs: Completed())
+    report = doctor_report(settings)
+    ytdlp = next(check for check in report["checks"] if check["code"] == "ytdlp_ready")
+    assert ytdlp["source"] == "test"
+    assert ytdlp["version"] == "2026.08.20"
+    assert {"python_version", "project_root_exists", "notes_root_writable", "runtime_root_writable"} <= {
+        check["code"] for check in report["checks"]
+    }
 
 
 def test_file_lock_blocks_concurrent_owner(tmp_path: Path) -> None:
