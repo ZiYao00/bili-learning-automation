@@ -376,6 +376,22 @@ def test_core_prepare_dry_run_returns_versioned_status_and_releases_reservation(
     assert not list(locks.glob("*.reservation.json"))
 
 
+def test_prepare_test_override_allows_an_existing_source(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_e2e_config(tmp_path, taxonomy)
+    existing = tmp_path / "notes" / "bilibili" / "archived.md"
+    existing.parent.mkdir(parents=True)
+    existing.write_text(
+        '---\nsource: "https://www.bilibili.com/video/BV1TXua68EYi/"\n---\n\n# 已归档\n', encoding="utf-8"
+    )
+    monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", _fake_ytdlp)
+    monkeypatch.setattr("bili_learning.lifecycle._schedule_failsafe_cleanup", lambda *args: None)
+    payload, code = prepare_note(tmp_path, "BV1TXua68EYi", allow_existing_for_test=True)
+    assert code == 0 and payload["status"] == "materials_ready"
+    assert payload["test_mode"] is True
+
+
 def _write_e2e_config(project_root: Path, taxonomy: dict) -> None:
     config_dir = project_root / "config"
     config_dir.mkdir()

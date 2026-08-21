@@ -32,6 +32,16 @@ python -m pytest -q
 - Cookie 只能作为 yt-dlp 的本地文件参数使用，不能读取内容。
 - cleanup 只能作用于 `.runtime/bilibili-learning` 下的 job。
 
+## 已归档视频回归测试
+
+如需对已归档视频重新完整转换，仅可在受控的 Codex 本地测试中明确使用：
+
+```powershell
+bili-learning prepare --allow-existing-for-test "<链接或 BV>"
+```
+
+该开关绕过 source/BVID 判重，并生成新的 `00-待整理` 测试笔记；它不属于 Hermes 的日常链接处理流程。
+
 ## 兼容入口
 
 - `prepare_ytdlp_bilibili_note.py`

@@ -102,6 +102,7 @@ def prepare_note(
     message: str | None,
     *,
     dry_run: bool = False,
+    allow_existing_for_test: bool = False,
     cleanup_job_path: Path | None = None,
     after_seconds: int = FAILSAFE_SECONDS,
     cleanup_runner: Path | None = None,
@@ -123,7 +124,7 @@ def prepare_note(
         resolved = resolve_input(message)
         reservation = claim_reservation(settings.runtime_root, resolved.bvid)
         existing = find_existing_note(settings.notes_root, resolved.canonical_url, resolved.bvid)
-        if existing:
+        if existing and not allow_existing_for_test:
             status = _existing_status(existing)
             return _status(
                 {
@@ -193,6 +194,7 @@ def prepare_note(
                 "description_status": job["description_status"],
                 "media_files": 0,
                 "stale_jobs_removed": stale_removed,
+                "test_mode": allow_existing_for_test,
             }
         )
     except ReservationBusyError as error:
