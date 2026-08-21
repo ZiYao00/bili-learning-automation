@@ -23,6 +23,7 @@
 - AI 正文从固定“怎么做 / 坑点 / 实践”四段式升级为“先看结论 + 动态知识正文”，按视频实际知识关系选择 Table / Grid / Card / Chip / Risk / Resource。
 - 知识提取规则增加“类别成员不可被二次压缩”和“原则 + 典型可直接使用值”保护，H3 百科视频继续作为知识密集型回归样本。
 - 正式阅读顺序调整为“标题/BVID → 先看结论 → 播放器 → 知识正文 → 视频资料”；视频资料压成单一附录区，原始简介继续折叠保留。
+- 长字幕处理改为 job 内受控 `agent-work` 工作区：核心会自动把 SRT 转换为 `transcript-manifest.json` 与一个或多个 transcript chunk，按完整 cue 边界分块且不做语义删减；Hermes 按 manifest 阅读，并可继续创建逐块知识摘录、索引和中间梳理文件，避免超长 SRT 被一次性压入上下文。所有临时文件由 finalizer / failsafe 随 job 统一清理。任务与 stale-job 保护窗口同步放宽到 2 小时，以降低长视频处理中途被清理的风险。
 
 ### Security
 

@@ -32,7 +32,7 @@ from .runtime import (
 )
 from .validator import validate_note
 
-FAILSAFE_SECONDS = 20 * 60
+FAILSAFE_SECONDS = 2 * 60 * 60
 STATUS_SCHEMA_VERSION = 1
 
 
@@ -168,6 +168,10 @@ def prepare_note(
                 "note_path": job["note_path"],
                 "draft_path": job["draft_path"],
                 "analysis_path": job["analysis_path"],
+                "agent_work_dir": job["agent_work_dir"],
+                "transcript_manifest_path": job["transcript_manifest_path"],
+                "transcript_mode": job["transcript_mode"],
+                "transcript_chunk_count": job["transcript_chunk_count"],
                 "subtitle_path": str(subtitle),
                 "description_status": job["description_status"],
                 "media_files": 0,

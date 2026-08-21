@@ -30,7 +30,7 @@ description: Turn a Bilibili copied link, supported Bilibili short link, or BV i
    - `failed`：回复短错误，不声称完成。
    - 只有 `materials_ready` 才继续。
 
-3. `materials_ready` 时读取 `handoff_path`、`job.json`、`subtitle_path`、`analysis_path`，并遵循项目共享的 `docs\\AGENT-INTEGRATION.md` 与内容标准。先判断字幕/简介是否足以支撑可信学习笔记；来源不足时在 `analysis.json` 记录原因，不得靠常识补全。直接读取原始 SRT；输出受限时分段读取，不得在 job 内生成 `_flat.txt`、缓存或任何临时副本。确需临时文件时只能使用系统 Temp，并在 `finally` 中立即删除。
+3. `materials_ready` 时读取 `handoff_path`、`job.json`、`analysis_path`、`agent_work_dir` 与 `transcript_manifest_path`，并遵循项目共享的 `docs\\AGENT-INTEGRATION.md` 与内容标准。程序已把原始 SRT 无语义删减地整理成适合 Agent 阅读的 transcript：manifest 为 `direct` 时读取唯一 chunk；为 `chunked` 时严格按 `chunks` 顺序逐块阅读，不要再把原始 SRT 整份塞入上下文，也不要自行重新按 1/3 等固定比例切分。处理长字幕时可在 `agent_work_dir` 创建 `part-XX-notes.md`、索引或中间梳理文件，把每块的重要参数、比较、限制、方法和资源先外化，再合并为 `knowledge_outline`。来源不足时在 `analysis.json` 记录原因，不得靠常识补全。所有临时文件都属于当前 job，由 finalizer 与 failsafe 统一清理；不得写到项目其他目录，也不得手工删除 job、reservation 或锁文件。
 
 4. 来源充分时，先填写 `knowledge_outline`，再只编辑 `draft_path` 的两个 marker：
 

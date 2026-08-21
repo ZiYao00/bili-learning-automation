@@ -12,9 +12,10 @@ from .note_template import note_filename, write_skeleton
 from .quality import write_analysis_template
 from .runtime import cleanup_job, waiting_file_lock
 from .taxonomy import classify
+from .transcript import prepare_agent_transcript
 
 MEDIA_SUFFIXES = {".mp3", ".m4a", ".wav", ".mp4", ".webm", ".flv", ".m4s", ".part"}
-STALE_SECONDS = 60 * 60
+STALE_SECONDS = 2 * 60 * 60
 YTDLP_TIMEOUT_SECONDS = 180
 JOB_SCHEMA_VERSION = 1
 NOTE_NAME_LOCK = "note-names.lock"
@@ -159,6 +160,9 @@ def create_job(
         filename = note_path.name
         draft_path = job_dir / filename
         analysis_path = job_dir / "analysis.json"
+        agent_work_dir = job_dir / "agent-work"
+        agent_work_dir.mkdir(parents=True, exist_ok=True)
+        transcript = prepare_agent_transcript(subtitle, agent_work_dir)
         payload: dict[str, Any] = {
             "schema_version": JOB_SCHEMA_VERSION,
             "bvid": bvid,
@@ -177,6 +181,10 @@ def create_job(
             "note_path": str(note_path),
             "draft_path": str(draft_path),
             "analysis_path": str(analysis_path),
+            "agent_work_dir": str(agent_work_dir),
+            "transcript_manifest_path": transcript["manifest_path"],
+            "transcript_mode": transcript["mode"],
+            "transcript_chunk_count": transcript["chunk_count"],
         }
         (job_dir / "job.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         write_skeleton(draft_path, payload)
@@ -193,7 +201,7 @@ def write_handoff(job_dir: Path, payload: dict[str, Any]) -> Path:
     handoff = job_dir / "agent_handoff.md"
     handoff.write_text(
         "# B站视频转笔记任务\n\n"
-        "1. 读取 `job.json`、`subtitle_path` 与共享内容标准。\n"
+        "1. 先读取 `job.json`、`transcript_manifest_path`、`agent_work_dir` 与共享内容标准。manifest 的 `chunks` 已按 cue 完整边界生成；`direct` 读取唯一 transcript，`chunked` 按 manifest 顺序逐块阅读，不要再把原始 SRT 整份塞入上下文。允许在 `agent_work_dir` 继续创建逐块知识摘录、索引或中间梳理文件。\n"
         "2. 先判断字幕与简介是否足以支撑可信学习笔记，并填写 runtime 的 `analysis_path`。来源不足时不要编造正文。\n"
         "3. 来源充分时，先在 `knowledge_outline` 中列出应保护的重要知识，再编辑 `draft_path`。不要改 Frontmatter、H1、视频简介、iframe、文件名、路径、tags、cssclasses 或 marker。\n"
         "4. 只填写两个 AI 区域：短的“先看结论”和根据视频内容动态组织的知识正文；不要强制套用步骤、坑点或实践清单。按共享标准根据知识关系选择 Table / Grid / Card / Risk / Resource / Chip，不为了好看强行卡片化。Grid 内的 Card 必须使用嵌套 Markdown：外层 `> [!grid-3]`，子卡片必须以 `> > [!card]` 开始，不能写成单层 `> [!card]`。\n"

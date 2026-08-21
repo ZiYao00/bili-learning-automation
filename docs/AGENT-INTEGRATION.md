@@ -11,7 +11,7 @@
 ## 必须执行的流程
 
 1. 把原始收到的文本交给 collector。
-2. 仅当 collector 返回 `materials_ready` 时，读取 `handoff_path`、`job.json`、`subtitle_path`、`analysis_path` 和共享内容标准。
+2. 仅当 collector 返回 `materials_ready` 时，读取 `handoff_path`、`job.json`、`analysis_path`、`agent_work_dir`、`transcript_manifest_path` 和共享内容标准。程序会把原始 SRT 整理为 runtime-only transcript；短字幕为单块 `direct`，长字幕为按完整 cue 边界生成的 `chunked` 清单。
 3. 先判断字幕与简介是否足以支撑可信学习笔记，并填写 runtime 的 `analysis.json`。
 4. 来源充分时先形成 `knowledge_outline`，再编辑 `draft_path` 中的 `BILI_AI_SUMMARY` 与 `BILI_AI_BODY` 两个区域。
 5. 成稿后重新对照字幕或 `knowledge_outline` 做覆盖复核；确认无重要遗漏、无来源外补写后，将 `coverage_review.status` 设为 `passed` 并填写 notes。
@@ -32,8 +32,8 @@
 - 默认流程只采集 metadata、UP 主原始简介和 `ai-zh`/`zh.*` 的 SRT 字幕；不得下载音视频、启动 Chrome/CDP 或回退到 ASR。
 - `confirmed_empty` 仅代表 info-json 明确给出空字符串且（如存在）简介 sidecar 与其一致；字段缺失、`null`、类型异常或两者不一致都必须失败。
 - Cookie 内容不得读取、打印、上传、编辑、提交或写入笔记；collector 仅可把配置的 Cookie 文件路径传给 yt-dlp。
-- 原始字幕、元数据、简介、`analysis.json` 和日志只允许存在于 `.runtime/bilibili-learning` 的单个 job；finalizer 负责精确清理。
-- 智能体只可在 job 内编辑既定的 `analysis.json` 与草稿中的两个 AI 区域；不得创建字幕展平文件、缓存、临时副本或其他辅助文件。读取字幕应直接读取原始 SRT；工具输出受限时分段读取，确需临时文件时只能使用系统 Temp 并在 `finally` 中立即删除，不得依赖重启清理。
+- 原始字幕、元数据、简介、`analysis.json`、日志和智能体临时工作文件只允许存在于 `.runtime/bilibili-learning` 的单个 job；finalizer 负责精确清理。
+- 智能体只可编辑既定的 `analysis.json`、草稿中的两个 AI 区域，以及 `agent_work_dir` 内的临时辅助文件。原始 SRT 由核心预处理器转换为 `transcript-manifest.json` 与一个或多个 transcript chunk；转换只移除 SRT 序号、毫秒精度与空行，保留字幕文字、顺序和 cue 边界，不做摘要、关键词过滤或语义去重。智能体应优先按 manifest 读取这些 chunk；长字幕可在 `agent_work_dir` 继续创建逐块知识摘录、索引或中间梳理文件，再合并与复核。`agent_work_dir` 不得存放最终笔记或持久资料；其内容随 job 一并由 finalizer / failsafe 清理。
 - 智能体不得手工删除 job、reservation 或锁文件。finalizer 清理失败时必须如实报告失败状态，保留现场供后续诊断；只有用户明确授权后，才可对已核实的单个遗留文件执行回收站归档。
 - 不得覆盖已有笔记；同一 BVID 仅在**活动任务期间**由 reservation 防止并发处理，任务完成后允许再次转换。草稿只存在于 runtime，只有 finalizer 校验通过后才原子发布到 `note_path`。
 

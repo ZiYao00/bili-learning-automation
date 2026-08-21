@@ -34,6 +34,7 @@ from bili_learning.runtime import (
     safe_job_path,
 )
 from bili_learning.taxonomy import classify
+from bili_learning.transcript import prepare_agent_transcript
 from bili_learning.validator import validate_note
 
 
@@ -131,6 +132,30 @@ def test_description_states() -> None:
     assert description_state({"description": 123}) == ("failed", "")
     assert description_state({"description": "info"}, "sidecar") == ("failed", "")
     assert description_state({"description": "info\n"}, "info") == ("present", "info")
+
+
+def test_prepare_agent_transcript_chunks_long_srt_without_losing_order(tmp_path: Path) -> None:
+    subtitle = tmp_path / "long.ai-zh.srt"
+    blocks = []
+    for index in range(1, 7):
+        blocks.append(
+            f"{index}\n00:00:{index:02d},000 --> 00:00:{index:02d},900\n知识点{index}-" + ("参数与限制" * 12)
+        )
+    subtitle.write_text("\n\n".join(blocks) + "\n", encoding="utf-8")
+    work = tmp_path / "agent-work"
+
+    result = prepare_agent_transcript(subtitle, work, direct_max_chars=80, chunk_target_chars=180)
+
+    assert result["mode"] == "chunked"
+    assert result["chunk_count"] > 1
+    assert sum(chunk["cue_count"] for chunk in result["chunks"]) == 6
+    combined = "".join(Path(chunk["path"]).read_text(encoding="utf-8") for chunk in result["chunks"])
+    positions = [combined.index(f"知识点{index}-") for index in range(1, 7)]
+    assert positions == sorted(positions)
+    manifest = json.loads(Path(result["manifest_path"]).read_text(encoding="utf-8"))
+    assert manifest["rules"]["semantic_summary"] is False
+    assert manifest["rules"]["text_order_preserved"] is True
+    assert manifest["rules"]["cue_boundaries_preserved"] is True
 
 
 def test_description_renders_compact_resources_and_preserves_raw_source() -> None:
@@ -354,6 +379,14 @@ def test_create_job_writes_runtime_draft_without_publishing_note(tmp_path: Path,
     assert draft_path.name == note_path.name
     analysis_path = Path(payload["analysis_path"])
     assert analysis_path.parent == job_dir
+    agent_work_dir = Path(payload["agent_work_dir"])
+    assert agent_work_dir.parent == job_dir
+    assert agent_work_dir.is_dir()
+    manifest_path = Path(payload["transcript_manifest_path"])
+    assert manifest_path.parent == agent_work_dir
+    assert payload["transcript_mode"] == "direct"
+    assert payload["transcript_chunk_count"] == 1
+    assert manifest_path.is_file()
     assert json.loads(analysis_path.read_text(encoding="utf-8"))["source_assessment"]["status"] == "pending"
     draft_text = draft_path.read_text(encoding="utf-8")
     assert 'source: "https://www.bilibili.com/video/BV1TXua68EYi/"' in draft_text
@@ -435,6 +468,9 @@ def test_reservation_spans_job_lifecycle_and_cleanup_releases_it(tmp_path: Path)
 
     job = runtime / "BV1TXua68EYi-job"
     job.mkdir()
+    agent_work = job / "agent-work"
+    agent_work.mkdir()
+    (agent_work / "subtitle-flat.txt").write_text("temporary", encoding="utf-8")
     (job / "job.json").write_text(json.dumps({"bvid": "BV1TXua68EYi"}), encoding="utf-8")
     bind_reservation(reservation, job)
     cleanup_job(runtime, job)
@@ -481,6 +517,9 @@ def test_prepare_allows_a_new_note_for_an_existing_source(
     payload, code = prepare_note(tmp_path, "BV1TXua68EYi")
     assert code == 0 and payload["status"] == "materials_ready"
     assert Path(payload["note_path"]).name == "H3 分段工作流.md"
+    assert payload["transcript_mode"] == "direct"
+    assert payload["transcript_chunk_count"] == 1
+    assert Path(payload["transcript_manifest_path"]).is_file()
 
 
 def _write_e2e_config(project_root: Path, taxonomy: dict) -> None:
