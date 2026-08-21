@@ -158,6 +158,24 @@ def test_prepare_agent_transcript_chunks_long_srt_without_losing_order(tmp_path:
     assert manifest["rules"]["cue_boundaries_preserved"] is True
 
 
+def test_prepare_agent_transcript_merges_a_tiny_tail_chunk(tmp_path: Path) -> None:
+    subtitle = tmp_path / "tail.ai-zh.srt"
+    blocks = [
+        "1\n00:00:01,000 --> 00:00:02,000\n" + ("甲" * 22_980),
+        "2\n00:00:02,000 --> 00:00:03,000\n" + ("乙" * 22_980),
+        "3\n00:00:03,000 --> 00:00:04,000\n尾巴",
+    ]
+    subtitle.write_text("\n\n".join(blocks) + "\n", encoding="utf-8")
+
+    result = prepare_agent_transcript(subtitle, tmp_path / "agent-work")
+
+    assert result["mode"] == "chunked"
+    assert result["chunk_count"] == 2
+    assert sum(chunk["cue_count"] for chunk in result["chunks"]) == 3
+    combined = "".join(Path(chunk["path"]).read_text(encoding="utf-8") for chunk in result["chunks"])
+    assert "尾巴" in combined
+
+
 def test_description_renders_compact_resources_and_preserves_raw_source() -> None:
     description = "节点升级说明\n工作流地址：\nhttps://example.com/workflow\n仓库：https://example.com/repo"
     rendered = quote_description(description, "present")

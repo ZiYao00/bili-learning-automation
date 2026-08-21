@@ -7,6 +7,7 @@ from typing import Any
 
 DIRECT_MAX_CHARS = 18_000
 CHUNK_TARGET_CHARS = 24_000
+MIN_TAIL_CHARS = 2_000
 _TIMECODE_RE = re.compile(
     r"^(?P<start>\d{2}:\d{2}:\d{2},\d{3})\s+-->\s+(?P<end>\d{2}:\d{2}:\d{2},\d{3})"
 )
@@ -65,6 +66,23 @@ def _chunk_cues(cues: list[dict[str, str | None]], target_chars: int) -> list[li
     return chunks
 
 
+def _group_chars(group: list[dict[str, str | None]]) -> int:
+    return sum(len(str(cue["line"])) + 1 for cue in group)
+
+
+def _merge_tiny_tail(
+    groups: list[list[dict[str, str | None]]],
+    *,
+    chunk_max_chars: int,
+    min_tail_chars: int = MIN_TAIL_CHARS,
+) -> list[list[dict[str, str | None]]]:
+    if len(groups) < 2 or _group_chars(groups[-1]) >= min_tail_chars:
+        return groups
+    if _group_chars(groups[-2]) + _group_chars(groups[-1]) > chunk_max_chars + min_tail_chars:
+        return groups
+    return [*groups[:-2], [*groups[-2], *groups[-1]]]
+
+
 def prepare_agent_transcript(
     subtitle_path: Path,
     agent_work_dir: Path,
@@ -97,6 +115,7 @@ def prepare_agent_transcript(
         planned_chunks = max(2, (len(compact_text) + chunk_target_chars - 1) // chunk_target_chars)
         effective_target_chars = (len(compact_text) + planned_chunks - 1) // planned_chunks
         groups = _chunk_cues(cues, effective_target_chars)
+        groups = _merge_tiny_tail(groups, chunk_max_chars=chunk_target_chars)
 
     chunks: list[dict[str, Any]] = []
     for index, group in enumerate(groups, start=1):
