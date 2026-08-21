@@ -1,12 +1,12 @@
 # 智能体接入协议
 
-本项目当前优先服务 Codex 与 Hermes。核心脚本、字幕采集、内容质量标准、taxonomy 与 finalizer 是唯一事实来源；适配层只负责各平台的入口、授权、调用和最终回复。未来其他智能体如需接入，应复用核心协议而不是复制一套新的写作规则。
+本项目当前优先服务 Codex、Hermes 与 WorkBuddy。核心脚本、字幕采集、内容质量标准、taxonomy 与 finalizer 是唯一事实来源；适配层只负责各平台的入口、授权、调用和最终回复。未来其他智能体如需接入，应复用核心协议而不是复制一套新的写作规则。
 
 ## 输入与授权
 
 - 只接受可解析的 Bilibili 复制链接、受支持短链接或 BV 号。
 - 无法解析 BV 号时要求用户重新发送“复制链接”，不得猜测。
-- 适配层必须确认调用者已获授权；Hermes 的额外规则是只接受 owner 私聊。
+- 适配层必须确认调用者已获授权；Hermes 的额外规则是只接受 owner 私聊，WorkBuddy 的额外规则是只接受用户在会话中主动提供链接/BV 号且意图明确。
 
 ## 必须执行的流程
 
@@ -122,4 +122,5 @@ bili-learning organize --note '<现有笔记路径>' --title '<学习后短标�
 
 - Hermes：微信私聊授权、链接接收、Hermes 安装、调用核心脚本和最终回复。
 - Codex：在项目目录中读取 `AGENTS.md`、本协议和共享标准，直接使用核心流程；目前不要求独立 Codex Skill。
+- WorkBuddy：适配层位于 `workbuddy-skills\bili-learning-automation\`，通过 junction 安装到 `%USERPROFILE%\.workbuddy\skills\`；负责会话触发、意图确认、调用核心脚本和最终回复，与 Hermes 共用同一套脚本入口。
 - 未来其他平台：只新增薄适配层，不复制核心 Python 逻辑、内容标准、taxonomy 或 finalizer。

@@ -1,6 +1,6 @@
 # B站视频转笔记
 
-本项目当前优先服务 Codex 与 Hermes。两者共用同一套核心脚本、字幕采集、内容标准、质量门禁、taxonomy 和 finalizer；不要为不同入口复制内容分析规则。
+本项目当前优先服务 Codex、Hermes 与 WorkBuddy。三者共用同一套核心脚本、字幕采集、内容标准、质量门禁、taxonomy 和 finalizer；不要为不同入口复制内容分析规则。
 
 生成或修改 `notes\bilibili` 中的笔记前，必须先阅读：
 
@@ -19,6 +19,6 @@
 - 视频简介抓取失败不能当作视频无简介；机器资料只可临时保留在 `.runtime`；
 - 只有 finalizer 返回 `note_ready` 才能声称完成。
 
-Hermes `SKILL.md` 只是 Hermes/微信入口适配层。Codex 在仓库内直接遵循本文件与共享协议。未来其他智能体只增加薄适配层，不应改变共享核心规则。
+Hermes `SKILL.md` 只是 Hermes/微信入口适配层；WorkBuddy 适配层在 `workbuddy-skills\` 下，通过 junction 安装到本机 `~\.workbuddy\skills\`。Codex 在仓库内直接遵循本文件与共享协议。未来其他智能体只增加薄适配层，不应改变共享核心规则。
 
 准备提交 / 推送当前这轮内容质量与 Obsidian 版式升级时，先阅读 `docs/reports/2026-08-21-pre-push-handoff.md`，按其中的范围、安全边界和验收项复核；不要把 `ComfyUI-Learning-Lab` 的独立工作区混入本仓库提交。

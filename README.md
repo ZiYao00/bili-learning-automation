@@ -54,14 +54,15 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-`.venv` 仅用于当前机器，已被 Git 忽略。当前已提供 Hermes 适配层，安装位置与验收见 [Hermes skill 安装](docs/HERMES-SKILL-INSTALL.md)。
+`.venv` 仅用于当前机器，已被 Git 忽略。当前已提供 Hermes 与 WorkBuddy 适配层：Hermes 安装位置与验收见 [Hermes skill 安装](docs/HERMES-SKILL-INSTALL.md)；WorkBuddy 适配层在 `workbuddy-skills\bili-learning-automation\`，通过 junction 安装到 `~\.workbuddy\skills\bili-learning-automation`。
 
 ## 多智能体使用
 
-核心脚本、taxonomy、笔记标准和 finalizer 保持智能体无关，但当前开发与验收优先保证 **Codex + Hermes** 两个入口可靠。统一输入/输出、清理和内容边界见 [智能体接入协议](docs/AGENT-INTEGRATION.md)。
+核心脚本、taxonomy、笔记标准和 finalizer 保持智能体无关，但当前开发与验收优先保证 **Codex + Hermes + WorkBuddy** 三个入口可靠。统一输入/输出、清理和内容边界见 [智能体接入协议](docs/AGENT-INTEGRATION.md)。
 
 - **Codex**：当前在本项目目录中工作时读取 `AGENTS.md`、接入协议和标准即可使用核心流程；目前不安装独立 Codex skill。
 - **Hermes**：已有微信私聊适配和已安装 skill，只保留入口特有规则，内容分析复用共享标准。
+- **WorkBuddy**：适配层位于 `workbuddy-skills\`，junction 安装到本机 WorkBuddy skills 目录；会话内用户提供链接/BV 号触发，复用同一套核心脚本与标准。
 - **其他智能体**：属于后续扩展目标；接入时增加薄适配层，不复制或改写核心流程与标准。
 
 ## Obsidian 版式
