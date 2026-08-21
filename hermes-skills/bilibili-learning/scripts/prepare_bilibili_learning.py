@@ -39,18 +39,6 @@ def canonicalize(value: str) -> tuple[str, str]:
     return bvid, f"https://www.bilibili.com/video/{bvid}/"
 
 
-def find_existing_note(canonical_url: str) -> Path | None:
-    if not NOTES_DIR.is_dir():
-        return None
-    for note in NOTES_DIR.glob("*.md"):
-        try:
-            if canonical_url in note.read_text(encoding="utf-8"):
-                return note
-        except OSError:
-            continue
-    return None
-
-
 def run(command: list[str], cwd: Path) -> str:
     completed = subprocess.run(
         command,
@@ -106,9 +94,6 @@ def main() -> None:
 
     try:
         bvid, canonical_url = canonicalize(args.url)
-        existing = find_existing_note(canonical_url)
-        if existing:
-            emit({"status": "already_exists", "bvid": bvid, "canonical_url": canonical_url, "note_path": str(existing)})
         if args.dry_run:
             emit({"status": "ready_to_process", "bvid": bvid, "canonical_url": canonical_url})
 

@@ -1,6 +1,6 @@
 # 智能体接入协议
 
-本协议适用于 Hermes、Codex 和未来接入本项目的其他智能体。核心脚本、taxonomy、笔记标准与 finalizer 是唯一事实来源；适配层只能处理各平台的消息入口、权限判断和最终回复。
+本项目当前优先服务 Codex 与 Hermes。核心脚本、字幕采集、内容质量标准、taxonomy 与 finalizer 是唯一事实来源；适配层只负责各平台的入口、授权、调用和最终回复。未来其他智能体如需接入，应复用核心协议而不是复制一套新的写作规则。
 
 ## 输入与授权
 
@@ -11,26 +11,87 @@
 ## 必须执行的流程
 
 1. 把原始收到的文本交给 collector。
-2. 仅当 collector 返回 `materials_ready` 时，读取 handoff、job、字幕和项目标准。
-3. 只在 `draft_path` 的程序生成 `BILI_AI_*_START/END` 标记内填写 AI 内容；`note_path` 是只读的最终发布位置。marker 仅存在于 runtime 草稿，finalizer 发布时会移除。
-4. 无论写作成功、失败或中断，都必须立即运行 finalizer。
-5. 仅在 finalizer 返回 `note_ready` 后报告完成。
+2. 仅当 collector 返回 `materials_ready` 时，读取 `handoff_path`、`job.json`、`subtitle_path`、`analysis_path` 和共享内容标准。
+3. 先判断字幕与简介是否足以支撑可信学习笔记，并填写 runtime 的 `analysis.json`。
+4. 来源充分时先形成 `knowledge_outline`，再编辑 `draft_path` 中的 `BILI_AI_SUMMARY` 与 `BILI_AI_BODY` 两个区域。
+5. 成稿后重新对照字幕或 `knowledge_outline` 做覆盖复核；确认无重要遗漏、无来源外补写后，将 `coverage_review.status` 设为 `passed` 并填写 notes。
+6. 无论写作成功、失败或中断，都必须运行 finalizer 清理 job。
+7. 只有 finalizer 返回 `note_ready` 才能报告完成。
 
-`already_exists`、`in_progress`、`incomplete_note`（仅旧版遗留骨架）、`subtitle_unavailable`、`failed` 和 `note_invalid` 都不是完成状态，必须返回简短真实说明，不得继续伪造笔记或声称成功。
+`in_progress`、`subtitle_unavailable`、`source_insufficient`、`failed` 和 `note_invalid` 都不是完成状态。
 
 ## 数据契约
 
 - 新生成的 `job.json` 使用 `schema_version: 1`；finalizer 只接受该版本。
-- 当前 collector 与 finalizer 的 JSON 响应都包含 `schema_version: 1`、`status` 和可读 `message`（如适用）。智能体应以 `status` 判断分支，不能从自然语言猜状态。
-- Frontmatter 的 `author`、`published`、`duration`、`source` 和 tags 由程序采用 JSON 风格双引号编码；这是 YAML 的无歧义子集。智能体不得自行改写这些字段。
+- collector 与 finalizer 的 JSON 响应包含 `schema_version: 1`、`status` 和可读 `message`（如适用）；智能体必须以 `status` 判断分支。
+- Frontmatter 的 `author`、`published`、`duration`、`source`、tags 与 `cssclasses` 由程序生成，智能体不得自行改写；视频笔记固定使用 `learning-page + video-note` 以接入共享 Obsidian 视觉系统。
+- `analysis.json` 是 runtime-only 质量报告，不进入最终 Obsidian 笔记。它用于记录来源充分性、知识清单和覆盖复核状态，不是给用户阅读的机器报告。
 
 ## 不可突破的数据边界
 
 - 默认流程只采集 metadata、UP 主原始简介和 `ai-zh`/`zh.*` 的 SRT 字幕；不得下载音视频、启动 Chrome/CDP 或回退到 ASR。
-- `confirmed_empty` 仅代表 info-json 明确给出空字符串且（如存在）简介 sidecar 与其一致；字段缺失、`null`、类型异常或两者不一致都必须失败，不能写成“没有简介”。
+- `confirmed_empty` 仅代表 info-json 明确给出空字符串且（如存在）简介 sidecar 与其一致；字段缺失、`null`、类型异常或两者不一致都必须失败。
 - Cookie 内容不得读取、打印、上传、编辑、提交或写入笔记；collector 仅可把配置的 Cookie 文件路径传给 yt-dlp。
-- 原始字幕、元数据、简介和日志只允许存在于 `.runtime/bilibili-learning` 的单个 job；finalizer 负责精确清理。
-- 不得覆盖已有笔记；同 BVID 的 reservation 从 collector 持续到 finalizer 或清理完成。草稿只存在于 runtime，只有 finalizer 校验通过后才会原子发布到 `note_path`。文件名、tags、Frontmatter、H1、简介、iframe 和输出路径由程序决定；所有新笔记先发布到 `00-待整理`。同名文件使用序号防覆盖。
+- 原始字幕、元数据、简介、`analysis.json` 和日志只允许存在于 `.runtime/bilibili-learning` 的单个 job；finalizer 负责精确清理。
+- 不得覆盖已有笔记；同一 BVID 仅在**活动任务期间**由 reservation 防止并发处理，任务完成后允许再次转换。草稿只存在于 runtime，只有 finalizer 校验通过后才原子发布到 `note_path`。
+
+## 来源充分性判断
+
+字幕是视频内容的文字投影，不等于视频本身。智能体必须先判断当前字幕与简介是否足以支撑可信学习笔记。
+
+判断应结合上下文，不要用单一字符数或固定时长阈值代替思考。重点观察：
+
+- 字幕是否连续、是否存在大面积缺句或乱码；
+- 专有名词、模型名、节点名、参数是否严重损坏到无法恢复语义；
+- 视频简介宣称的重要主题是否在字幕里实际出现；
+- 是否大量依赖“这里、如图、这个参数、按这样连接”等画面信息，导致字幕无法说明关键事实；
+- 是否能仅凭字幕与简介明确辨认主要结论、方法、参数、限制、比较和重要资源。
+
+如果不足，设置 `source_assessment.status = "insufficient"`，说明原因，`coverage_review.status = "not_applicable"`，不要编造正文，也不要把任务包装成完成。
+
+## 内容提取与整理原则
+
+正文事实只能来自当前视频字幕和 UP 主原始简介；不得利用模型常识补全视频没有提供的具体参数、资源地址或结论。
+
+对学习价值高的信息应优先保护，不能仅为了缩短篇幅而删除：
+
+- 参数、数值、公式、数量和上下限；
+- 模型、节点、插件、LoRA、格式、版本等专有名词；
+- A/B 差异、适用条件和兼容性；
+- 作者明确推荐、质量/速度/稳定性的取舍；
+- 会改变结果的前提、例外、冲突和警告；
+- 结构化方法、提示词公式、关键工作流；
+- 视频明确提供且具有学习价值的资源地址。
+
+这不是机械保留规则。广告价格、活动口播或与学习目标无关的数字是否保留，应由智能体根据长期参考价值判断。
+
+长字幕或知识密集内容允许先按语义章节/时间段分段提取，再合并、去重和组织。不要把固定 Map-Reduce 流程强加给所有短视频。
+
+## 最终笔记结构
+
+程序负责：Frontmatter、H1、BVID、小型视频简介、UP 主资源、原始简介、iframe、tags、cssclasses、文件名和路径。正式阅读顺序由程序固定为：**标题 / BVID → 先看结论 → 播放器 → 动态知识正文 → 视频资料**。
+
+智能体负责两个区域：
+
+- `BILI_AI_SUMMARY`：短的“先看结论”，用于快速判断视频价值；
+- `BILI_AI_BODY`：根据视频真实信息结构动态组织的知识正文。
+
+正文不强制出现“怎么做 / 容易踩坑 / 我来实践”。需要时可以使用这些章节，不需要时应省略。章节名称、数量、长短、表格、列表和步骤形式由内容决定。
+
+## 覆盖复核
+
+程序可以检查结构和流程状态，但不能可靠判断“知识有没有漏”。因此成稿后必须由智能体完成语义复核。
+
+至少检查：
+
+- `knowledge_outline` 中的重要参数、限制、比较和方法是否已经进入正文；
+- 比较关系是否只写了一边；
+- 默认值后面的例外或限制是否被误删；
+- 多个方案是否被错误合并；
+- 是否为了简短而丢掉高价值具体信息；
+- 是否出现字幕/简介没有支持的新事实。
+
+复核通过后设置 `coverage_review.status = "passed"` 并简要记录复核结果。Finalizer 只验证该流程确实完成，不用确定性算法假装评估语义完整度。
 
 ## 笔记内容边界
 
@@ -41,22 +102,22 @@ docs\standards\CODEX-VIDEO-NOTE-GUIDE.md
 docs\standards\STANDARD-VIDEO-NOTE-EXAMPLE.md
 ```
 
-taxonomy 已由程序用于确定 tags 和后续整理建议；新笔记的 H1 默认使用 B站原视频标题，BVID 由程序写为 H1 下方的小字。简介由程序写成简要说明、UP 主资源链接和可折叠的原始简介。所有新笔记先进入 `00-待整理`，不得由智能体自行改放模型目录。AI 内容只能基于字幕或 UP 主原始简介；不得暴露 runtime 路径、job 文件名、证据编号或采集状态。
+所有新笔记先进入 `00-待整理`。H1 默认使用 B站原视频标题，BVID 由程序写为 H1 下方的小字。允许重复链接再次生成笔记；同名文件由程序以 `（2）`、`（3）` 防覆盖。分类建议和 tags 由程序确定；智能体不得自行跳过 `00-待整理`。
 
 ## 学习后整理流程
 
-只有用户明确要求“整理笔记”后，智能体才可调用统一核心入口。该操作把短标题、视频简介的一句摘要和归档目录合并为一次用户触发的整理动作；不要在收集阶段自动执行。
+只有用户明确要求“整理笔记”后，智能体才可调用统一核心入口：
 
 ```powershell
 bili-learning organize --note '<现有笔记路径>' --title '<学习后短标题>' --intro '<一句简介摘要>'
 ```
 
 - `--title` 与 `--intro` 只能基于现有笔记、UP 主简介和用户的学习判断；不得捏造参数或资源。
-- 省略 `--category` 时，核心按现有 tags 推断 taxonomy 建议目录；需要时才传入项目内相对目录，例如 `01-视频生成/01-MiniMax-H3`。
-- 核心原子创建新文件、确认成功后才删除旧位置，并重建导航；适配层不得自行移动或重命名文件。
+- 省略 `--category` 时，核心按现有 tags 推断 taxonomy 建议目录。
+- 核心负责原子创建、迁移和导航刷新；适配层不得自行移动或重命名文件。
 
 ## 适配层边界
 
-- Hermes 适配层：微信私聊授权、链接接收、Hermes 安装和回复格式。
-- Codex 当前直接在项目目录中读取 `AGENTS.md` 与本协议，不安装独立 skill。
-- 其他平台只新增薄适配层；不得复制核心 Python 逻辑、另建 taxonomy 或绕过 finalizer。
+- Hermes：微信私聊授权、链接接收、Hermes 安装、调用核心脚本和最终回复。
+- Codex：在项目目录中读取 `AGENTS.md`、本协议和共享标准，直接使用核心流程；目前不要求独立 Codex Skill。
+- 未来其他平台：只新增薄适配层，不复制核心 Python 逻辑、内容标准、taxonomy 或 finalizer。

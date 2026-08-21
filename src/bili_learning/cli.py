@@ -29,11 +29,6 @@ def main() -> None:
     prepare_parser = subparsers.add_parser("prepare", help="采集资料并创建 runtime 草稿任务")
     prepare_parser.add_argument("message", nargs="?", help="Bilibili 复制链接、短链或 BV 号")
     prepare_parser.add_argument("--dry-run", action="store_true")
-    prepare_parser.add_argument(
-        "--allow-existing-for-test",
-        action="store_true",
-        help="仅限本地测试：允许已存在 source/BVID 再次完整转换；普通智能体不得使用",
-    )
     prepare_parser.add_argument("--cleanup-job", type=Path)
     prepare_parser.add_argument("--after-seconds", type=int, default=FAILSAFE_SECONDS)
     prepare_parser.add_argument("--cleanup-runner", type=Path, help=argparse.SUPPRESS)
@@ -66,7 +61,6 @@ def main() -> None:
             project_root,
             args.message,
             dry_run=args.dry_run,
-            allow_existing_for_test=args.allow_existing_for_test,
             cleanup_job_path=args.cleanup_job,
             after_seconds=args.after_seconds,
             cleanup_runner=args.cleanup_runner,

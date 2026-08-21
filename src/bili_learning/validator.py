@@ -4,10 +4,11 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .frontmatter import parse_frontmatter
+from .frontmatter import DEFAULT_CSSCLASSES, parse_frontmatter, parse_frontmatter_list
 from .note_template import AI_MARKERS, PLACEHOLDER_TEXT, bvid_line, quote_description
+from .quality import load_analysis_report, validate_analysis_report
 
-ALLOWED_FRONTMATTER_FIELDS = {"author", "published", "duration", "source", "tags"}
+ALLOWED_FRONTMATTER_FIELDS = {"author", "published", "duration", "source", "tags", "cssclasses"}
 
 
 def validate_note(note: Path, job: dict[str, Any]) -> list[str]:
@@ -53,17 +54,25 @@ def validate_note(note: Path, job: dict[str, Any]) -> list[str]:
     for tag in job.get("required_tags", []):
         if tag not in tags:
             errors.append(f"缺少规范标签：{tag}")
+    cssclasses = parse_frontmatter_list(text, "cssclasses")
+    missing_cssclasses = [cssclass for cssclass in DEFAULT_CSSCLASSES if cssclass not in cssclasses]
+    if missing_cssclasses:
+        errors.append("缺少必需 cssclasses：" + ", ".join(missing_cssclasses))
 
     description_block = quote_description(job.get("description", ""), job["description_status"])
     description_at = text.find(description_block)
     iframe_url = "https://player.bilibili.com/player.html?bvid=" + job["bvid"]
     iframe_at = text.find(iframe_url)
+    summary_at = text.find(AI_MARKERS["summary"][0])
+    body_at = text.find(AI_MARKERS["body"][0])
     if description_at < 0:
         errors.append("视频简介未按采集结果完整保留")
     if iframe_at < 0:
         errors.append("缺少正确的官方播放器 iframe")
-    elif description_at >= 0 and description_at > iframe_at:
-        errors.append("视频简介没有放在播放器之前")
+    if min(summary_at, iframe_at, body_at, description_at) >= 0 and not (
+        summary_at < iframe_at < body_at < description_at
+    ):
+        errors.append("阅读顺序必须为先看结论 → 播放器 → 知识正文 → 视频资料")
 
     for key, (start, end) in AI_MARKERS.items():
         start_at = text.find(start)
@@ -75,15 +84,18 @@ def validate_note(note: Path, job: dict[str, Any]) -> list[str]:
         if PLACEHOLDER_TEXT in region or not region.strip():
             errors.append(f"AI 内容区域尚未完成：{key}")
 
-    for heading in ("## 怎么做", "## 容易踩坑"):
-        if heading not in text:
-            errors.append(f"缺少章节：{heading}")
     if "[!summary] 先看结论" not in text:
         errors.append("缺少先看结论")
-    if "**我来实践**" not in text:
-        errors.append("缺少实践清单")
 
-    forbidden = (".runtime", "agent_handoff.md", "job.json", "字幕证据索引")
+    try:
+        report = load_analysis_report(Path(job["analysis_path"]))
+        errors.extend(validate_analysis_report(report))
+        if report.get("source_assessment", {}).get("status") == "insufficient":
+            errors.append("来源不足，拒绝发布正式学习笔记")
+    except (KeyError, ValueError) as error:
+        errors.append(str(error))
+
+    forbidden = (".runtime", "agent_handoff.md", "job.json", "analysis.json", "字幕证据索引")
     for token in forbidden:
         if token in text:
             errors.append(f"主笔记包含机器内部信息：{token}")

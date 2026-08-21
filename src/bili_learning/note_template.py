@@ -11,9 +11,7 @@ PLACEHOLDER_TEXT = "待智能体根据字幕填写"
 
 AI_MARKERS = {
     "summary": ("<!-- BILI_AI_SUMMARY_START -->", "<!-- BILI_AI_SUMMARY_END -->"),
-    "steps": ("<!-- BILI_AI_STEPS_START -->", "<!-- BILI_AI_STEPS_END -->"),
-    "pitfalls": ("<!-- BILI_AI_PITFALLS_START -->", "<!-- BILI_AI_PITFALLS_END -->"),
-    "practice": ("<!-- BILI_AI_PRACTICE_START -->", "<!-- BILI_AI_PRACTICE_END -->"),
+    "body": ("<!-- BILI_AI_BODY_START -->", "<!-- BILI_AI_BODY_END -->"),
 }
 
 
@@ -64,20 +62,20 @@ def _description_resources(description: str) -> list[tuple[str, str]]:
 
 def quote_description(description: str, status: str) -> str:
     if status == "confirmed_empty":
-        return "> **视频简介**\n>\n> 本视频未提供简介。"
+        return "## 视频资料\n\n### 视频简介\n\n本视频未提供简介。"
     if status != "present":
         raise ValueError("简介状态不是可生成笔记的状态")
     lines = [line.strip() for line in description.splitlines() if line.strip()]
     overview = next((line for line in lines if not _URL_PATTERN.search(line) and not line.endswith(("：", ":"))), "UP 主原始简介见下方。")
     resources = _description_resources(description)
-    result = ["## 视频简介", "", overview]
+    result = ["## 视频资料", "", "### 视频简介", "", overview]
     if resources:
-        result.extend(["", "## UP 主资源", ""])
+        result.extend(["", "### UP 主资源", ""])
         result.extend(f"- [{label}]({url})" for label, url in resources)
     result.extend(
         [
             "",
-            "<details>",
+            '<details class="video-note-source-details">',
             "<summary>UP 主原始简介</summary>",
             "",
             html.escape(description),
@@ -104,28 +102,19 @@ def render_note_skeleton(job: dict[str, Any]) -> str:
         f"{frontmatter}\n\n"
         f"# {job['canonical_title']}\n\n"
         f"{bvid_line(bvid)}\n\n"
-        f"{description}\n\n"
+        f"{AI_MARKERS['summary'][0]}\n"
+        "> [!summary] 先看结论\n"
+        f"> {PLACEHOLDER_TEXT}。\n"
+        f"{AI_MARKERS['summary'][1]}\n\n"
         "<iframe\n"
         f"  src=\"https://player.bilibili.com/player.html?bvid={bvid}&autoplay=0&danmaku=0\"\n"
         "  style=\"width:100%;aspect-ratio:16/9;border:0;\"\n"
         "  allowfullscreen>\n"
         "</iframe>\n\n"
-        f"{AI_MARKERS['summary'][0]}\n"
-        "> [!summary] 先看结论\n"
-        f"> {PLACEHOLDER_TEXT}。\n"
-        f"{AI_MARKERS['summary'][1]}\n\n"
-        f"{AI_MARKERS['steps'][0]}\n"
-        "## 怎么做\n\n"
-        "待智能体根据字幕填写。\n"
-        f"{AI_MARKERS['steps'][1]}\n\n"
-        f"{AI_MARKERS['pitfalls'][0]}\n"
-        "## 容易踩坑\n\n"
-        "待智能体根据字幕填写。\n"
-        f"{AI_MARKERS['pitfalls'][1]}\n\n"
-        f"{AI_MARKERS['practice'][0]}\n"
-        "**我来实践**\n\n"
-        "- [ ] 待智能体根据字幕填写。\n"
-        f"{AI_MARKERS['practice'][1]}\n"
+        f"{AI_MARKERS['body'][0]}\n"
+        f"{PLACEHOLDER_TEXT}。根据视频实际内容组织知识正文；不要套固定章节。\n"
+        f"{AI_MARKERS['body'][1]}\n\n"
+        f"{description}\n"
     )
 
 

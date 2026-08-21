@@ -1,0 +1,451 @@
+/*
+ * ComfyUI Learning Lab — Core Design System v0.3
+ *
+ * Core scope
+ *   Apply only to notes with: cssclasses: [learning-page]
+ *
+ * Public API
+ *   - Design tokens: --ll-*
+ *   - Semantic callouts: lead / summary / meta / risk / resource
+ *   - Layout callouts: grid-2 / grid-3 / grid-auto + card
+ *   - Micro UI: .ll-badge / .ll-metric / .ll-note / .ll-chip-*
+ *   - Shared table and responsive rules
+ *
+ * Extension contract
+ *   1. Extensions require learning-lab.css; do not duplicate Core components.
+ *   2. Scope overrides with a combined class, e.g. .learning-page.video-note.
+ *   3. Reuse --ll-* tokens before introducing extension-specific tokens.
+ *   4. Extension tokens/classes use their own prefix, e.g. --vn-* / video-note-*.
+ *   5. Domain-specific rules stay in extensions; Core remains domain-agnostic.
+ *
+ * Goal: one stable visual language across model, video, plugin, workflow,
+ * and future knowledge-page types without coupling their domain behavior.
+ */
+
+/* 00 — Core design tokens */
+
+.learning-page {
+  --ll-content-max: 1120px;
+  --ll-page-padding-inline: clamp(24px, 4vw, 64px);
+  --ll-page-padding-inline-narrow: 18px;
+
+  --ll-radius-sm: 8px;
+  --ll-radius-md: 12px;
+  --ll-radius-lg: 16px;
+
+  --ll-gap-xs: 0.45rem;
+  --ll-gap-sm: 0.75rem;
+  --ll-gap-md: 1rem;
+  --ll-gap-lg: 1.4rem;
+  --ll-gap-xl: 2rem;
+  --ll-grid-gap: var(--ll-gap-md);
+
+  --ll-surface: var(--background-secondary);
+  --ll-surface-soft: var(--background-primary-alt, var(--background-secondary));
+  --ll-border: var(--background-modifier-border);
+  --ll-border-hover: var(--background-modifier-border-hover, var(--background-modifier-border));
+  --ll-text: var(--text-normal);
+  --ll-muted: var(--text-muted);
+  --ll-faint: var(--text-faint);
+  --ll-accent: var(--interactive-accent);
+  --ll-on-accent: var(--text-on-accent, #fff);
+}
+
+/* 10 — Page frame & typography */
+
+.learning-page .markdown-preview-sizer {
+  max-width: var(--ll-content-max);
+  padding-inline: var(--ll-page-padding-inline);
+  container-type: inline-size;
+  container-name: learning-page;
+}
+
+.learning-page h1 {
+  margin-top: 0.25em;
+  margin-bottom: 0.35em;
+  font-size: clamp(2rem, 4vw, 2.8rem);
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+  font-weight: 720;
+}
+
+.learning-page h2 {
+  margin-top: 2.8em;
+  margin-bottom: 1em;
+  padding-bottom: 0.5em;
+  border-bottom: 1px solid var(--ll-border);
+  font-size: clamp(1.25rem, 2.2vw, 1.55rem);
+  line-height: 1.25;
+  letter-spacing: -0.018em;
+  font-weight: 680;
+}
+
+.learning-page h3 {
+  margin-top: 1.9em;
+  margin-bottom: 0.65em;
+  font-size: 1.05rem;
+  line-height: 1.35;
+  font-weight: 680;
+}
+
+.learning-page p,
+.learning-page li {
+  line-height: 1.72;
+}
+
+.learning-page p {
+  margin-block: 0.7em;
+}
+
+.learning-page ul,
+.learning-page ol {
+  margin-block: 0.7em 1em;
+}
+
+.learning-page hr {
+  margin: 2.6rem 0;
+  border: 0;
+  border-top: 1px solid var(--ll-border);
+}
+
+.learning-page strong {
+  font-weight: 680;
+}
+
+.learning-page a {
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 0.07em;
+}
+
+/* 20 — Semantic callouts */
+
+.learning-page .callout[data-callout="lead"],
+.learning-page .callout[data-callout="summary"],
+.learning-page .callout[data-callout="meta"],
+.learning-page .callout[data-callout="risk"],
+.learning-page .callout[data-callout="resource"] {
+  border-radius: var(--ll-radius-md);
+  box-shadow: none;
+}
+
+.learning-page .callout[data-callout="lead"] {
+  margin: 0.6rem 0 1.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ll-muted);
+  font-size: 1.03rem;
+}
+
+.learning-page .callout[data-callout="lead"] > .callout-title {
+  display: none;
+}
+
+.learning-page .callout[data-callout="lead"] > .callout-content {
+  padding: 0;
+}
+
+.learning-page .callout[data-callout="summary"] {
+  margin: 1.25rem 0 1.8rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--ll-accent) 32%, var(--ll-border));
+  border-left: 3px solid var(--ll-accent);
+  background: color-mix(in srgb, var(--ll-accent) 7%, var(--background-primary));
+}
+
+.learning-page .callout[data-callout="meta"] {
+  margin: 1.1rem 0;
+  padding: 0.8rem 0.95rem;
+  border: 1px solid var(--ll-border);
+  background: var(--ll-surface-soft);
+  color: var(--ll-muted);
+  font-size: 0.88rem;
+}
+
+.learning-page .callout[data-callout="risk"] {
+  margin: 1.1rem 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--ll-border-hover);
+  border-left: 3px solid var(--text-warning, var(--ll-accent));
+  background: var(--ll-surface-soft);
+}
+
+.learning-page .callout[data-callout="resource"] {
+  margin: 1.1rem 0;
+  padding: 1rem 1.05rem;
+  border: 1px solid var(--ll-border);
+  background: var(--ll-surface);
+}
+
+.learning-page .callout[data-callout="summary"] > .callout-title,
+.learning-page .callout[data-callout="meta"] > .callout-title,
+.learning-page .callout[data-callout="risk"] > .callout-title,
+.learning-page .callout[data-callout="resource"] > .callout-title {
+  font-weight: 680;
+  letter-spacing: -0.01em;
+}
+
+.learning-page .callout[data-callout="summary"] .callout-icon,
+.learning-page .callout[data-callout="meta"] .callout-icon,
+.learning-page .callout[data-callout="resource"] .callout-icon {
+  display: none;
+}
+
+/* 30 — Layout primitives */
+
+.learning-page .callout[data-callout="grid-2"],
+.learning-page .callout[data-callout="grid-3"],
+.learning-page .callout[data-callout="grid-auto"] {
+  margin: 1.1rem 0 1.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.learning-page .callout[data-callout="grid-2"] > .callout-title,
+.learning-page .callout[data-callout="grid-3"] > .callout-title,
+.learning-page .callout[data-callout="grid-auto"] > .callout-title {
+  display: none;
+}
+
+.learning-page .callout[data-callout="grid-2"] > .callout-content,
+.learning-page .callout[data-callout="grid-3"] > .callout-content,
+.learning-page .callout[data-callout="grid-auto"] > .callout-content {
+  display: grid;
+  align-items: stretch;
+  padding: 0;
+  gap: var(--ll-grid-gap);
+}
+
+.learning-page .callout[data-callout="grid-2"] > .callout-content {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.learning-page .callout[data-callout="grid-3"] > .callout-content {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.learning-page .callout[data-callout="grid-auto"] > .callout-content {
+  grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr));
+}
+
+.learning-page .callout[data-callout="grid-2"] .callout[data-callout="card"],
+.learning-page .callout[data-callout="grid-3"] .callout[data-callout="card"] {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@container learning-page (max-width: 560px) {
+  .learning-page .callout[data-callout="grid-3"] > .callout-content {
+    grid-template-columns: 1fr;
+  }
+}
+
+@container learning-page (max-width: 480px) {
+  .learning-page .callout[data-callout="grid-2"] > .callout-content {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 40 — Surface components */
+
+.learning-page .callout[data-callout="card"] {
+  height: 100%;
+  margin: 0;
+  padding: 1rem 1.05rem;
+  border: 1px solid var(--ll-border);
+  border-radius: var(--ll-radius-md);
+  background: var(--ll-surface);
+  box-shadow: none;
+  transition: border-color 120ms ease, transform 120ms ease, background 120ms ease;
+}
+
+.learning-page .callout[data-callout="card"]:hover {
+  border-color: var(--ll-border-hover);
+  background: color-mix(in srgb, var(--ll-surface) 88%, var(--ll-accent) 12%);
+  transform: translateY(-1px);
+}
+
+.learning-page .callout[data-callout="card"] > .callout-title {
+  margin-bottom: 0.65rem;
+  color: var(--ll-text);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.012em;
+}
+
+.learning-page .callout[data-callout="card"] .callout-icon {
+  display: none;
+}
+
+.learning-page .callout[data-callout="card"] > .callout-content {
+  color: var(--ll-text);
+}
+
+.learning-page .callout[data-callout="card"] > .callout-content > :first-child {
+  margin-top: 0;
+}
+
+.learning-page .callout[data-callout="card"] > .callout-content > :last-child {
+  margin-bottom: 0;
+}
+
+/* 50 — Micro UI */
+
+.learning-page .ll-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin: 0 0.35rem 0.35rem 0;
+  padding: 0.18rem 0.48rem;
+  border: 1px solid var(--ll-border);
+  border-radius: 999px;
+  background: var(--background-primary);
+  color: var(--ll-muted);
+  font-size: 0.72rem;
+  line-height: 1.3;
+  font-weight: 650;
+  letter-spacing: 0.015em;
+  vertical-align: middle;
+}
+
+.learning-page .ll-badge.is-priority {
+  border-color: var(--ll-accent);
+  background: var(--ll-accent);
+  color: var(--ll-on-accent);
+}
+
+.learning-page .ll-badge.is-test {
+  border-color: color-mix(in srgb, var(--ll-accent) 45%, var(--ll-border));
+  background: color-mix(in srgb, var(--ll-accent) 8%, var(--background-primary));
+  color: var(--ll-accent);
+}
+
+.learning-page .ll-badge.is-source {
+  background: var(--ll-surface);
+  color: var(--ll-muted);
+}
+
+.learning-page .ll-metric {
+  margin: 0.15rem 0 0.75rem;
+  font-size: clamp(1.45rem, 3vw, 1.9rem);
+  line-height: 1.05;
+  font-weight: 720;
+  letter-spacing: -0.035em;
+}
+
+.learning-page .ll-kicker {
+  margin: 0 0 0.45rem;
+  color: var(--ll-muted);
+  font-size: 0.76rem;
+  line-height: 1.4;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.learning-page .ll-note,
+.learning-page small.ll-note {
+  color: var(--ll-muted);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.learning-page .ll-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.48rem;
+  margin: 0.85rem 0 1.1rem;
+}
+
+.learning-page .ll-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.62rem;
+  border: 1px solid var(--ll-border);
+  border-radius: 999px;
+  background: var(--ll-surface);
+  color: var(--ll-text);
+  font-size: 0.82rem;
+  line-height: 1.25;
+  font-weight: 600;
+}
+
+/* 60 — Data presentation */
+
+.learning-page table {
+  width: 100%;
+  margin: 1rem 0 1.4rem;
+  border: 1px solid var(--ll-border);
+  border-radius: var(--ll-radius-md);
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  font-size: 0.9rem;
+}
+
+.learning-page th,
+.learning-page td {
+  padding: 0.7rem 0.78rem;
+  border-right: 1px solid var(--ll-border);
+  border-bottom: 1px solid var(--ll-border);
+  vertical-align: top;
+  line-height: 1.55;
+}
+
+.learning-page th {
+  background: var(--ll-surface);
+  color: var(--ll-muted);
+  font-size: 0.78rem;
+  font-weight: 680;
+  text-align: left;
+  letter-spacing: 0.02em;
+}
+
+.learning-page td:first-child {
+  font-weight: 650;
+}
+
+.learning-page tr > :last-child {
+  border-right: 0;
+}
+
+.learning-page tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.learning-page tbody tr:hover td {
+  background: color-mix(in srgb, var(--ll-surface) 88%, var(--ll-accent) 12%);
+}
+
+/* 70 — Resource links */
+
+.learning-page .callout[data-callout="resource"] a {
+  font-weight: 650;
+}
+
+.learning-page .callout[data-callout="resource"] p:last-child {
+  margin-bottom: 0;
+}
+
+/* 90 — Responsive adjustments */
+
+@media (max-width: 720px) {
+  .learning-page .markdown-preview-sizer {
+    padding-inline: var(--ll-page-padding-inline-narrow);
+  }
+
+  .learning-page h2 {
+    margin-top: 2.2em;
+  }
+
+  .learning-page table {
+    font-size: 0.84rem;
+  }
+
+  .learning-page th,
+  .learning-page td {
+    padding: 0.58rem 0.62rem;
+  }
+}

@@ -16,8 +16,6 @@ from bili_learning.cli import main  # noqa: E402
 
 
 if __name__ == "__main__":
-    if "--allow-existing-for-test" in sys.argv[1:]:
-        raise SystemExit("该回归测试开关仅允许 Codex 直接调用核心 CLI，Hermes 日常入口禁止使用。")
     sys.argv = [
         "bili-learning",
         "--project-root",

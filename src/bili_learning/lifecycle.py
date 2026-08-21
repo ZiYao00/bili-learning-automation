@@ -10,7 +10,6 @@ from typing import Any
 from .collector import (
     cleanup_stale_jobs,
     create_job,
-    find_existing_note,
     media_count,
     new_job_dir,
     run_ytdlp,
@@ -20,8 +19,8 @@ from .collector import (
 from .config import load_settings
 from .input_resolver import resolve_input
 from .navigation import build_navigation
-from .note_template import PLACEHOLDER_TEXT
 from .publisher import publish_validated_draft
+from .quality import load_analysis_report, validate_analysis_report
 from .runtime import (
     Reservation,
     ReservationBusyError,
@@ -89,20 +88,11 @@ def _schedule_failsafe_cleanup(job_dir: Path, project_root: Path, runner: Path |
     )
 
 
-def _existing_status(path: Path) -> str:
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
-        return "already_exists"
-    return "incomplete_note" if PLACEHOLDER_TEXT in text else "already_exists"
-
-
 def prepare_note(
     project_root: Path,
     message: str | None,
     *,
     dry_run: bool = False,
-    allow_existing_for_test: bool = False,
     cleanup_job_path: Path | None = None,
     after_seconds: int = FAILSAFE_SECONDS,
     cleanup_runner: Path | None = None,
@@ -123,19 +113,6 @@ def prepare_note(
         stale_removed = cleanup_stale_jobs(settings)
         resolved = resolve_input(message)
         reservation = claim_reservation(settings.runtime_root, resolved.bvid)
-        existing = find_existing_note(settings.notes_root, resolved.canonical_url, resolved.bvid)
-        if existing and not allow_existing_for_test:
-            status = _existing_status(existing)
-            return _status(
-                {
-                    "status": status,
-                    "bvid": resolved.bvid,
-                    "note_path": str(existing),
-                    "message": "该视频已存在笔记。",
-                    "stale_jobs_removed": stale_removed,
-                },
-                2 if status == "incomplete_note" else 0,
-            )
         if dry_run:
             return _status(
                 {
@@ -190,11 +167,11 @@ def prepare_note(
                 "handoff_path": str(handoff),
                 "note_path": job["note_path"],
                 "draft_path": job["draft_path"],
+                "analysis_path": job["analysis_path"],
                 "subtitle_path": str(subtitle),
                 "description_status": job["description_status"],
                 "media_files": 0,
                 "stale_jobs_removed": stale_removed,
-                "test_mode": allow_existing_for_test,
             }
         )
     except ReservationBusyError as error:
@@ -223,13 +200,22 @@ def finalize_note(project_root: Path, job_path: Path, note_path: Path) -> tuple[
     code = 0
     try:
         job = json.loads((job_dir / "job.json").read_text(encoding="utf-8"))
-        errors = validate_note(note_path, job)
-        if errors:
-            payload, code = {"status": "note_invalid", "message": "；".join(errors)}, 2
+        report = load_analysis_report(Path(job["analysis_path"]))
+        report_errors = validate_analysis_report(report)
+        source_status = report.get("source_assessment", {}).get("status")
+        if source_status == "insufficient" and not report_errors:
+            payload, code = {
+                "status": "source_insufficient",
+                "message": report["source_assessment"]["reason"],
+            }, 2
         else:
-            publish_validated_draft(note_path, Path(job["note_path"]))
-            build_navigation(settings)
-            payload = {"status": "note_ready", "note_path": job["note_path"]}
+            errors = validate_note(note_path, job)
+            if errors:
+                payload, code = {"status": "note_invalid", "message": "；".join(errors)}, 2
+            else:
+                publish_validated_draft(note_path, Path(job["note_path"]))
+                build_navigation(settings)
+                payload = {"status": "note_ready", "note_path": job["note_path"]}
     except Exception as error:
         payload, code = {"status": "failed", "message": str(error)}, 1
     try:

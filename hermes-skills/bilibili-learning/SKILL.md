@@ -9,8 +9,6 @@ description: Turn a Bilibili copied link, supported Bilibili short link, or BV i
 
 本 skill 是 Hermes/微信适配层。通用输入、数据、笔记和 finalizer 约束的唯一来源是项目根目录 `docs\AGENT-INTEGRATION.md`；本文件只保留 Hermes 私聊的触发、调用和回复规则。
 
-`--allow-existing-for-test` 是 Codex 本地回归测试开关；Hermes 入口明确禁止使用，日常链接始终先判重。
-
 只在 owner 私聊中运行；群聊或发送者范围不确定时先确认。
 
 ## Mandatory workflow
@@ -26,25 +24,24 @@ description: Turn a Bilibili copied link, supported Bilibili short link, or BV i
 
 2. 读取 JSON 状态：
 
-   - `already_exists`：回复已有文件名，不继续。
    - `in_progress`：说明同一视频已有活动任务，不重复采集或生成。
    - `incomplete_note`：仅旧版遗留骨架会返回；说明该笔记尚未完成，不声称完成。
    - `subtitle_unavailable`：说明没有可用中文字幕，且没有下载媒体，不生成笔记。
    - `failed`：回复短错误，不声称完成。
    - 只有 `materials_ready` 才继续。
 
-3. `materials_ready` 时读取 `handoff_path`、`job.json`、`subtitle_path`。只编辑 `draft_path` 的四组 marker，不改 Frontmatter、H1、BVID 小字、简介、iframe、文件名、路径或 marker 本身。所有新笔记由程序先发布到 `00-待整理`；H1 默认是 B站原视频标题，分类建议和 tags 已由程序确定，不需要重新读取 taxonomy。
+3. `materials_ready` 时读取 `handoff_path`、`job.json`、`subtitle_path`、`analysis_path`，并遵循项目共享的 `docs\\AGENT-INTEGRATION.md` 与内容标准。先判断字幕/简介是否足以支撑可信学习笔记；来源不足时在 `analysis.json` 记录原因，不得靠常识补全。
 
-4. 只在四组 marker 内填写：
+4. 来源充分时，先填写 `knowledge_outline`，再只编辑 `draft_path` 的两个 marker：
 
    - `BILI_AI_SUMMARY`：短的“先看结论”；
-   - `BILI_AI_STEPS`：`## 怎么做`；
-   - `BILI_AI_PITFALLS`：`## 容易踩坑`；
-   - `BILI_AI_PRACTICE`：简短实践清单。
+   - `BILI_AI_BODY`：根据视频真实信息结构动态组织的知识正文。
 
-   只写字幕或原始简介支持的事实。不要把临时路径、job 文件名、证据编号、采集状态写进主笔记。marker 仅用于草稿校验，正式 Obsidian 笔记发布时会自动移除。
+   不强制套用“怎么做 / 容易踩坑 / 我来实践”。参数、公式、限制、专名、A/B 差异、兼容性、作者明确推荐和重要资源等高价值信息，不能只为缩短篇幅而删除。正文只写字幕或原始简介支持的事实。版式按共享标准选择 Table / Grid / Card / Risk / Resource / Chip，不为了好看强行卡片化；Frontmatter 与 `learning-page + video-note` cssclasses 由程序负责，Hermes 不修改。
 
-5. 写完后立即 finalizer：
+5. 成稿后重新对照字幕或 `knowledge_outline` 做覆盖复核；确认无重要遗漏、无来源外补写后，将 `coverage_review.status` 设为 `passed` 并填写 notes。不要把 runtime 路径、job 文件名、analysis 文件、证据编号或采集状态写进主笔记。
+
+6. 写完后立即 finalizer：
 
    ```powershell
    python "$project\hermes-skills\bilibili-learning\scripts\finalize_ytdlp_bilibili_note.py" --job '<job_dir>' --note '<draft_path>'
@@ -52,9 +49,10 @@ description: Turn a Bilibili copied link, supported Bilibili short link, or BV i
 
    即使写作失败，也必须运行 finalizer 清理 job。
 
-6. 只在 finalizer 返回后回复：
+7. 只在 finalizer 返回后回复：
 
    - `note_ready`：`已完成：《标题》\n笔记：<文件名>\n已写入 Obsidian。`
+   - `source_insufficient`：说明现有字幕/简介不足以支撑可靠学习笔记，本次未写入正式笔记。
    - `note_invalid` / `failed`：只报告短错误，不能说已完成。
 
 ## 学习后整理

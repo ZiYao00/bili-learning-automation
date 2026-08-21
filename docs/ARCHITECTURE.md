@@ -7,9 +7,10 @@
 → input_resolver 规范化 BVID 与 canonical URL
 → yt-dlp 仅采集元数据、UP 主简介、ai-zh/zh 字幕
 → taxonomy 生成 tags 与后续整理建议；原视频标题的新笔记进入 00-待整理
-→ Python 在 runtime 写入确定性 Markdown 草稿
-→ 接入智能体只填写四个 AI 内容区域
-→ finalizer 强校验真实元数据与结构后原子发布
+→ Python 在 runtime 写入确定性 Markdown 草稿与 analysis.json
+→ Codex/Hermes 判断来源充分性并形成 knowledge_outline
+→ 智能体填写“先看结论 + 动态知识正文”并完成 coverage review
+→ finalizer 校验质量流程状态、真实元数据与结构后原子发布
 → navigation 原子刷新
 → 清理临时 job
 ```
@@ -21,7 +22,9 @@
 - `hermes-skills/bilibili-learning/SKILL.md`：Hermes/微信专属适配约束。
 - `hermes-skills/bilibili-learning/scripts/`：只定位项目根目录并转发到核心 CLI 的兼容入口。
 - `config/bilibili-note-taxonomy.json`：模型别名、tags、后续整理建议和默认 `notes_root`。
-- `docs/standards/`：人类可读的笔记质量标准。
+- `docs/standards/`：人类可读的笔记质量与版式语义标准。
+- `obsidian/snippets/`：随仓库提交、可直接安装到 Obsidian Vault 的 `learning-lab.css` Core 与 `video-note.css` Extension。
+- `docs/OBSIDIAN-STYLING.md`：CSS 安装、作用域、升级同步和无样式降级规则。当前副本与 `ComfyUI-Learning-Lab` Design System v0.3 / Video Note v0.1 对齐，但运行时不依赖另一个本地仓库。
 
 ## 确定性边界
 
@@ -34,19 +37,22 @@
 - 原始简介；
 - iframe；
 - tags；
+- `learning-page + video-note` cssclasses；
+- 阅读顺序（Summary → Player → AI Body → Source）；
 - 输出路径；
 - 导航。
 
 taxonomy 的 route.path 不直接决定新文件的路径。新笔记统一先进入 fallback.path（默认 `00-待整理`）；route.path 仅随 job 保留为建议分类，并通过 tags 帮助 `organize` 在学习后归档。收集阶段 H1 直接使用原视频标题，不进行主题提炼。
 
-接入智能体只负责根据字幕和原始简介生成：
+接入智能体只负责字幕理解与语义内容：
 
-- 先看结论；
-- 怎么做；
-- 容易踩坑；
-- 我来实践。
+- 判断字幕与简介是否足以支撑可信学习笔记；
+- 形成 runtime `knowledge_outline`；
+- 写短的“先看结论”；
+- 根据视频真实信息结构组织动态知识正文；
+- 成稿后完成覆盖复核。
 
-这样避免 LLM 重写元数据、简介或路径。
+章节、表格和步骤形式由内容决定；确定性骨架仍由程序控制，避免 LLM 重写元数据、简介或路径。
 
 ## 数据边界
 
@@ -57,13 +63,12 @@ taxonomy 的 route.path 不直接决定新文件的路径。新笔记统一先�
 
 ## 配置边界
 
-`notes_root` 从 taxonomy 统一读取，也可用 `BILI_LEARNING_NOTES_ROOT` 覆盖。collector、判重、finalizer、navigation 使用同一 settings loader。
+`notes_root` 从 taxonomy 统一读取，也可用 `BILI_LEARNING_NOTES_ROOT` 覆盖。collector、finalizer、navigation 使用同一 settings loader。
 
 ## 可靠性原则
 
-- BVID 以 H1 下方小字和 `source` 共同用于判重；文件名使用原视频标题，同名时在预约锁保护下使用递增序号，避免并行任务冲突。
-- 同一 BVID 使用跨 collector、智能体写作与 finalizer 的 reservation；残留 reservation 超过 1 小时且对应 job 不再活动时可自动恢复。
-- 判重以 Frontmatter `source` 为准；旧笔记仅在文件名含相同 BVID 时兼容识别，正文中出现链接不会误判重复。
+- 文件名使用原视频标题，同名时在预约锁保护下使用递增序号，避免覆盖。已完成视频允许再次转换并生成新笔记。
+- 同一 BVID 仅在活动 collector、智能体写作与 finalizer 期间使用 reservation 防止并发；任务结束后释放 reservation，允许再次转换。残留 reservation 超过 1 小时且对应 job 不再活动时可自动恢复。
 - Finalizer 校验真实值，而非仅检查字段名；无效草稿不会进入笔记库，随 runtime job 一起清理。草稿的 `BILI_AI_*` marker 只用于校验，发布时会移除，因此正式 Obsidian 笔记不含机器标记。
 - 导航采用临时文件后原子替换。
 - 不同 BVID 可并行处理；导航重建使用独占锁串行执行，避免多个 finalizer 交叉覆盖同一组导航页。当前不会自动删除旧导航页，以免误删用户手写内容。

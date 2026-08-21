@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import Any
 
 from .config import DependencyError, Settings
-from .frontmatter import parse_frontmatter
-from .note_template import bvid_line, note_filename, write_skeleton
+from .note_template import note_filename, write_skeleton
+from .quality import write_analysis_template
 from .runtime import cleanup_job, waiting_file_lock
 from .taxonomy import classify
 
@@ -18,28 +18,6 @@ STALE_SECONDS = 60 * 60
 YTDLP_TIMEOUT_SECONDS = 180
 JOB_SCHEMA_VERSION = 1
 NOTE_NAME_LOCK = "note-names.lock"
-
-
-def _frontmatter_source(note: Path) -> str | None:
-    try:
-        text = note.read_text(encoding="utf-8")
-    except OSError:
-        return None
-    values, _ = parse_frontmatter(text)
-    return values.get("source")
-
-
-def find_existing_note(notes_root: Path, canonical_url: str, bvid: str) -> Path | None:
-    if not notes_root.is_dir():
-        return None
-    for note in notes_root.rglob("*.md"):
-        if _frontmatter_source(note) == canonical_url:
-            return note
-        if bvid_line(bvid) in note.read_text(encoding="utf-8"):
-            return note
-        if note.stem.endswith(f"__{bvid}"):
-            return note
-    return None
 
 
 def cleanup_stale_jobs(settings: Settings) -> int:
@@ -180,6 +158,7 @@ def create_job(
             note_path = note_directory / note_filename(canonical_title, sequence)
         filename = note_path.name
         draft_path = job_dir / filename
+        analysis_path = job_dir / "analysis.json"
         payload: dict[str, Any] = {
             "schema_version": JOB_SCHEMA_VERSION,
             "bvid": bvid,
@@ -197,9 +176,11 @@ def create_job(
             **filing,
             "note_path": str(note_path),
             "draft_path": str(draft_path),
+            "analysis_path": str(analysis_path),
         }
         (job_dir / "job.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         write_skeleton(draft_path, payload)
+        write_analysis_template(analysis_path)
     return payload
 
 
@@ -212,11 +193,13 @@ def write_handoff(job_dir: Path, payload: dict[str, Any]) -> Path:
     handoff = job_dir / "agent_handoff.md"
     handoff.write_text(
         "# B站视频转笔记任务\n\n"
-        "1. 读取 `job.json` 与 `subtitle_path`。\n"
-        "2. `draft_path` 是程序生成的临时骨架；不要改 Frontmatter、H1、视频简介、iframe、文件名或 tags。\n"
-        "3. 只在四组 `BILI_AI_*_START/END` marker 内填写：先看结论、怎么做、容易踩坑、我来实践。\n"
-        "4. 正文只使用字幕或原始简介支持的内容，不写临时路径、证据编号或采集细节。\n"
-        "5. 写完立刻运行 finalizer；无论写作成功或失败都必须 finalizer 清理 job。\n",
+        "1. 读取 `job.json`、`subtitle_path` 与共享内容标准。\n"
+        "2. 先判断字幕与简介是否足以支撑可信学习笔记，并填写 runtime 的 `analysis_path`。来源不足时不要编造正文。\n"
+        "3. 来源充分时，先在 `knowledge_outline` 中列出应保护的重要知识，再编辑 `draft_path`。不要改 Frontmatter、H1、视频简介、iframe、文件名、路径、tags、cssclasses 或 marker。\n"
+        "4. 只填写两个 AI 区域：短的“先看结论”和根据视频内容动态组织的知识正文；不要强制套用步骤、坑点或实践清单。按共享标准根据知识关系选择 Table / Grid / Card / Risk / Resource / Chip，不为了好看强行卡片化。\n"
+        "5. 正文只使用字幕或原始简介支持的事实。参数、公式、限制、专名、比较、作者明确推荐、兼容性、资源等高价值信息不能仅为缩短篇幅而删除；有检索价值的同类成员和“原则 + 可直接使用值”也要避免二次压缩。\n"
+        "6. 成稿后重新对照字幕/knowledge_outline 做覆盖复核；确认无重要遗漏和无来源外补写后，将 `coverage_review.status` 设为 `passed` 并填写 notes。\n"
+        "7. 写完立即运行 finalizer；无论成功或失败都必须 finalizer 清理 job。\n",
         encoding="utf-8",
     )
     return handoff

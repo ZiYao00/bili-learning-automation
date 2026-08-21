@@ -66,9 +66,21 @@ def _rewrite_title_and_intro(text: str, title: str, intro: str) -> str:
     )
     if count != 1:
         raise ValueError("笔记缺少 H1，无法整理")
-    pattern = r"(^## 视频简介\r?\n\r?\n)(.*?)(?=\r?\n\r?\n## |\Z)"
-    result, count = re.subn(pattern, lambda match: match.group(1) + intro, result, count=1, flags=re.DOTALL | re.MULTILINE)
-    if count != 1:
+    patterns = (
+        r"(^### 视频简介\r?\n\r?\n)(.*?)(?=\r?\n\r?\n### UP 主资源|\r?\n\r?\n<details|\r?\n\r?\n## |\Z)",
+        r"(^## 视频简介\r?\n\r?\n)(.*?)(?=\r?\n\r?\n## |\r?\n\r?\n<details|\Z)",
+    )
+    for pattern in patterns:
+        result, count = re.subn(
+            pattern,
+            lambda match: match.group(1) + intro,
+            result,
+            count=1,
+            flags=re.DOTALL | re.MULTILINE,
+        )
+        if count == 1:
+            break
+    else:
         raise ValueError("笔记缺少标准视频简介，无法整理")
     return result
 

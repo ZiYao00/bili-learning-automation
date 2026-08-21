@@ -1,3 +1,10 @@
+# B站视频转笔记：成品示例
+
+本文件展示的是内容质量和结构自由度，不是要求所有视频复制同一套章节。
+
+## 示例 A：短操作教程
+
+```md
 ---
 author: "示例UP主"
 published: "2026-08-11"
@@ -7,38 +14,19 @@ tags:
   - "视频生成"
   - "工作流"
   - "MiniMax-H3"
+cssclasses:
+  - "learning-page"
+  - "video-note"
 ---
 
 # H3 分段工作流：连续片段生成
 
 <small>BV号：BV1EXAMPLE01</small>
 
-## 视频简介
-
-本示例用于展示程序保留并压缩展示 UP 主原始简介。
-
-## UP 主资源
-
-- [示例资源](https://example.com/resource)
-
-<details>
-<summary>UP 主原始简介</summary>
-
-本示例用于展示“程序保留 UP 主原始简介”的位置。真实笔记中这里必须是 collector 取得的原始简介，智能体不得改写。
-https://example.com/resource
-
-</details>
-
-<iframe
-  src="https://player.bilibili.com/player.html?bvid=BV1EXAMPLE01&autoplay=0&danmaku=0"
-  style="width:100%;aspect-ratio:16/9;border:0;"
-  allowfullscreen>
-</iframe>
-
 > [!summary] 先看结论
-> **用途：** 把单段时长受限的视频拆成多个片段连续生成。
-> **适合：** 已有首帧或参考图，需要制作更长连续视频的人。
-> **记住：** 每段控制在模型允许时长内，并让上一段末帧参与下一段生成。
+> 这段视频讲如何把受单段时长限制的视频拆成连续片段生成；关键是让上一段末帧参与下一段生成，并在扩大总时长前先验证两段之间的主体与动作衔接。
+
+<iframe ...></iframe>
 
 ## 怎么做
 
@@ -46,18 +34,110 @@ https://example.com/resource
 2. 为每个片段准备对应提示词。
 3. 第一段使用初始参考图。
 4. 后续片段以上一段末帧作为连续性参考。
-5. 检查输出片段后再决定是否拼接。
-
-[02:34 末帧桥接](https://player.bilibili.com/player.html?bvid=BV1EXAMPLE01&t=154)
+5. 检查输出片段后再决定是否继续增加总时长。
 
 ## 容易踩坑
 
-- **单段超过模型限制** → 增加分段数或缩短单段时长。
-- **提示词数量与片段数不一致** → 先确认每个片段都有对应提示词。
 - **主体在后续片段发生明显变化** → 检查上一段末帧是否正确作为下一段参考。
 
-**我来实践**
+## 视频资料
 
-- [ ] 先做两个短片段的最小测试。
-- [ ] 检查两段之间的主体和动作衔接。
-- [ ] 确认流程稳定后再增加总时长。
+### 视频简介
+
+本示例用于展示程序保留并压缩展示 UP 主原始简介。
+
+### UP 主资源
+
+- [示例资源](https://example.com/resource)
+
+<details class="video-note-source-details">
+<summary>UP 主原始简介</summary>
+
+原始简介内容……
+
+</details>
+```
+
+这里使用“怎么做 / 容易踩坑”是因为视频本身是操作教程，不代表它们是固定章节。
+
+## 示例 B：知识密集型模型百科
+
+```md
+> [!summary] 先看结论
+> 这类视频的价值不在单一操作步骤，而在模型规格、输入方式、提示词、加速方案和兼容性之间的系统关系。正文应保留可复查的参数、限制、方案差异与作者明确建议。
+
+## 01 · 核心规格
+
+| 项目 | 视频给出的信息 |
+| --- | --- |
+| 推荐分辨率 | 原则 + 典型可直接使用值 |
+| 帧数规则 | …… |
+| 建议时长 | …… |
+
+## 02 · 两种模型路线
+
+> [!grid-2]
+>
+> > [!card] FL2VA
+> > **适合**：……
+> >
+> > **限制 / 特点**：……
+>
+> > [!card] Ref2VA
+> > **适合**：……
+> >
+> > **限制 / 特点**：……
+
+## 03 · 输入与提示词
+
+| 输入 | 能力 | 数量 / 时长限制 | 关键区别 |
+| --- | --- | --- | --- |
+| 文本 | …… | …… | …… |
+| 图片 | …… | …… | …… |
+| 视频 | …… | …… | …… |
+| 音频 | …… | …… | …… |
+
+## 04 · 三条加速路线
+
+> [!grid-3]
+>
+> > [!card] Attention
+> > SageAttention · Sol-Attn
+>
+> > [!card] Turbo / LoRA
+> > larryvrh · drbaph · Abiray · LightX2V
+>
+> > [!card] Cache / Prediction
+> > 适合后测，注意稳定性与质量损失。
+
+<div class="ll-chip-row">
+  <span class="ll-chip">EasyCache</span>
+  <span class="ll-chip">LazyCache</span>
+  <span class="ll-chip">TeaCache</span>
+  <span class="ll-chip">MagCache</span>
+  <span class="ll-chip">FirstBlockCache</span>
+  <span class="ll-chip">Spectrum</span>
+</div>
+
+> [!risk] 兼容性
+> 互斥、冲突、画质损失等真正影响选择的条件在这里单独强调。
+
+## 05 · 提示词结构
+
+……
+
+> [!resource]- 当前章节的关键资源
+> 只在正文确实需要时引用相关 GitHub / 模型 / 工作流入口；程序已在文末保留完整 UP 主资源，不重复抄整份清单。
+```
+
+这里没有强制“我来实践”，因为视频核心是知识百科。章节数量、表格和分组都由实际字幕决定。
+
+## 质量判断
+
+无论采用哪种结构，都必须满足：
+
+- 事实只来自当前字幕与 UP 主原始简介；
+- 高价值参数、限制、比较、专名、兼容性和重要资源不能因为追求简短而丢失；
+- 不确定的信息宁可省略或判定来源不足，不得用模型常识补全；
+- 成稿后完成覆盖复核；
+- runtime 的 `analysis.json`、marker、内部路径和采集状态不进入正式笔记。
