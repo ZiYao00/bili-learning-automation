@@ -214,6 +214,36 @@ def test_validator_checks_real_metadata_and_markers(tmp_path: Path) -> None:
     assert any("author" in error for error in validate_note(note, job))
 
 
+def test_validator_rejects_a_card_without_grid_nesting(tmp_path: Path) -> None:
+    note = tmp_path / "卡片嵌套.md"
+    analysis = tmp_path / "analysis.json"
+    job = {
+        "schema_version": 1,
+        "bvid": "BV1TXua68EYi",
+        "canonical_url": "https://www.bilibili.com/video/BV1TXua68EYi/",
+        "author": "UP",
+        "published": "2026-08-11",
+        "duration": "07:05",
+        "description": "原始简介",
+        "description_status": "present",
+        "canonical_title": "卡片嵌套",
+        "note_filename": note.name,
+        "required_tags": ["视频生成"],
+        "note_path": str(note),
+        "analysis_path": str(analysis),
+    }
+    _write_passed_analysis(analysis)
+    base = _complete_ai_regions(render_note_skeleton(job))
+    note.write_text(base + "\n> [!card] 错误\n> 单层卡片\n", encoding="utf-8")
+    assert any("Card 必须嵌套" in error for error in validate_note(note, job))
+
+    note.write_text(
+        base + "\n> [!grid-2]\n>\n> > [!card] 正确\n> > 嵌套卡片\n",
+        encoding="utf-8",
+    )
+    assert validate_note(note, job) == []
+
+
 def test_validator_rejects_unfinished_quality_review(tmp_path: Path) -> None:
     note = tmp_path / "质量复核.md"
     analysis = tmp_path / "analysis.json"

@@ -86,6 +86,8 @@ def validate_note(note: Path, job: dict[str, Any]) -> list[str]:
 
     if "[!summary] 先看结论" not in text:
         errors.append("缺少先看结论")
+    if re.search(r"^> \[!card\]", text, re.MULTILINE):
+        errors.append("Card 必须嵌套在 Grid 内：使用 > > [!card]，不能直接使用 > [!card]")
 
     try:
         report = load_analysis_report(Path(job["analysis_path"]))

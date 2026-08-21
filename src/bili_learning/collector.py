@@ -196,7 +196,7 @@ def write_handoff(job_dir: Path, payload: dict[str, Any]) -> Path:
         "1. 读取 `job.json`、`subtitle_path` 与共享内容标准。\n"
         "2. 先判断字幕与简介是否足以支撑可信学习笔记，并填写 runtime 的 `analysis_path`。来源不足时不要编造正文。\n"
         "3. 来源充分时，先在 `knowledge_outline` 中列出应保护的重要知识，再编辑 `draft_path`。不要改 Frontmatter、H1、视频简介、iframe、文件名、路径、tags、cssclasses 或 marker。\n"
-        "4. 只填写两个 AI 区域：短的“先看结论”和根据视频内容动态组织的知识正文；不要强制套用步骤、坑点或实践清单。按共享标准根据知识关系选择 Table / Grid / Card / Risk / Resource / Chip，不为了好看强行卡片化。\n"
+        "4. 只填写两个 AI 区域：短的“先看结论”和根据视频内容动态组织的知识正文；不要强制套用步骤、坑点或实践清单。按共享标准根据知识关系选择 Table / Grid / Card / Risk / Resource / Chip，不为了好看强行卡片化。Grid 内的 Card 必须使用嵌套 Markdown：外层 `> [!grid-3]`，子卡片必须以 `> > [!card]` 开始，不能写成单层 `> [!card]`。\n"
         "5. 正文只使用字幕或原始简介支持的事实。参数、公式、限制、专名、比较、作者明确推荐、兼容性、资源等高价值信息不能仅为缩短篇幅而删除；有检索价值的同类成员和“原则 + 可直接使用值”也要避免二次压缩。\n"
         "6. 成稿后重新对照字幕/knowledge_outline 做覆盖复核；确认无重要遗漏和无来源外补写后，将 `coverage_review.status` 设为 `passed` 并填写 notes。\n"
         "7. 写完立即运行 finalizer；无论成功或失败都必须 finalizer 清理 job。\n",
