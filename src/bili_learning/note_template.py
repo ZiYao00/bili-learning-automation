@@ -4,6 +4,7 @@ import html
 import re
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from .frontmatter import render_frontmatter
 
@@ -43,19 +44,43 @@ def _resource_label(value: str) -> str:
     return value.strip().strip("⏺️•*-—:： \t")
 
 
+def _resource_platform(url: str) -> str:
+    host = (urlparse(url).hostname or "").lower()
+    if host == "github.com" or host.endswith(".github.com"):
+        return "GitHub"
+    if host == "pan.quark.cn" or host.endswith(".pan.quark.cn"):
+        return "夸克网盘"
+    if host == "feishu.cn" or host.endswith(".feishu.cn"):
+        return "飞书"
+    return ""
+
+
+def _display_resource_label(label: str, section: str, url: str) -> str:
+    platform = _resource_platform(url)
+    if section == "涉及插件":
+        if platform == "GitHub":
+            return f"GitHub 插件 · {label}"
+        return f"插件 · {label}" + (f"（{platform}）" if platform else "")
+    return label + (f"（{platform}）" if platform else "")
+
+
 def _description_resources(description: str) -> list[tuple[str, str]]:
     resources: list[tuple[str, str]] = []
     previous_label = ""
+    section = ""
     for raw_line in description.splitlines():
         urls = _URL_PATTERN.findall(raw_line)
         label = _resource_label(_URL_PATTERN.sub("", raw_line))
         if not urls:
             if label:
                 previous_label = label
+                if raw_line.strip().endswith(("：", ":")):
+                    section = label
             continue
         for index, url in enumerate(urls, start=1):
             resource_name = label if label else previous_label
-            resources.append((resource_name or f"UP 主资源 {len(resources) + index}", url))
+            resource_name = resource_name or f"UP 主资源 {len(resources) + index}"
+            resources.append((_display_resource_label(resource_name, section, url), url))
         previous_label = ""
     return resources
 

@@ -145,6 +145,21 @@ def test_description_renders_compact_resources_and_preserves_raw_source() -> Non
     assert description in rendered
 
 
+def test_description_resource_labels_include_section_type_and_platform() -> None:
+    description = (
+        "涉及插件：\n"
+        "MieNodes: https://github.com/MieMieeeee/ComfyUI-MieNodes\n"
+        "资料：\n"
+        "MiniMax H3 模型提示词指令：https://example.feishu.cn/wiki/prompt\n"
+        "工作流：https://pan.quark.cn/s/workflow"
+    )
+    rendered = quote_description(description, "present")
+    assert "[GitHub 插件 · MieNodes](https://github.com/MieMieeeee/ComfyUI-MieNodes)" in rendered
+    assert "[MiniMax H3 模型提示词指令（飞书）](https://example.feishu.cn/wiki/prompt)" in rendered
+    assert "[工作流（夸克网盘）](https://pan.quark.cn/s/workflow)" in rendered
+    assert description in rendered
+
+
 def test_taxonomy_rejects_duplicate_route_ids(taxonomy: dict) -> None:
     taxonomy["routes"].append(dict(taxonomy["routes"][0]))
     with pytest.raises(ValueError, match="重复"):

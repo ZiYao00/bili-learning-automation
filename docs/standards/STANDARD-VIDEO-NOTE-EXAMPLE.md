@@ -48,7 +48,9 @@ cssclasses:
 
 ### UP 主资源
 
-- [示例资源](https://example.com/resource)
+- [GitHub 插件 · 示例节点](https://github.com/example/example-node)
+- [工作流（夸克网盘）](https://pan.quark.cn/s/example)
+- [模型提示词指令（飞书）](https://example.feishu.cn/wiki/example)
 
 <details class="video-note-source-details">
 <summary>UP 主原始简介</summary>
