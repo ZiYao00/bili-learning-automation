@@ -12,6 +12,7 @@ import pytest
 
 import bili_learning.navigation as navigation
 from bili_learning.collector import (
+    STALE_SECONDS,
     cleanup_stale_jobs,
     create_job,
     description_state,
@@ -590,7 +591,7 @@ def test_cleanup_stale_jobs_keeps_locks(tmp_path: Path, taxonomy: dict) -> None:
     stale_job.mkdir()
     locks = settings.runtime_root / "locks"
     locks.mkdir()
-    old = time.time() - 7200
+    old = time.time() - (STALE_SECONDS + 120)
     os.utime(stale_job, (old, old))
     os.utime(locks, (old, old))
     assert cleanup_stale_jobs(settings) == 1
