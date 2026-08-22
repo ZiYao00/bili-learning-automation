@@ -20,7 +20,7 @@ jobs:
       - name: Install development dependencies
         run: python -m pip install -e ".[dev]"
       - name: Compile
-        run: python -m compileall -q src hermes-skills/bilibili-learning/scripts
+        run: python -m compileall -q src hermes-skills/bili-learning-automation/scripts
       - name: Ruff
         run: python -m ruff check .
       - name: Pytest
