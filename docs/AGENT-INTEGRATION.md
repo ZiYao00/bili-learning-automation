@@ -24,7 +24,7 @@
 
 - 新生成的 `job.json` 使用 `schema_version: 1`；finalizer 只接受该版本。
 - collector 与 finalizer 的 JSON 响应包含 `schema_version: 1`、`status` 和可读 `message`（如适用）；智能体必须以 `status` 判断分支。`in_progress` 还可返回 reservation 当前绑定的 `job_dir`，供适配层在不重新采集的前提下验证是否可安全续做。
-- Frontmatter 的 `author`、`published`、`duration`、`source`、tags 与 `cssclasses` 由程序生成，智能体不得自行改写；视频笔记固定使用 `learning-page + video-note` 以接入共享 Obsidian 视觉系统。
+- Frontmatter 的 `author`、`published`、`duration`、`source`、tags 与 `cssclasses`，以及标题下方“作者 · 日期 · 时长 · BVID”元信息行由程序生成，智能体不得自行改写；视频笔记固定使用 `learning-page + video-note` 以接入共享 Obsidian 视觉系统。
 - `analysis.json` 是 runtime-only 质量报告，不进入最终 Obsidian 笔记。它用于记录来源充分性、知识清单和覆盖复核状态，不是给用户阅读的机器报告。
 
 ## 不可突破的数据边界
@@ -53,7 +53,7 @@
 
 ## 内容提取与整理原则
 
-正文事实只能来自当前视频字幕和 UP 主原始简介；不得利用模型常识补全视频没有提供的具体参数、资源地址或结论。
+正文事实只能来自当前视频字幕和 UP 主原始简介；不得利用模型常识补全视频没有提供的具体参数、资源地址或结论。若简介或字幕明确说明“三连 / 充电 / 评论关键词 / 私信 / 进群”等条件后才能领取模板、工作流或其他资料，核心会将其记录为 `resource_access_notices` 并在“视频资料 → 资料获取方式”中展示。资料本体没有出现在当前来源时，智能体只能说明获取条件，不得自行生成、还原或猜测该资料内容。
 
 对学习价值高的信息应优先保护，不能仅为了缩短篇幅而删除：
 
@@ -71,7 +71,7 @@
 
 ## 最终笔记结构
 
-程序负责：Frontmatter、H1、BVID、小型视频简介、UP 主资源、原始简介、iframe、tags、cssclasses、文件名和路径。UP 主资源标题由程序根据原始简介中的资源小节、原标签和 URL 平台规范化，例如 `GitHub 插件 · MieNodes`、`工作流（夸克网盘）`、`MiniMax H3 模型提示词指令（飞书）`；无法可靠判断类型时保留原标签，不凭 URL 猜测内容类型。正式阅读顺序由程序固定为：**标题 / BVID → 先看结论 → 播放器 → 动态知识正文 → 视频资料**。
+程序负责：Frontmatter、H1、标题下方元信息行、UP 主资源、条件资料获取提示、原始简介、iframe、tags、cssclasses、文件名和路径。UP 主资源标题由程序根据原始简介中的资源小节、原标签和 URL 平台规范化，例如 `GitHub 插件 · MieNodes`、`工作流（夸克网盘）`、`国际站 · 体验地址`；重复 URL 去重，已包含平台名的标签不重复追加平台。正式阅读顺序固定为：**标题 / 元信息 → 先看结论 → 动态知识正文 → 视频资料**。播放器移动到“视频资料 → 原视频”，让知识正文优先进入阅读主链；“资料获取方式 / UP 主资源 / 视频简介”仅在存在对应内容时出现，UP 主原始简介继续折叠保留。
 
 智能体负责两个区域：
 
@@ -104,7 +104,7 @@ docs\standards\CODEX-VIDEO-NOTE-GUIDE.md
 docs\standards\STANDARD-VIDEO-NOTE-EXAMPLE.md
 ```
 
-所有新笔记先进入 `00-待整理`。H1 默认使用 B站原视频标题，BVID 由程序写为 H1 下方的小字。允许重复链接再次生成笔记；同名文件由程序以 `（2）`、`（3）` 防覆盖。分类建议和 tags 由程序确定；智能体不得自行跳过 `00-待整理`。
+所有新笔记先进入 `00-待整理`。H1 默认使用 B站原视频标题；程序在 H1 下方生成“作者 · 发布日期 · 时长 · BVID”的紧凑元信息行。允许重复链接再次生成笔记；同名文件由程序以 `（2）`、`（3）` 防覆盖。分类建议和 tags 由程序确定；智能体不得自行跳过 `00-待整理`。
 
 ## 学习后整理流程
 

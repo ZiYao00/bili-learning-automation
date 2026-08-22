@@ -140,16 +140,19 @@ cssclasses:
 
 `learning-page` 启用 Core，`video-note` 启用视频扩展。Codex、Hermes、WorkBuddy 和用户都不需要为了样式手工添加这两个 class。
 
+`video-note.css` 会把视频原标题控制在比通用学习页更紧凑的字号，并放宽长标题的可用行宽；这只影响 `learning-page + video-note`，不会改动其它 Learning Lab 笔记。
+
 正式阅读顺序是：
 
 ```text
-标题 / BVID
+标题 / 作者 · 日期 · 时长 · BVID
 → 先看结论
-→ Bilibili 播放器
 → 动态知识正文
 → 视频资料
-   ├── 视频简介
-   ├── UP 主资源
+   ├── 原视频（Bilibili 播放器）
+   ├── 资料获取方式（存在时）
+   ├── UP 主资源（存在时）
+   ├── 视频简介（存在真实内容时）
    └── UP 主原始简介（折叠）
 ```
 

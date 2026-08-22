@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from .frontmatter import DEFAULT_CSSCLASSES, parse_frontmatter, parse_frontmatter_list
-from .note_template import AI_MARKERS, PLACEHOLDER_TEXT, bvid_line, quote_description
+from .note_template import AI_MARKERS, PLACEHOLDER_TEXT, metadata_line, render_video_materials
 from .quality import load_analysis_report, validate_analysis_report
 
 ALLOWED_FRONTMATTER_FIELDS = {"author", "published", "duration", "source", "tags", "cssclasses"}
@@ -30,8 +30,8 @@ def validate_note(note: Path, job: dict[str, Any]) -> list[str]:
     title_match = re.search(r"^#\s+(.+)$", text, re.MULTILINE)
     if not title_match or title_match.group(1).strip() != job["canonical_title"]:
         errors.append("H1 不符合原视频标题")
-    if bvid_line(job["bvid"]) not in text:
-        errors.append("缺少 BVID 小字标识")
+    if metadata_line(job) not in text:
+        errors.append("缺少标题下方视频元信息")
 
     values, tags = parse_frontmatter(text)
     actual_fields = set(values)
@@ -59,20 +59,20 @@ def validate_note(note: Path, job: dict[str, Any]) -> list[str]:
     if missing_cssclasses:
         errors.append("缺少必需 cssclasses：" + ", ".join(missing_cssclasses))
 
-    description_block = quote_description(job.get("description", ""), job["description_status"])
+    description_block = render_video_materials(job)
     description_at = text.find(description_block)
     iframe_url = "https://player.bilibili.com/player.html?bvid=" + job["bvid"]
     iframe_at = text.find(iframe_url)
     summary_at = text.find(AI_MARKERS["summary"][0])
     body_at = text.find(AI_MARKERS["body"][0])
     if description_at < 0:
-        errors.append("视频简介未按采集结果完整保留")
+        errors.append("视频资料未按采集结果完整保留")
     if iframe_at < 0:
         errors.append("缺少正确的官方播放器 iframe")
     if min(summary_at, iframe_at, body_at, description_at) >= 0 and not (
-        summary_at < iframe_at < body_at < description_at
+        summary_at < body_at < description_at <= iframe_at
     ):
-        errors.append("阅读顺序必须为先看结论 → 播放器 → 知识正文 → 视频资料")
+        errors.append("阅读顺序必须为先看结论 → 知识正文 → 视频资料，播放器放在视频资料内")
 
     for key, (start, end) in AI_MARKERS.items():
         start_at = text.find(start)

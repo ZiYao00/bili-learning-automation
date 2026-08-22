@@ -14,10 +14,25 @@
 /* ---------- Long video titles ---------- */
 
 .learning-page.video-note h1 {
-  max-width: 26ch;
-  font-size: clamp(1.7rem, 3.3vw, 2.35rem);
-  line-height: 1.12;
-  letter-spacing: -0.028em;
+  max-width: 34ch;
+  font-size: clamp(1.6rem, 2.6vw, 2rem);
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+}
+
+.learning-page.video-note .video-note-meta {
+  display: block;
+  margin: 0.25rem 0 1rem;
+  color: var(--ll-muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.learning-page.video-note .video-note-empty-description {
+  display: block;
+  margin: 0.8rem 0 1.2rem;
+  color: var(--ll-muted);
+  font-size: 0.84rem;
 }
 
 /* ---------- Bilibili player ---------- */
@@ -71,7 +86,7 @@
 @media (max-width: 720px) {
   .learning-page.video-note h1 {
     max-width: none;
-    font-size: clamp(1.55rem, 7vw, 2rem);
+    font-size: clamp(1.42rem, 5.8vw, 1.72rem);
   }
 
   .learning-page.video-note iframe[src*="player.bilibili.com"] {

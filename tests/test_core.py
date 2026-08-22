@@ -32,9 +32,17 @@ from bili_learning.doctor import doctor_report
 from bili_learning.frontmatter import parse_frontmatter, parse_frontmatter_list
 from bili_learning.input_resolver import resolve_input
 from bili_learning.lifecycle import finalize_note, prepare_note
-from bili_learning.note_template import bvid_line, note_filename, quote_description, render_note_skeleton
+from bili_learning.note_template import (
+    bvid_line,
+    metadata_line,
+    note_filename,
+    quote_description,
+    render_note_skeleton,
+    render_video_materials,
+)
 from bili_learning.organizer import organize_note
 from bili_learning.publisher import publish_validated_draft
+from bili_learning.resource_access import detect_resource_access_notices
 from bili_learning.runtime import (
     ReservationBusyError,
     bind_reservation,
@@ -211,6 +219,127 @@ def test_description_resource_labels_include_section_type_and_platform() -> None
     assert "[MiniMax H3 模型提示词指令（飞书）](https://example.feishu.cn/wiki/prompt)" in rendered
     assert "[工作流（夸克网盘）](https://pan.quark.cn/s/workflow)" in rendered
     assert description in rendered
+
+
+def test_video_materials_filter_separator_context_deduplicate_and_normalize_entities() -> None:
+    description = (
+        "AITUDOU官网：https://aitudou.cn\n"
+        "--------------在线工作流区域--------------\n"
+        "国际站：\n"
+        "工作流：AITUDOU-MiniMax H3(全能参考)\n"
+        "体验地址：https://example.com/demo\n"
+        "国内站：\n"
+        "体验地址：https://example.cn/demo\n"
+        "夸克网盘：https://pan.quark.cn/s/demo\n"
+        "备用下载：https://pan.quark.cn/s/demo\n"
+        "本地工作流&amp;模型&amp;提示词模板"
+    )
+    rendered = render_video_materials(
+        {
+            "bvid": "BV1EXAMPLE",
+            "description": description,
+            "description_status": "present",
+            "resource_access_notices": [],
+        }
+    )
+    compact = rendered.split("<details", 1)[0]
+    assert "### 视频简介" not in compact
+    assert "在线工作流区域" not in compact
+    assert "[国际站 · 体验地址](https://example.com/demo)" in rendered
+    assert "[国内站 · 体验地址](https://example.cn/demo)" in rendered
+    assert "夸克网盘（夸克网盘）" not in rendered
+    compact_resources = rendered.split('<details class="video-note-source-details">', 1)[0]
+    assert compact_resources.count("https://pan.quark.cn/s/demo") == 1
+    assert "&amp;amp;" not in rendered
+    assert "本地工作流&amp;模型&amp;提示词模板" in rendered
+
+
+def test_video_materials_keep_real_overview_before_resource_section() -> None:
+    rendered = render_video_materials(
+        {
+            "bvid": "BV1EXAMPLE",
+            "description": "视频简介：\n这是一个新的工作流教程\n工作流：https://example.com/workflow",
+            "description_status": "present",
+            "resource_access_notices": [],
+        }
+    )
+    assert "### 视频简介\n\n这是一个新的工作流教程" in rendered
+
+
+def test_video_materials_omit_empty_overview_but_keep_player_and_resources() -> None:
+    rendered = render_video_materials(
+        {
+            "bvid": "BV1EXAMPLE",
+            "description": "工作流：https://example.com/workflow",
+            "description_status": "present",
+            "resource_access_notices": [],
+        }
+    )
+    assert "### 原视频" in rendered
+    assert "player.bilibili.com/player.html?bvid=BV1EXAMPLE" in rendered
+    assert "### UP 主资源" in rendered
+    assert "### 视频简介" not in rendered
+
+
+def test_resource_access_detects_explicit_conditions_without_inventing_materials(tmp_path: Path) -> None:
+    subtitle = tmp_path / "resource.ai-zh.srt"
+    subtitle.write_text(
+        "1\n00:00:01,000 --> 00:00:02,000\n这个提示词模板三连后我会发给大家\n\n"
+        "2\n00:00:03,000 --> 00:00:04,000\n充电用户可以领取完整工作流\n\n"
+        "3\n00:00:05,000 --> 00:00:06,000\n评论区回复H3领取资料\n",
+        encoding="utf-8",
+    )
+    notices = detect_resource_access_notices("", subtitle)
+    conditions = {notice["condition"] for notice in notices}
+    assert "三连" in conditions
+    assert "充电" in conditions
+    assert "评论/关键词" in conditions
+    assert all(notice["source"] == "subtitle" for notice in notices)
+
+
+def test_resource_access_prefers_description_and_deduplicates_matching_subtitle(tmp_path: Path) -> None:
+    subtitle = tmp_path / "duplicate.ai-zh.srt"
+    subtitle.write_text(
+        "1\n00:00:01,000 --> 00:00:02,000\n三连后领取提示词模板\n",
+        encoding="utf-8",
+    )
+    notices = detect_resource_access_notices("三连后领取提示词模板", subtitle)
+    matching = [notice for notice in notices if notice["resource"] == "提示词模板"]
+    assert len(matching) == 1
+    assert matching[0]["source"] == "description"
+
+
+def test_resource_access_does_not_join_generic_engagement_with_unrelated_template(tmp_path: Path) -> None:
+    subtitle = tmp_path / "generic.ai-zh.srt"
+    subtitle.write_text(
+        "1\n00:00:01,000 --> 00:00:02,000\n大家喜欢的话记得一键三连\n\n"
+        "2\n00:00:10,000 --> 00:00:11,000\n下面讲一下提示词模板的结构\n\n"
+        "3\n00:00:20,000 --> 00:00:21,000\n关注我们，这个工作流可以直接下载\n",
+        encoding="utf-8",
+    )
+    assert detect_resource_access_notices("", subtitle) == []
+
+
+def test_note_skeleton_prioritizes_reading_before_player() -> None:
+    job = {
+        "author": "示例UP主",
+        "published": "2026-08-22",
+        "duration": "11:36",
+        "canonical_url": "https://www.bilibili.com/video/BV1EXAMPLE/",
+        "required_tags": ["视频生成"],
+        "canonical_title": "示例视频标题",
+        "bvid": "BV1EXAMPLE",
+        "description": "教程说明",
+        "description_status": "present",
+        "resource_access_notices": [],
+    }
+    rendered = render_note_skeleton(job)
+    assert metadata_line(job) in rendered
+    summary_at = rendered.index("[!summary] 先看结论")
+    body_at = rendered.index("BILI_AI_BODY_START")
+    materials_at = rendered.index("## 视频资料")
+    player_at = rendered.index("player.bilibili.com")
+    assert summary_at < body_at < materials_at < player_at
 
 
 def test_taxonomy_rejects_duplicate_route_ids(taxonomy: dict) -> None:
@@ -529,13 +658,13 @@ def test_create_job_writes_runtime_draft_without_publishing_note(tmp_path: Path,
     assert json.loads(analysis_path.read_text(encoding="utf-8"))["source_assessment"]["status"] == "pending"
     draft_text = draft_path.read_text(encoding="utf-8")
     assert 'source: "https://www.bilibili.com/video/BV1TXua68EYi/"' in draft_text
-    assert bvid_line("BV1TXua68EYi") in draft_text
+    assert '<small class="video-note-meta">UP · 2026-08-11 · 07:05 · BV1TXua68EYi</small>' in draft_text
     assert parse_frontmatter_list(draft_text, "cssclasses") == ["learning-page", "video-note"]
     assert (
         draft_text.find("<!-- BILI_AI_SUMMARY_START -->")
-        < draft_text.find("https://player.bilibili.com/player.html")
         < draft_text.find("<!-- BILI_AI_BODY_START -->")
         < draft_text.find("## 视频资料")
+        < draft_text.find("https://player.bilibili.com/player.html")
     )
 
 
@@ -896,9 +1025,39 @@ def test_organize_note_updates_title_intro_moves_and_rebuilds_navigation(tmp_pat
     assert organized.startswith("---")
     assert "# H3 分段生成" in organized
     assert "将长视频拆成连续片段生成。" in organized
-    assert bvid_line("BV1TXua68EYi") in organized
+    assert metadata_line(job) in organized
     assert (settings.notes_root / "99-导航" / "01-视频生成.md").is_file()
     assert "00-待整理]]（0）" in (settings.notes_root / "99-导航" / "首页.md").read_text(encoding="utf-8")
+
+
+def test_organize_note_adds_learning_intro_when_source_has_only_resources(tmp_path: Path, taxonomy: dict) -> None:
+    settings = _settings(tmp_path, taxonomy)
+    source = settings.notes_root / "00-待整理" / "资源型简介.md"
+    source.parent.mkdir(parents=True)
+    job = {
+        "bvid": "BV1TXua68EYi",
+        "author": "UP",
+        "published": "2026-08-11",
+        "duration": "07:05",
+        "canonical_url": "https://www.bilibili.com/video/BV1TXua68EYi/",
+        "required_tags": ["视频生成", "工作流", "MiniMax-H3"],
+        "description": "工作流：https://example.com/workflow",
+        "description_status": "present",
+        "canonical_title": "资源型简介",
+    }
+    source.write_text(
+        _complete_ai_regions(render_note_skeleton(job))
+        .replace("<!-- BILI_AI_SUMMARY_START -->", "")
+        .replace("<!-- BILI_AI_SUMMARY_END -->", "")
+        .replace("<!-- BILI_AI_BODY_START -->", "")
+        .replace("<!-- BILI_AI_BODY_END -->", ""),
+        encoding="utf-8",
+    )
+    target = organize_note(settings, source, "整理后标题", "学习后补充的一句简介。")
+    text = target.read_text(encoding="utf-8")
+    assert metadata_line(job) in text
+    assert "### 视频简介\n\n学习后补充的一句简介。" in text
+    assert text.index("### 视频简介") < text.index('<details class="video-note-source-details">')
 
 
 def test_organize_note_migrates_a_legacy_description_and_bvid_filename(tmp_path: Path, taxonomy: dict) -> None:

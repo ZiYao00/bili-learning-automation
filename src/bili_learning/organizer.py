@@ -8,7 +8,7 @@ from pathlib import Path, PurePosixPath
 from .config import Settings
 from .frontmatter import parse_frontmatter
 from .navigation import build_navigation
-from .note_template import bvid_line, note_filename, quote_description, safe_title
+from .note_template import bvid_line, note_filename, render_video_materials, safe_title
 
 
 def _safe_category(value: str) -> tuple[str, ...]:
@@ -49,7 +49,23 @@ def _upgrade_legacy_description(text: str) -> str:
     raw = "\n".join(re.sub(r"^> ?", "", line) for line in match.group("body").splitlines()).strip()
     if not raw:
         raise ValueError("旧笔记的视频简介为空，无法整理")
-    return text[: match.start()] + quote_description(raw, "present") + text[match.end() :]
+    iframe_match = re.search(r"<iframe\b.*?</iframe>", text[match.end() :], flags=re.DOTALL | re.IGNORECASE)
+    if not iframe_match:
+        raise ValueError("旧笔记缺少播放器，无法整理")
+    iframe_text = iframe_match.group(0)
+    bvid_match = re.search(r"player\.html\?bvid=(BV[0-9A-Za-z]+)", iframe_text)
+    if not bvid_match:
+        raise ValueError("旧笔记播放器缺少 BVID，无法整理")
+    materials = render_video_materials(
+        {
+            "bvid": bvid_match.group(1),
+            "description": raw,
+            "description_status": "present",
+            "resource_access_notices": [],
+        }
+    )
+    iframe_end = match.end() + iframe_match.end()
+    return text[: match.start()] + materials + text[iframe_end:]
 
 
 def _rewrite_title_and_intro(text: str, title: str, intro: str) -> str:
@@ -57,17 +73,21 @@ def _rewrite_title_and_intro(text: str, title: str, intro: str) -> str:
     bvid_match = re.search(r"player\.html\?bvid=(BV[0-9A-Za-z]+)", text)
     if not bvid_match:
         raise ValueError("笔记缺少播放器 BVID，无法整理")
-    result, count = re.subn(
-        r"^#\s+.+$(?:\r?\n\r?\n<small>BV号：[^<]+</small>)?",
-        f"# {title}\n\n{bvid_line(bvid_match.group(1))}",
-        text,
-        count=1,
-        flags=re.MULTILINE,
-    )
+
+    result, count = re.subn(r"^#\s+.+$", f"# {title}", text, count=1, flags=re.MULTILINE)
     if count != 1:
         raise ValueError("笔记缺少 H1，无法整理")
+    if "video-note-meta" not in result and not re.search(r"<small>BV号：[^<]+</small>", result):
+        result = re.sub(
+            r"^(#\s+.+)$",
+            lambda match: match.group(1) + f"\n\n{bvid_line(bvid_match.group(1))}",
+            result,
+            count=1,
+            flags=re.MULTILINE,
+        )
+
     patterns = (
-        r"(^### 视频简介\r?\n\r?\n)(.*?)(?=\r?\n\r?\n### UP 主资源|\r?\n\r?\n<details|\r?\n\r?\n## |\Z)",
+        r"(^### 视频简介\r?\n\r?\n)(.*?)(?=\r?\n\r?\n### |\r?\n\r?\n<details|\r?\n\r?\n## |\Z)",
         r"(^## 视频简介\r?\n\r?\n)(.*?)(?=\r?\n\r?\n## |\r?\n\r?\n<details|\Z)",
     )
     for pattern in patterns:
@@ -79,10 +99,18 @@ def _rewrite_title_and_intro(text: str, title: str, intro: str) -> str:
             flags=re.DOTALL | re.MULTILINE,
         )
         if count == 1:
-            break
-    else:
-        raise ValueError("笔记缺少标准视频简介，无法整理")
-    return result
+            return result
+
+    details_marker = '<details class="video-note-source-details">'
+    details_at = result.find(details_marker)
+    if details_at >= 0:
+        return result[:details_at].rstrip() + f"\n\n### 视频简介\n\n{intro}\n\n" + result[details_at:]
+
+    video_materials_at = result.find("## 视频资料")
+    if video_materials_at >= 0:
+        return result.rstrip() + f"\n\n### 视频简介\n\n{intro}\n"
+
+    raise ValueError("笔记缺少标准视频资料区，无法整理")
 
 
 def _publish_reorganized(source: Path, target: Path, content: str) -> None:
