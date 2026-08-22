@@ -9,14 +9,15 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-LOCK_STALE_SECONDS = 60 * 60
+LOCK_STALE_SECONDS = 2 * 60 * 60
 RESERVATION_SUFFIX = ".reservation.json"
 
 
 class ReservationBusyError(RuntimeError):
-    def __init__(self, bvid: str, age_seconds: int | None = None) -> None:
+    def __init__(self, bvid: str, age_seconds: int | None = None, job_dir: str | None = None) -> None:
         self.bvid = bvid
         self.age_seconds = age_seconds
+        self.job_dir = job_dir
         super().__init__(f"该视频已有活动任务：{bvid}")
 
 
@@ -64,7 +65,7 @@ def _remove_stale_reservation(path: Path, stale_seconds: int) -> None:
             pass
         # A reservation that has already been bound to a missing job cannot
         # belong to an active task. Reclaim it immediately rather than
-        # blocking a retry until the generic one-hour stale timeout expires.
+        # blocking a retry until the generic stale timeout expires.
     elif _reservation_age_seconds(path, payload) <= stale_seconds:
         # Between claiming a reservation and binding its newly-created job,
         # job_dir is intentionally empty. Keep that short-lived reservation.
@@ -84,7 +85,9 @@ def claim_reservation(runtime_root: Path, bvid: str, stale_seconds: int = LOCK_S
         fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     except FileExistsError as exc:
         current = _read_reservation(path)
-        raise ReservationBusyError(bvid, _reservation_age_seconds(path, current)) from exc
+        owner = current.get("job_dir")
+        job_dir = owner if isinstance(owner, str) and owner else None
+        raise ReservationBusyError(bvid, _reservation_age_seconds(path, current), job_dir) from exc
     try:
         os.write(fd, json.dumps(payload, ensure_ascii=False).encode("utf-8"))
     finally:

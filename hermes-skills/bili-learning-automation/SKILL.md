@@ -9,7 +9,7 @@ description: Turn a Bilibili copied link, supported Bilibili short link, or BV i
 
 本 skill 是 Hermes/微信适配层。通用输入、数据、笔记和 finalizer 约束的唯一来源是项目根目录 `docs\AGENT-INTEGRATION.md`；本文件只保留 Hermes 私聊的触发、调用和回复规则。
 
-只在 owner 私聊中运行；群聊或发送者范围不确定时先确认。
+只在 owner 私聊中运行；群聊或发送者范围不确定时先确认。过程消息与最终回复统一使用简体中文；代码、路径、模型名和原始专有名词除外。
 
 ## Mandatory workflow
 
@@ -24,13 +24,13 @@ description: Turn a Bilibili copied link, supported Bilibili short link, or BV i
 
 2. 读取 JSON 状态：
 
-   - `in_progress`：说明同一视频已有活动任务，不重复采集或生成。
+   - `in_progress`：不重复采集。若响应带 `job_dir`，且 `reservation_age_seconds >= 1800`，只检查该绑定 job：`job.json`、`analysis_path`、`draft_path`、`transcript_manifest_path` 与 manifest 中全部 chunks 都存在，草稿两个 AI marker 仍未填写且 `analysis.json` 仍为 pending 时，视为可续做的中断任务，直接从步骤 3 继续；不要先跑 doctor。条件不满足则按活动任务处理，不抢占、不手工删锁。只有文件缺失、路径矛盾或状态异常时才运行 doctor 诊断。
    - `incomplete_note`：仅旧版遗留骨架会返回；说明该笔记尚未完成，不声称完成。
    - `subtitle_unavailable`：说明没有可用中文字幕，且没有下载媒体，不生成笔记。
    - `failed`：回复短错误，不声称完成。
-   - 只有 `materials_ready` 才继续。
+   - `materials_ready`，或满足上述“可续做中断任务”条件的 `in_progress`，才继续。
 
-3. `materials_ready` 时读取 `handoff_path`、`job.json`、`analysis_path`、`agent_work_dir` 与 `transcript_manifest_path`，并遵循项目共享的 `docs\\AGENT-INTEGRATION.md` 与内容标准。程序已把原始 SRT 无语义删减地整理成适合 Agent 阅读的 transcript：manifest 为 `direct` 时读取唯一 chunk；为 `chunked` 时严格按 `chunks` 顺序逐块阅读，不要再把原始 SRT 整份塞入上下文，也不要自行重新按 1/3 等固定比例切分。处理长字幕时可在 `agent_work_dir` 创建 `part-XX-notes.md`、索引或中间梳理文件，把每块的重要参数、比较、限制、方法和资源先外化，再合并为 `knowledge_outline`。来源不足时在 `analysis.json` 记录原因，不得靠常识补全。所有临时文件都属于当前 job，由 finalizer 与 failsafe 统一清理；不得写到项目其他目录，也不得手工删除 job、reservation 或锁文件。
+3. 进入可处理状态后读取 `handoff_path`（新任务）或绑定 job 内的 `job.json`（续做任务），再读取 `analysis_path`、`agent_work_dir` 与 `transcript_manifest_path`，并遵循项目共享的 `docs\\AGENT-INTEGRATION.md` 与内容标准。程序已把原始 SRT 无语义删减地整理成适合 Agent 阅读的 transcript：manifest 为 `direct` 时读取唯一 chunk；为 `chunked` 时严格按 `chunks` 顺序逐块阅读。单个 chunk 在工具限制内时优先一次完整读取，只有工具明确返回截断/continuation 时才继续读取剩余部分；不要主动把一个 chunk 再拆成多次读取，也不要把原始 SRT 整份塞入上下文或自行重新按固定比例切分。处理长字幕时可在 `agent_work_dir` 创建 `part-XX-notes.md`、索引或中间梳理文件，把每块的重要参数、比较、限制、方法和资源先外化，再合并为 `knowledge_outline`。来源不足时在 `analysis.json` 记录原因，不得靠常识补全。所有临时文件都属于当前 job，由 finalizer 与 failsafe 统一清理；不得写到项目其他目录，也不得手工删除 job、reservation 或锁文件。
 
 4. 来源充分时，先填写 `knowledge_outline`，再只编辑 `draft_path` 的两个 marker：
 

@@ -491,9 +491,28 @@ def test_reservation_spans_job_lifecycle_and_cleanup_releases_it(tmp_path: Path)
     (agent_work / "subtitle-flat.txt").write_text("temporary", encoding="utf-8")
     (job / "job.json").write_text(json.dumps({"bvid": "BV1TXua68EYi"}), encoding="utf-8")
     bind_reservation(reservation, job)
+    with pytest.raises(ReservationBusyError) as busy:
+        claim_reservation(runtime, "BV1TXua68EYi")
+    assert busy.value.job_dir == str(job)
     cleanup_job(runtime, job)
     assert not job.exists()
     assert claim_reservation(runtime, "BV1TXua68EYi").path.is_file()
+
+
+def test_reservation_default_stale_window_is_two_hours(tmp_path: Path) -> None:
+    runtime = tmp_path / ".runtime" / "bilibili-learning"
+    reservation = claim_reservation(runtime, "BV1TXua68EYi")
+    payload = json.loads(reservation.path.read_text(encoding="utf-8"))
+
+    payload["updated_at"] = time.time() - 3700
+    reservation.path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ReservationBusyError):
+        claim_reservation(runtime, "BV1TXua68EYi")
+
+    payload["updated_at"] = time.time() - 7300
+    reservation.path.write_text(json.dumps(payload), encoding="utf-8")
+    replacement = claim_reservation(runtime, "BV1TXua68EYi")
+    assert replacement.path.is_file()
 
 
 def test_claim_reservation_reclaims_missing_bound_job_without_waiting(tmp_path: Path) -> None:
@@ -519,6 +538,23 @@ def test_core_prepare_dry_run_returns_versioned_status_and_releases_reservation(
     assert payload["status"] == "ready_to_process"
     locks = tmp_path / ".runtime" / "bilibili-learning" / "locks"
     assert not list(locks.glob("*.reservation.json"))
+
+
+def test_prepare_in_progress_returns_bound_job_dir(tmp_path: Path, taxonomy: dict) -> None:
+    _write_e2e_config(tmp_path, taxonomy)
+    settings = load_settings(tmp_path)
+    reservation = claim_reservation(settings.runtime_root, "BV1TXua68EYi")
+    job = settings.runtime_root / "BV1TXua68EYi-existing"
+    job.mkdir(parents=True)
+    (job / "job.json").write_text(json.dumps({"bvid": "BV1TXua68EYi"}), encoding="utf-8")
+    bind_reservation(reservation, job)
+
+    payload, code = prepare_note(tmp_path, "BV1TXua68EYi")
+
+    assert code == 2
+    assert payload["status"] == "in_progress"
+    assert payload["job_dir"] == str(job)
+    cleanup_job(settings.runtime_root, job)
 
 
 def test_prepare_allows_a_new_note_for_an_existing_source(

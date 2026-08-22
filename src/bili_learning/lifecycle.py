@@ -185,6 +185,7 @@ def prepare_note(
                 "bvid": error.bvid,
                 "message": "该视频已有活动任务，暂不重复处理。",
                 "reservation_age_seconds": error.age_seconds,
+                "job_dir": error.job_dir,
             },
             2,
         )
