@@ -17,7 +17,7 @@
 
 ## 代码分层
 
-- `src/bili_learning/`：可测试的核心逻辑和 agent-neutral CLI（`prepare`、`finalize`、`organize`、`doctor`、`build-nav`）。
+- `src/bili_learning/`：可测试的核心逻辑和 agent-neutral CLI（`prepare`、`finalize`、`organize`、`doctor`、`configure-obsidian`、`build-nav`）。
 - `docs/AGENT-INTEGRATION.md`：所有智能体共用的接入协议。
 - `hermes-skills/bili-learning-automation/SKILL.md`：Hermes/微信专属适配约束。
 - `hermes-skills/bili-learning-automation/scripts/`：只定位项目根目录并转发到核心 CLI 的兼容入口。
@@ -63,7 +63,7 @@ taxonomy 的 route.path 不直接决定新文件的路径。新笔记统一先�
 
 ## 配置边界
 
-`notes_root` 从 taxonomy 统一读取，也可用 `BILI_LEARNING_NOTES_ROOT` 覆盖。collector、finalizer、navigation 使用同一 settings loader。
+正式用户推荐显式配置 `vault_root + notes_subdir`，由统一 settings loader 计算 `notes_root`；旧版 `notes_root` / `BILI_LEARNING_NOTES_ROOT` 保持兼容。taxonomy 的 `notes/bilibili` 只作为临时 repository fallback；未显式配置时，新采集返回 `configuration_required`，但已有 job 的 finalizer / cleanup 仍可继续。collector、finalizer、navigation 与 doctor 共用同一 settings loader。
 
 ## 可靠性原则
 

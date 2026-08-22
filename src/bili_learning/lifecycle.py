@@ -16,7 +16,7 @@ from .collector import (
     select_subtitle,
     write_handoff,
 )
-from .config import load_settings
+from .config import DependencyError, load_settings
 from .input_resolver import resolve_input
 from .navigation import build_navigation
 from .publisher import publish_validated_draft
@@ -105,6 +105,18 @@ def prepare_note(
     if not message:
         return _status({"status": "failed", "message": "需要提供 B站复制链接、短链接或 BV 号。"}, 2)
 
+    if settings.notes_is_fallback and not dry_run:
+        return _status(
+            {
+                "status": "configuration_required",
+                "message": "尚未配置 Obsidian Vault；为避免把私人笔记长期写进代码仓库，本次未启动采集。",
+                "temporary_notes_root": str(settings.notes_root),
+                "config_path": str(settings.local_config_path),
+                "required": "vault_root",
+            },
+            2,
+        )
+
     job_dir: Path | None = None
     reservation: Reservation | None = None
     ready = False
@@ -178,6 +190,8 @@ def prepare_note(
                 "stale_jobs_removed": stale_removed,
             }
         )
+    except DependencyError as error:
+        return _status({"status": "failed", "code": error.code, "message": str(error)}, 1)
     except ReservationBusyError as error:
         return _status(
             {

@@ -26,6 +26,9 @@ tests/yt-dlp/
 build/
 dist/
 
+# Local agent state and project memory
+.workbuddy/
+
 # Bundled or locally copied third-party dependencies
 bili-note/
 web-access/

@@ -26,7 +26,7 @@ python -m pytest -q
 ## 设计原则
 
 - 确定性数据由 Python 生成，不让 LLM 重写元数据。
-- taxonomy 是分类和 notes root 的配置源。
+- taxonomy 是分类规则与 repository fallback 的配置源；正式 Obsidian 笔记位置优先使用本机 `vault_root + notes_subdir`，旧 `notes_root` 仅用于兼容。
 - 每次成功转换生成一篇笔记；同名文件使用序号防覆盖，BVID 不作为文件级唯一性约束。
 - 公开 CI 不访问真实 Bilibili 账号。
 - Cookie 只能作为 yt-dlp 的本地文件参数使用，不能读取内容。
@@ -38,6 +38,7 @@ python -m pytest -q
 - `finalize_ytdlp_bilibili_note.py`
 - `build_bilibili_navigation.py`
 - `doctor_bilibili_learning.py`
+- `configure_bilibili_learning.py`
 
 不要在没有迁移 Hermes 调用方的情况下删除或改名这些入口。
 

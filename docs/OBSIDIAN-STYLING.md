@@ -1,6 +1,6 @@
 # Obsidian 视觉样式
 
-本项目已经自带视频学习笔记所需的两份 CSS，不依赖用户另外下载 `ComfyUI-Learning-Lab`：
+本项目自带视频学习笔记需要的两份 CSS，不依赖其他仓库：
 
 ```text
 bili-learning-automation/
@@ -13,43 +13,65 @@ bili-learning-automation/
 - `learning-lab.css`：Core Design System，负责阅读宽度、标题层级、Callout、Grid、Card、Badge、Chip、Table 和响应式布局。
 - `video-note.css`：Video Note Extension，依赖 Core，只处理长视频标题、Bilibili 播放器、来源附录等视频笔记特有样式。
 
-当前仓库中的副本与 `ComfyUI-Learning-Lab` Design System v0.3 / Video Note v0.1 对齐。对普通使用者来说，本仓库内这两份文件就是安装来源，不需要知道另一个项目的目录。
+## 先分清两个目录
 
-## 第一次使用：把 CSS 安装到 Obsidian
+新版推荐配置：
 
-### 1. 找到你的 Vault 根目录
+```json
+{
+  "vault_root": "D:\\Notes\\MyVault",
+  "notes_subdir": "bilibili"
+}
+```
 
-Obsidian 的 Vault 根目录就是包含 `.obsidian` 文件夹的目录。例如：
+它们对应：
+
+```text
+Vault 根目录
+D:\Notes\MyVault
+├── .obsidian\
+│   └── snippets\        ← CSS 放这里
+└── bilibili\             ← 本项目笔记放这里
+    └── 00-待整理\
+```
+
+因此记住一条规则即可：
+
+> CSS 始终安装到 `<vault_root>\.obsidian\snippets\`，不是 `<notes_root>\.obsidian\snippets\`。
+
+旧版 `notes_root` / `BILI_LEARNING_NOTES_ROOT` 继续兼容，但它只告诉程序“笔记在哪”，不能可靠告诉程序“Vault 根在哪”。这种情况下 doctor 会提示 `obsidian_vault_unknown`，CSS 路径需要用户自己确认。
+
+## 第一次安装 CSS
+
+### 1. 确认 Vault 根目录
+
+Vault 根目录就是直接包含 `.obsidian` 的文件夹。例如：
 
 ```text
 D:\Notes\MyVault\
 ├── .obsidian\
-├── 00-待整理\
+├── bilibili\
 └── 其它笔记\
 ```
 
-Windows 默认可能隐藏 `.obsidian`。如果看不到，可以在资源管理器开启“显示隐藏的项目”。
-
-> 如果 `BILI_LEARNING_NOTES_ROOT` 指向 Vault 内的某个子目录，例如 `D:\Notes\MyVault\bilibili`，CSS 仍然要安装到 `D:\Notes\MyVault\.obsidian\snippets\`，而不是 `bilibili\.obsidian\`。
-
-> 如果你直接把本项目的 `notes/bilibili` 作为一个独立 Obsidian Vault 打开，那么它自己就是 Vault 根目录，CSS 应放到 `notes/bilibili/.obsidian/snippets/`。
+Windows 默认可能隐藏 `.obsidian`。看不到时可在资源管理器开启“显示隐藏的项目”。
 
 ### 2. 打开或创建 snippets 目录
 
-目标目录是：
+目标目录：
 
 ```text
-你的 Vault\.obsidian\snippets\
+D:\Notes\MyVault\.obsidian\snippets\
 ```
 
 如果 `.obsidian\snippets\` 不存在，可以手动创建 `snippets` 文件夹。
 
-### 3. 从本仓库复制两个文件
+### 3. 复制两份 CSS
 
-从：
+从仓库：
 
 ```text
-bili-learning-automation\obsidian\snippets\
+obsidian\snippets\
 ├── learning-lab.css
 └── video-note.css
 ```
@@ -62,7 +84,7 @@ bili-learning-automation\obsidian\snippets\
 └── video-note.css
 ```
 
-两个文件都需要保留。`video-note.css` 依赖 `learning-lab.css`，只复制扩展文件会导致部分版式失效。
+两个文件都需要保留。`video-note.css` 依赖 `learning-lab.css`。
 
 ### 4. 在 Obsidian 启用
 
@@ -78,11 +100,37 @@ bili-learning-automation\obsidian\snippets\
 2. 启用 `learning-lab`；
 3. 启用 `video-note`。
 
-完成后重新打开一篇新生成的视频学习笔记即可看到版式。
+## Doctor 可以帮你检查什么
 
-## 不需要手工修改笔记 Frontmatter
+运行：
 
-新生成的视频学习笔记会由程序自动写入：
+```powershell
+python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py
+```
+
+在已经配置 `vault_root` 时，doctor 会检查：
+
+```text
+Obsidian Vault
+learning-lab.css
+video-note.css
+```
+
+相关代码：
+
+```text
+obsidian_vault_detected
+obsidian_snippet_learning_lab
+obsidian_snippet_video_note
+```
+
+CSS 不存在时是 `WARN`，不会影响 Markdown 的基本可读性。
+
+程序**不会静默复制或覆盖 CSS**。原因是用户可能已经自行修改 CSS，或者多个项目正在共享同一份设计系统。需要升级时由用户明确决定是否覆盖。
+
+## 不需要手工修改 Frontmatter
+
+新生成的视频学习笔记由程序自动写入：
 
 ```yaml
 cssclasses:
@@ -90,9 +138,9 @@ cssclasses:
   - video-note
 ```
 
-`learning-page` 启用 Core，`video-note` 启用视频扩展。Codex、Hermes 和用户都不需要为了样式手工添加这两个 class。
+`learning-page` 启用 Core，`video-note` 启用视频扩展。Codex、Hermes、WorkBuddy 和用户都不需要为了样式手工添加这两个 class。
 
-最终阅读顺序固定为：
+正式阅读顺序是：
 
 ```text
 标题 / BVID
@@ -109,16 +157,20 @@ Agent 会根据知识关系选择 Table / Grid / Card / Chip / Risk / Resource �
 
 ## 更新项目后如何同步 CSS
 
-以后 `git pull` 或升级本项目后，如果 `obsidian/snippets/` 中的 CSS 有更新，重新把这两个文件复制到 Vault 的 `.obsidian/snippets/` 并覆盖旧版本，然后在 Obsidian 的“CSS 代码片段”页面刷新一次。
+以后 `git pull` 或升级本项目后，如果 `obsidian/snippets/` 中的 CSS 有更新：
 
-建议两个文件一起更新，不要只替换其中一个版本。
+1. 先确认自己是否修改过 Vault 中的 CSS；
+2. 需要升级时同时更新 `learning-lab.css` 和 `video-note.css`；
+3. 回到 Obsidian“CSS 代码片段”页面刷新。
+
+不要只替换其中一个版本，也不要让自动化在未确认的情况下覆盖用户版本。
 
 ## 样式没有生效时
 
 优先检查：
 
-- 当前打开的笔记是否属于你安装 CSS 的那个 Vault；
-- 两个文件是否真的位于该 Vault 的 `.obsidian/snippets/`；
+- 当前打开的笔记是否属于配置的 `vault_root`；
+- 两个文件是否真的位于 `<vault_root>/.obsidian/snippets/`；
 - Obsidian“设置 → 外观 → CSS 代码片段”里是否同时启用了 `learning-lab` 与 `video-note`；
 - 笔记 Frontmatter 是否包含 `learning-page` 与 `video-note`；
 - 更新 CSS 后是否点击了刷新，必要时关闭再重新启用代码片段。
@@ -127,11 +179,9 @@ Agent 会根据知识关系选择 Table / Grid / Card / Chip / Risk / Resource �
 
 ## 维护约定
 
-本仓库提交可直接使用的 CSS 副本，确保项目可以独立安装和使用。设计语言最初来自 `ComfyUI-Learning-Lab`，后续如果两个项目继续共享 Design System，维护者应显式同步版本，而不是让运行时依赖另一个本地仓库。
-
-同步 CSS 时应同时检查：
+本仓库提交可直接使用的 CSS 副本，确保项目能够独立安装和使用。维护设计系统时应同时检查：
 
 - `learning-lab.css` Core 与 `video-note.css` Extension 的版本依赖是否匹配；
 - 本项目生成的 `cssclasses` 是否仍与选择器一致；
-- `docs/OBSIDIAN-STYLING.md` 和 README 的安装路径是否仍准确；
+- `docs/OBSIDIAN-STYLING.md`、`docs/QUICKSTART.md` 与 README 的安装路径是否仍准确；
 - 真实视频笔记在浅色 / 深色和窄分栏下是否仍可读。

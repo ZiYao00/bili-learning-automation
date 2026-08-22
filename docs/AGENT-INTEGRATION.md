@@ -11,14 +11,14 @@
 ## 必须执行的流程
 
 1. 把原始收到的文本交给 collector。
-2. collector 返回 `materials_ready` 时读取 `handoff_path`、`job.json`、`analysis_path`、`agent_work_dir`、`transcript_manifest_path` 和共享内容标准。`in_progress` 不得重新采集；若响应带绑定 `job_dir`，适配层只能在确认该 job 已明显陈旧且仍处于未写作状态、必需文件完整时续做同一 job，否则继续视为活动任务。程序会把原始 SRT 整理为 runtime-only transcript；短字幕为单块 `direct`，长字幕为按完整 cue 边界生成的 `chunked` 清单。
+2. collector 先检查笔记位置。若返回 `configuration_required`，适配层必须停止采集并向用户索取 Obsidian Vault 根目录（包含 `.obsidian` 的目录），通过统一 `configure-obsidian` 入口写入本机配置后再重试原请求；不得静默使用仓库内 fallback。若返回 `failed` 且 `code = ytdlp_not_configured`，只向用户提供安装指引（Windows 推荐 `winget install yt-dlp`），不得自动安装、下载或把 `yt-dlp.exe` 放入 Skill / 仓库；安装完成后再重试。collector 返回 `materials_ready` 时再读取 `handoff_path`、`job.json`、`analysis_path`、`agent_work_dir`、`transcript_manifest_path` 和共享内容标准。`in_progress` 不得重新采集；若响应带绑定 `job_dir`，适配层只能在确认该 job 已明显陈旧且仍处于未写作状态、必需文件完整时续做同一 job，否则继续视为活动任务。程序会把原始 SRT 整理为 runtime-only transcript；短字幕为单块 `direct`，长字幕为按完整 cue 边界生成的 `chunked` 清单。
 3. 先判断字幕与简介是否足以支撑可信学习笔记，并填写 runtime 的 `analysis.json`。
 4. 来源充分时先形成 `knowledge_outline`，再编辑 `draft_path` 中的 `BILI_AI_SUMMARY` 与 `BILI_AI_BODY` 两个区域。
 5. 成稿后重新对照字幕或 `knowledge_outline` 做覆盖复核；确认无重要遗漏、无来源外补写后，将 `coverage_review.status` 设为 `passed` 并填写 notes。
 6. 无论写作成功、失败或中断，都必须运行 finalizer 清理 job。
 7. 只有 finalizer 返回 `note_ready` 且 `temporary_data_removed: true` 才能报告完成。
 
-`in_progress`、`subtitle_unavailable`、`source_insufficient`、`failed` 和 `note_invalid` 都不是完成状态。
+`configuration_required`、`in_progress`、`subtitle_unavailable`、`source_insufficient`、`failed` 和 `note_invalid` 都不是完成状态。
 
 ## 数据契约
 

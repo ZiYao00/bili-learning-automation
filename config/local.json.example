@@ -1,5 +1,5 @@
 {
-  "ytdlp": "C:\\Tools\\yt-dlp.exe",
-  "notes_root": "D:\\YourObsidianVault\\bilibili",
+  "vault_root": "D:\\YourObsidianVault",
+  "notes_subdir": "bilibili",
   "cookie_file": "C:\\PrivateConfig\\bilibili_cookies.txt"
 }

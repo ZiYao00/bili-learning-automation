@@ -22,6 +22,7 @@ doctor 不访问 Bilibili，也不读取 Cookie 内容。
 
 | 状态 | 含义 | 推荐处理 |
 | --- | --- | --- |
+| `configuration_required` | 尚未显式绑定 Obsidian Vault | 提供包含 `.obsidian` 的 Vault 根目录；本次不会启动采集 |
 | `materials_ready` | 采集完成，等待智能体写笔记 | 正常继续 |
 | `in_progress` | 同 BV 已有活动任务 | 不重复采集；等待或由适配层安全续做陈旧 job |
 | `subtitle_unavailable` | 没有取得可用中文字幕 | 本次停止，不自动下载视频做 ASR |
@@ -75,15 +76,21 @@ ytdlp_path_invalid
 ytdlp_not_executable
 ```
 
-推荐检查顺序：
+项目不会内置或自动安装 yt-dlp。第一次使用优先让 doctor 自动检测；Windows 如果返回 `ytdlp_not_configured`，先按官方方式安装：
 
-1. `config/local.json` 是否填写了正确 `ytdlp`；
-2. `BILI_LEARNING_YTDLP` 是否覆盖了本机配置；
-3. 文件是否真的存在；
-4. yt-dlp 是否可以直接运行；
-5. 如果依赖 PATH，当前 Agent 进程是否继承到了正确 PATH。
+```powershell
+winget install yt-dlp
+```
 
-配置说明见 [CONFIGURATION.md](CONFIGURATION.md)。
+安装后重新运行 doctor。仍然找不到时再检查：
+
+1. 新终端中能否直接运行 `yt-dlp --version`；
+2. 当前 Agent 进程是否继承到更新后的 PATH；
+3. 是否设置了错误的 `BILI_LEARNING_YTDLP`；
+4. `config/local.json` 是否存在错误的自定义 `ytdlp` 路径；
+5. 如果使用自定义目录，文件是否真实存在且可执行。
+
+不要通过把 `yt-dlp.exe` 复制进 Skill 或仓库来解决。配置说明见 [CONFIGURATION.md](CONFIGURATION.md)。
 
 ---
 

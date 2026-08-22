@@ -1,232 +1,228 @@
 # 配置说明
 
-如果你已经按照 [新手快速上手](QUICKSTART.md) 配好并成功生成过笔记，这份文档平时不需要经常看。
+普通用户优先使用 `config/local.json`。它只保存当前电脑的路径配置，并已被 Git 忽略。
 
-它主要解决三个问题：
+新版本把 Obsidian 配置拆成两个概念：
 
-1. yt-dlp 在哪里；
-2. Cookie 文件在哪里；
-3. 笔记要写到哪里。
+```text
+vault_root     = Obsidian Vault 根目录（直接包含 .obsidian）
+notes_subdir   = 本项目在 Vault 内使用的相对子目录
+notes_root     = vault_root / notes_subdir（程序计算结果）
+```
 
-普通用户优先使用 `config/local.json`，比临时环境变量更直观，也更适合长期使用。
+这样程序既知道笔记应该写到哪里，也知道 CSS 应该检查哪个 `.obsidian/snippets/`。
 
 ---
 
-## 1. 最推荐的配置方式：`config/local.json`
+## 1. 推荐配置
 
-项目提供模板：
+项目模板：
 
 ```text
 config/local.json.example
 ```
 
-复制一份：
-
-```powershell
-Copy-Item .\config\local.json.example .\config\local.json
-```
-
-然后修改成本机路径：
+复制后修改为自己的路径：
 
 ```json
 {
-  "ytdlp": "G:\\Program\\yt-dlp\\yt-dlp.exe",
-  "notes_root": "D:\\Notes\\MyVault\\bilibili",
+  "vault_root": "D:\\Notes\\MyVault",
+  "notes_subdir": "bilibili",
   "cookie_file": "D:\\Private\\bilibili_cookies.txt"
 }
 ```
 
-### `ytdlp`
-
-`yt-dlp.exe` 的完整路径。
-
-例如：
-
-```json
-"ytdlp": "G:\\Program\\yt-dlp\\yt-dlp.exe"
-```
-
-### `notes_root`
-
-生成 Markdown 笔记的根目录。
-
-例如：
-
-```json
-"notes_root": "D:\\Notes\\MyVault\\bilibili"
-```
-
-新笔记会先进入：
+最终笔记会写到：
 
 ```text
 D:\Notes\MyVault\bilibili\00-待整理\
 ```
 
-### `cookie_file`
-
-Netscape 格式 Bilibili Cookie 文件的路径。
-
-例如：
-
-```json
-"cookie_file": "D:\\Private\\bilibili_cookies.txt"
-```
-
-这里只填写**文件路径**，不要把 Cookie 内容直接写进 JSON。
-
-`config/local.json` 已被 Git 忽略，不会作为正常源码提交。
-
----
-
-## 2. 也可以使用环境变量
-
-如果你更习惯脚本或临时环境，可以设置：
-
-| 环境变量 | 用途 |
-| --- | --- |
-| `BILI_LEARNING_YTDLP` | yt-dlp 可执行文件 |
-| `BILI_LEARNING_NOTES_ROOT` | 笔记根目录 |
-| `BILI_LEARNING_COOKIE_FILE` | Cookie 文件 |
-| `BILI_LEARNING_TAXONOMY` | 自定义 taxonomy 文件 |
-
-PowerShell 示例：
-
-```powershell
-$env:BILI_LEARNING_YTDLP = 'G:\Program\yt-dlp\yt-dlp.exe'
-$env:BILI_LEARNING_NOTES_ROOT = 'D:\Notes\MyVault\bilibili'
-$env:BILI_LEARNING_COOKIE_FILE = 'D:\Private\bilibili_cookies.txt'
-```
-
-这种方式默认只对当前 PowerShell 会话生效。
-
----
-
-## 3. 配置优先级
-
-如果同一个项目同时存在环境变量、`local.json` 和默认值，优先级是：
-
-```text
-环境变量
-→ config/local.json
-→ 项目默认值
-```
-
-yt-dlp 还会继续尝试：
-
-```text
-系统 PATH 中的 yt-dlp
-```
-
-所以 yt-dlp 的完整查找顺序是：
-
-1. `BILI_LEARNING_YTDLP`；
-2. `config/local.json` 的 `ytdlp`；
-3. PATH 中的 `yt-dlp`。
-
-不确定当前到底用了哪一个时，直接运行 doctor，它会显示最终来源。
-
----
-
-## 4. 默认配置在哪里
-
-默认 taxonomy：
-
-```text
-config/bilibili-note-taxonomy.json
-```
-
-它负责：
-
-- 默认 `notes_root`；
-- `00-待整理` fallback；
-- tags；
-- 学习后整理时的建议分类；
-- 导航目录。
-
-### 一个容易误解的地方
-
-Taxonomy route 的 `path` **不是新笔记直接发布的位置**。
-
-新笔记统一先进入 fallback：
-
-```text
-00-待整理
-```
-
-只有你明确执行“学习后整理”时，系统才根据 tags / taxonomy 把笔记归档到建议目录。
-
-这能避免还没学习的视频直接混进正式知识库。
-
----
-
-## 5. 默认笔记目录
-
-如果没有覆盖 `notes_root`，项目默认使用：
-
-```text
-notes/bilibili
-```
-
-你可以直接把它作为测试目录，也可以指向自己的 Obsidian Vault 子目录。
-
-例如：
-
-```text
-D:\Notes\MyVault\bilibili
-```
-
-### 注意 CSS 放置位置
-
-如果 `notes_root` 是：
-
-```text
-D:\Notes\MyVault\bilibili
-```
-
-真正的 Vault 是：
-
-```text
-D:\Notes\MyVault
-```
-
-CSS 应该放在：
+CSS 则应该位于：
 
 ```text
 D:\Notes\MyVault\.obsidian\snippets\
 ```
 
-而不是：
+### `ytdlp`（可选覆盖）
 
-```text
-D:\Notes\MyVault\bilibili\.obsidian\snippets\
+普通用户**不需要**预先填写 `ytdlp`。程序会先检查 `BILI_LEARNING_YTDLP`、再检查 `config/local.json` 的自定义覆盖，最后自动查找系统 PATH 中的 `yt-dlp`。
+
+项目不会内置 `yt-dlp.exe`，也不会自动下载安装。首次 doctor 如果没有检测到 yt-dlp，会给出 Windows 推荐命令：
+
+```powershell
+winget install yt-dlp
 ```
 
-详见 [Obsidian 样式教程](OBSIDIAN-STYLING.md)。
+安装后重新运行 doctor 即可。只有 yt-dlp 位于自定义目录且没有加入 PATH 时，才建议配置例如：
+
+```json
+"ytdlp": "D:\\Tools\\yt-dlp.exe"
+```
+
+### `vault_root`
+
+Obsidian Vault 根目录，必须是直接包含 `.obsidian` 的目录，例如：
+
+```text
+D:\Notes\MyVault\
+├── .obsidian\
+├── bilibili\
+└── 其它笔记\
+```
+
+不要把 `D:\Notes\MyVault\bilibili` 错写成 `vault_root`，除非它本身就是一个独立 Vault，并且内部确实有 `.obsidian`。
+
+### `notes_subdir`
+
+Vault 内用于保存本项目笔记的**相对子目录**。默认推荐：
+
+```json
+"notes_subdir": "bilibili"
+```
+
+资深 Obsidian 用户也可以使用自己的知识库结构，例如：
+
+```json
+"notes_subdir": "03-Resources\\Bilibili"
+```
+
+`notes_subdir` 不能是绝对路径，也不能包含 `..` 跳出 Vault。
+
+### `cookie_file`
+
+Netscape 格式 Bilibili Cookie 文件路径。这里只写路径，不要把 Cookie 内容放进 JSON、日志、Issue 或聊天记录。
 
 ---
 
-## 6. Cookie 怎么配置
+## 2. 第一次绑定 Vault
 
-项目默认会尝试：
+除了手工编辑 JSON，也可以使用统一配置命令：
 
-```text
-key/bilibili_cookies.txt
+```powershell
+python .\hermes-skills\bili-learning-automation\scripts\configure_bilibili_learning.py --vault 'D:\Notes\MyVault' --notes-subdir 'bilibili'
 ```
 
-但更推荐显式写入 `config/local.json` 或环境变量，这样换机器时更容易理解。
+这个命令会：
 
-Cookie 文件必须存在；项目不会主动读取、显示或记录 Cookie 内容，只把路径交给 yt-dlp。
+- 检查 Vault 目录是否存在；
+- 检查该目录下是否有 `.obsidian`；
+- 保留 `local.json` 中已有的 yt-dlp、Cookie 等配置；
+- 如果存在旧版 `notes_root`，迁移为新的 `vault_root + notes_subdir`；
+- 不复制或覆盖 CSS；
+- 不访问 Bilibili。
 
-不要：
+配置成功后会返回：
 
-- 把 Cookie 提交到 Git；
-- 把 Cookie 内容放进 Issue；
-- 把 Cookie 内容贴给智能体做诊断；
-- 把 Cookie 内容写进 `local.json`。
+```json
+{
+  "status": "configured",
+  "vault_root": "D:\\Notes\\MyVault",
+  "notes_root": "D:\\Notes\\MyVault\\bilibili"
+}
+```
+
+Hermes / WorkBuddy 在首次收到 `configuration_required` 时，也应向用户询问这个 Vault 路径，再调用同一配置入口。
 
 ---
 
-## 7. 如何确认配置正确
+## 3. 为什么不再默认把笔记写进仓库
+
+Taxonomy 仍保留：
+
+```text
+notes/bilibili
+```
+
+作为安全 fallback，便于开发、测试和诊断。但它现在被定义为**临时状态**，不是正式用户的长期笔记目录。
+
+如果没有显式配置 Vault 或旧版 `notes_root`：
+
+- doctor 会报告 `notes_repository_fallback`；
+- 普通新采集会返回 `configuration_required`；
+- yt-dlp 不会启动；
+- 不会静默把私人笔记写进代码仓库。
+
+已有 runtime job 的 finalizer / 清理流程不受这个门禁影响，避免升级后把旧任务卡死。
+
+---
+
+## 4. 旧版 `notes_root` 仍然兼容
+
+旧配置：
+
+```json
+{
+  "notes_root": "D:\\Notes\\MyVault\\bilibili"
+}
+```
+
+仍可继续使用，程序不会强制破坏现有用户配置。
+
+但旧配置只告诉程序“笔记目录”，没有明确告诉程序 Vault 根在哪里，因此 doctor 无法可靠判断 `.obsidian/snippets/`。
+
+建议有机会时迁移为：
+
+```json
+{
+  "vault_root": "D:\\Notes\\MyVault",
+  "notes_subdir": "bilibili"
+}
+```
+
+不要同时配置 `notes_root` 和 `vault_root / notes_subdir`。两套配置同时出现时程序会明确报错，避免路径歧义。
+
+---
+
+## 5. 环境变量
+
+高级用户仍可使用环境变量：
+
+| 环境变量 | 用途 |
+| --- | --- |
+| `BILI_LEARNING_YTDLP` | yt-dlp 可执行文件 |
+| `BILI_LEARNING_VAULT_ROOT` | Obsidian Vault 根目录 |
+| `BILI_LEARNING_NOTES_SUBDIR` | Vault 内笔记相对子目录 |
+| `BILI_LEARNING_NOTES_ROOT` | 旧版兼容：直接指定笔记根目录 |
+| `BILI_LEARNING_COOKIE_FILE` | Cookie 文件 |
+| `BILI_LEARNING_TAXONOMY` | 自定义 taxonomy 文件 |
+
+推荐的新方式：
+
+```powershell
+$env:BILI_LEARNING_VAULT_ROOT = 'D:\Notes\MyVault'
+$env:BILI_LEARNING_NOTES_SUBDIR = 'bilibili'
+```
+
+旧版 `BILI_LEARNING_NOTES_ROOT` 继续兼容，但不能与 `BILI_LEARNING_VAULT_ROOT / BILI_LEARNING_NOTES_SUBDIR` 同时使用。
+
+---
+
+## 6. 路径解析优先级
+
+笔记位置按以下顺序解析：
+
+```text
+1. 旧环境变量 BILI_LEARNING_NOTES_ROOT
+   或新环境变量 BILI_LEARNING_VAULT_ROOT + BILI_LEARNING_NOTES_SUBDIR
+2. config/local.json 的旧 notes_root
+   或新 vault_root + notes_subdir
+3. taxonomy 的 notes/bilibili fallback
+```
+
+环境变量和 `local.json` 内部如果混用新旧两套路径模型，会直接报配置冲突，不做静默猜测。
+
+`yt-dlp` 的顺序是：
+
+```text
+BILI_LEARNING_YTDLP
+→ local.json 的 ytdlp
+→ 系统 PATH
+```
+
+---
+
+## 7. Doctor 会检查什么
 
 运行：
 
@@ -234,108 +230,92 @@ Cookie 文件必须存在；项目不会主动读取、显示或记录 Cookie �
 python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py
 ```
 
-正常情况下重点关注：
-
-- yt-dlp 找到并可执行；
-- Cookie 文件存在；
-- taxonomy 有效；
-- notes root 可写；
-- runtime 可写；
-- 共享协议文档存在。
-
-如果智能体需要 JSON：
+结构化输出：
 
 ```powershell
 python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py --json
 ```
 
-doctor 不访问 Bilibili，也不读取 Cookie 内容。
+重点检查：
+
+- Python 版本；
+- 项目根和 taxonomy；
+- 当前笔记位置是否仍是仓库 fallback；
+- `vault_root` 是否真正包含 `.obsidian`；
+- `learning-lab.css` 是否存在；
+- `video-note.css` 是否存在；
+- notes/runtime 是否可写；
+- yt-dlp 是否存在、可执行以及最终来源；
+- Cookie 文件是否存在；
+- 共享协议是否存在。
+
+CSS 缺失和 repository fallback 使用 `WARN`；它们不会伪装成硬故障，但会明确告诉用户当前配置还不完整。真正无法运行的依赖仍使用 `FAIL`。
+
+Doctor 不访问 Bilibili，也不读取 Cookie 内容。
 
 ---
 
-## 8. 配置错误时会怎样
+## 8. CSS 为什么要知道 Vault 根
 
-项目不会为了“尽量跑下去”而静默猜配置。
+仓库内的样式文件位于：
 
-以下情况会直接停止：
+```text
+obsidian/snippets/
+├── learning-lab.css
+└── video-note.css
+```
 
-- `config/local.json` 不是有效 JSON；
-- 出现未知字段；
-- 路径值为空；
-- taxonomy 格式无效；
-- yt-dlp 路径不存在或不可执行；
-- Cookie 文件不存在；
-- notes / runtime 无法写入。
+它们应该安装到：
 
-这样做是为了避免把笔记写错目录、误用旧配置或产生无法追踪的半成品。
+```text
+<vault_root>/.obsidian/snippets/
+```
+
+而不是：
+
+```text
+<notes_root>/.obsidian/snippets/
+```
+
+程序只负责诊断 CSS 是否存在，**不会静默覆盖**用户已经修改过的 CSS。具体安装、启用和升级方式见 [Obsidian 样式教程](OBSIDIAN-STYLING.md)。
 
 ---
 
 ## 9. 支持的 `local.json` 字段
 
-当前只支持：
+当前支持：
 
 ```text
 ytdlp
-notes_root
+vault_root
+notes_subdir
+notes_root      # 旧版兼容
 cookie_file
 taxonomy
 ```
 
-示例：
+推荐新配置：
 
 ```json
 {
-  "ytdlp": "G:\\Program\\yt-dlp\\yt-dlp.exe",
-  "notes_root": "D:\\Notes\\MyVault\\bilibili",
-  "cookie_file": "D:\\Private\\bilibili_cookies.txt",
-  "taxonomy": "D:\\Config\\my-taxonomy.json"
+  "vault_root": "D:\\Notes\\MyVault",
+  "notes_subdir": "bilibili",
+  "cookie_file": "D:\\Private\\bilibili_cookies.txt"
 }
 ```
 
-普通用户通常只需要前三项。
+本机配置出现未知字段、空路径、新旧笔记路径冲突或非法 `notes_subdir` 时会直接停止，不会尝试“猜一个能跑的值”。
 
 ---
 
-## 10. 笔记命名规则
+## 10. 笔记命名与归档
 
-默认文件名：
-
-```text
-{原视频标题}.md
-```
-
-例如：
+新笔记仍统一先进入：
 
 ```text
-H3智能一体化节点重磅升级.md
+<notes_root>/00-待整理/
 ```
 
-如果同目录已经存在同名文件，会自动生成：
+文件名默认使用原视频标题；同名时自动生成 `（2）`、`（3）`，不覆盖旧笔记。
 
-```text
-H3智能一体化节点重磅升级（2）.md
-H3智能一体化节点重磅升级（3）.md
-```
-
-不会覆盖旧笔记。
-
-BVID 会写在 H1 下方，但不会强行加入文件名。
-
-学习后如果希望使用更短的标题，应该通过 `organize` 统一整理，而不是手工改名和移动。
-
----
-
-## 11. 换电脑时最少需要迁移什么
-
-换机器后通常只需要重新准备：
-
-1. 项目代码；
-2. Python；
-3. yt-dlp；
-4. Cookie 文件；
-5. `config/local.json`；
-6. Obsidian Vault；
-7. 对应智能体适配层。
-
-其中 `local.json` 和 Cookie 都是本机私有配置，不建议提交到公开仓库。
+只有用户明确执行“学习后整理”时，系统才根据 tags / taxonomy 移入建议分类并刷新导航。

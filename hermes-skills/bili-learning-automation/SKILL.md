@@ -24,10 +24,12 @@ description: Turn a Bilibili copied link, supported Bilibili short link, or BV i
 
 2. 读取 JSON 状态：
 
+   - `configuration_required`：**不要继续采集**。说明尚未绑定 Obsidian Vault，并询问 owner 的 Vault 根目录（即包含 `.obsidian` 的目录）。owner 在当前私聊提供路径后执行 `python "$project\\hermes-skills\\bili-learning-automation\\scripts\\configure_bilibili_learning.py" --vault '<Vault根目录>' --notes-subdir 'bilibili'`；只有返回 `configured` 才可重新使用本会话中之前收到的 B站链接执行步骤 1。若 owner 明确指定 Vault 内其他相对子目录，则使用其指定值。不得自动扫描整块磁盘、不得未经确认选择 Vault。
    - `in_progress`：不重复采集。若响应带 `job_dir`，且 `reservation_age_seconds >= 1800`，只检查该绑定 job：`job.json`、`analysis_path`、`draft_path`、`transcript_manifest_path` 与 manifest 中全部 chunks 都存在，草稿两个 AI marker 仍未填写且 `analysis.json` 仍为 pending 时，视为可续做的中断任务，直接从步骤 3 继续；不要先跑 doctor。条件不满足则按活动任务处理，不抢占、不手工删锁。只有文件缺失、路径矛盾或状态异常时才运行 doctor 诊断。
    - `incomplete_note`：仅旧版遗留骨架会返回；说明该笔记尚未完成，不声称完成。
    - `subtitle_unavailable`：说明没有可用中文字幕，且没有下载媒体，不生成笔记。
-   - `failed`：回复短错误，不声称完成。
+   - `failed` 且 `code = ytdlp_not_configured`：说明当前电脑未检测到 yt-dlp，并给 owner `winget install yt-dlp`。**只提供命令，不自动执行安装，也不要把 `yt-dlp.exe` 复制进 Skill / 仓库。** 安装完成后重新执行原请求；只有 owner 明确使用自定义 yt-dlp 位置时才配置 `BILI_LEARNING_YTDLP` 或 `local.json.ytdlp`。
+   - 其它 `failed`：回复短错误，不声称完成。
    - `materials_ready`，或满足上述“可续做中断任务”条件的 `in_progress`，才继续。
 
 3. 进入可处理状态后读取 `handoff_path`（新任务）或绑定 job 内的 `job.json`（续做任务），再读取 `analysis_path`、`agent_work_dir` 与 `transcript_manifest_path`，并遵循项目共享的 `docs\\AGENT-INTEGRATION.md` 与内容标准。程序已把原始 SRT 无语义删减地整理成适合 Agent 阅读的 transcript：manifest 为 `direct` 时读取唯一 chunk；为 `chunked` 时严格按 `chunks` 顺序逐块阅读。单个 chunk 在工具限制内时优先一次完整读取，只有工具明确返回截断/continuation 时才继续读取剩余部分；不要主动把一个 chunk 再拆成多次读取，也不要把原始 SRT 整份塞入上下文或自行重新按固定比例切分。处理长字幕时可在 `agent_work_dir` 创建 `part-XX-notes.md`、索引或中间梳理文件，把每块的重要参数、比较、限制、方法和资源先外化，再合并为 `knowledge_outline`。来源不足时在 `analysis.json` 记录原因，不得靠常识补全。所有临时文件都属于当前 job，由 finalizer 与 failsafe 统一清理；不得写到项目其他目录，也不得手工删除 job、reservation 或锁文件。

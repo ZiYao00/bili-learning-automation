@@ -58,8 +58,8 @@
 按下面顺序即可：
 
 1. 下载项目；
-2. 配置 Python、yt-dlp、Cookie 和笔记目录；
-3. 运行 doctor 检查环境；
+2. 准备 Python，配置 Cookie 和 Obsidian 笔记目录；
+3. 运行 doctor，让它自动检测 yt-dlp 和其它依赖；
 4. 把 CSS 安装到 Obsidian；
 5. 安装 Hermes / WorkBuddy 适配层，或者直接使用 Codex；
 6. 发送一个 B站链接测试。
@@ -187,6 +187,7 @@ obsidian/snippets/
 
 | 状态 | 代表什么 |
 | --- | --- |
+| `configuration_required` | 尚未显式绑定 Obsidian Vault；本次不会启动采集 |
 | `materials_ready` | 字幕、简介等材料已经准备完成 |
 | `in_progress` | 同一个 BV 号已经有活动任务，防止并发冲突 |
 | `subtitle_unavailable` | 没有取得可用中文字幕 |
@@ -213,16 +214,22 @@ config/local.json
 
 ```json
 {
-  "ytdlp": "G:\\Program\\yt-dlp\\yt-dlp.exe",
-  "notes_root": "D:\\Notes\\MyVault\\bilibili",
+  "vault_root": "D:\\Notes\\MyVault",
+  "notes_subdir": "bilibili",
   "cookie_file": "D:\\Private\\bilibili_cookies.txt"
 }
 ```
 
+`vault_root` 是直接包含 `.obsidian` 的 Vault 根目录，`notes_subdir` 是本项目在 Vault 内使用的相对子目录。未显式配置笔记位置时，仓库内 `notes/bilibili` 只作为临时 fallback；新采集会返回 `configuration_required`，不会静默把私人笔记写进代码仓库。
+
+`yt-dlp` 默认不需要写进配置：程序会自动检查环境变量、本机 `local.json` 覆盖和系统 PATH。首次检查如果未检测到 yt-dlp，只会给出安装指引，不会自动安装，也不会在 Skill / 仓库中内置 `yt-dlp.exe`。Windows 推荐按官方说明运行 `winget install yt-dlp`；如果你把 yt-dlp 放在自定义位置，再单独配置 `ytdlp` 即可。
+
 也支持环境变量：
 
 - `BILI_LEARNING_TAXONOMY`
-- `BILI_LEARNING_NOTES_ROOT`
+- `BILI_LEARNING_VAULT_ROOT`
+- `BILI_LEARNING_NOTES_SUBDIR`
+- `BILI_LEARNING_NOTES_ROOT`（旧版兼容）
 - `BILI_LEARNING_YTDLP`
 - `BILI_LEARNING_COOKIE_FILE`
 
@@ -242,7 +249,7 @@ python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning
 python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py --json
 ```
 
-doctor 会检查 yt-dlp、Cookie 文件、taxonomy、notes/runtime 写权限和关键文档，不读取 Cookie 内容，也不访问 Bilibili。
+doctor 会检查 yt-dlp、Cookie 文件、taxonomy、Vault/CSS、notes/runtime 写权限和关键文档，不读取 Cookie 内容，也不访问 Bilibili。若未检测到 yt-dlp，只提供官方安装指引，不会自动安装。
 
 常见错误见 [故障排查](docs/TROUBLESHOOTING.md)。
 

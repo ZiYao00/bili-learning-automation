@@ -192,6 +192,9 @@ https://www.bilibili.com/video/BVxxxxxxxxxx/
 ```text
 识别项目
 → collector
+→ 首次未绑定 Vault 时返回 configuration_required
+→ owner 提供包含 .obsidian 的 Vault 根目录并完成配置
+→ collector 重试
 → materials_ready
 → 读取 transcript manifest
 → 阅读字幕
@@ -280,6 +283,16 @@ hermes skills list
 ### Skill 内容正确，但 Obsidian 没有样式
 
 这是 CSS 安装问题，不是 Hermes Skill 问题。看 [Obsidian 样式教程](OBSIDIAN-STYLING.md)。
+
+### collector 返回 `ytdlp_not_configured`
+
+说明当前电脑没有检测到 yt-dlp。Hermes 只应提示 owner 运行：
+
+```powershell
+winget install yt-dlp
+```
+
+Hermes 不自动安装，也不要把 `yt-dlp.exe` 复制到 Skill 或仓库。安装完成后重新发送原链接即可；自定义安装位置才需要单独配置 `ytdlp`。
 
 ### collector 返回 `subtitle_unavailable`
 

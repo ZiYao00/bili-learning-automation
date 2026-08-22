@@ -47,9 +47,9 @@ python -m pip install -e ".[dev]"
 
 ---
 
-## 3. 配置 yt-dlp、笔记目录和 Cookie
+## 3. 配置笔记目录和 Cookie
 
-最适合普通用户的是 `config/local.json`。
+最适合普通用户的是 `config/local.json`。`yt-dlp` 不要求预先写死路径：首次 doctor 会自动检测，缺失时只给安装指引，不会自动安装。
 
 先复制模板：
 
@@ -61,19 +61,31 @@ Copy-Item .\config\local.json.example .\config\local.json
 
 ```json
 {
-  "ytdlp": "G:\\Program\\yt-dlp\\yt-dlp.exe",
-  "notes_root": "D:\\Notes\\MyVault\\bilibili",
+  "vault_root": "D:\\Notes\\MyVault",
+  "notes_subdir": "bilibili",
   "cookie_file": "D:\\Private\\bilibili_cookies.txt"
 }
 ```
 
-三个字段分别表示：
+几个字段分别表示：
 
-- `ytdlp`：`yt-dlp.exe` 的位置；
-- `notes_root`：生成笔记的根目录；
+- `vault_root`：Obsidian Vault 根目录，也就是直接包含 `.obsidian` 的目录；
+- `notes_subdir`：本项目在 Vault 内使用的相对子目录，默认推荐 `bilibili`；
 - `cookie_file`：Netscape 格式 Bilibili Cookie 文件的位置。
 
-`config/local.json` 已被 Git 忽略，适合保存本机路径。
+最终笔记目录会自动计算为 `<vault_root>/<notes_subdir>`。例如上面的配置会写入 `D:\Notes\MyVault\bilibili\00-待整理\`。
+
+`config/local.json` 已被 Git 忽略，适合保存本机路径。旧版 `notes_root` 仍然兼容，但新安装建议使用 `vault_root + notes_subdir`，这样程序才能准确检查 Obsidian 和 CSS。
+
+### yt-dlp 不需要复制进项目
+
+项目不会携带 `yt-dlp.exe`，也不会替用户自动下载安装。首次运行 doctor 时会依次检查环境变量、本机 `local.json` 覆盖和系统 PATH。Windows 如果未检测到 yt-dlp，按官方方式安装即可：
+
+```powershell
+winget install yt-dlp
+```
+
+安装后重新运行 doctor。只有你把 yt-dlp 放在自定义目录、且没有加入 PATH 时，才需要在 `local.json` 增加例如 `"ytdlp": "D:\\Tools\\yt-dlp.exe"`。
 
 如果不想使用 `local.json`，也可以通过环境变量配置，详见 [配置说明](CONFIGURATION.md)。
 
@@ -87,7 +99,15 @@ Copy-Item .\config\local.json.example .\config\local.json
 python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py
 ```
 
-如果环境正确，你应该看到 yt-dlp、Cookie、taxonomy、notes/runtime 写权限等检查通过。
+如果环境正确，你应该看到 yt-dlp、Cookie、taxonomy、Vault、notes/runtime 写权限等检查通过。doctor 还会检查 `learning-lab.css` 与 `video-note.css` 是否位于当前 Vault 的 `.obsidian/snippets/`。
+
+如果看到 `notes_repository_fallback`，说明还没有显式绑定 Vault。此时新的视频采集会返回 `configuration_required`，不会再把私人笔记静默写入代码仓库。你可以修改 `config/local.json`，也可以运行：
+
+```powershell
+python .\hermes-skills\bili-learning-automation\scripts\configure_bilibili_learning.py --vault 'D:\Notes\MyVault' --notes-subdir 'bilibili'
+```
+
+该命令只写本机 `config/local.json`，并要求 `--vault` 真正包含 `.obsidian`。
 
 如果要让智能体读取结构化诊断结果：
 
@@ -310,6 +330,7 @@ bili-learning organize --note '<笔记路径>' --title '<短标题>' --intro '<�
 
 | 状态 | 含义 | 用户通常怎么做 |
 | --- | --- | --- |
+| `configuration_required` | 尚未显式绑定 Obsidian Vault | 告诉智能体你的 Vault 根目录；本次不会启动采集 |
 | `materials_ready` | 字幕、简介等材料已经准备好 | 等智能体继续写笔记 |
 | `in_progress` | 同一 BV 号已有活动任务 | 不要重复启动；Hermes 可在安全条件下续做陈旧未完成 job |
 | `subtitle_unavailable` | 没有取得可用中文字幕 | 本次不会生成笔记，也不会下载音视频 |

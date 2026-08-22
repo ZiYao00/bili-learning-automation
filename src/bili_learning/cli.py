@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
-from .config import load_settings
+from .config import DEFAULT_NOTES_SUBDIR, ConfigurationError, configure_obsidian, load_settings
 from .doctor import doctor_report, run_doctor
 from .lifecycle import FAILSAFE_SECONDS, finalize_note, prepare_note
 from .navigation import build_navigation
@@ -20,11 +21,26 @@ def find_project_root() -> Path:
 
 
 def main() -> None:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
     parser = argparse.ArgumentParser(prog="bili-learning", description="B站视频转笔记维护工具")
     parser.add_argument("--project-root", type=Path, help="项目根目录；省略时从当前目录向上查找")
     subparsers = parser.add_subparsers(dest="command", required=True)
+
     doctor_parser = subparsers.add_parser("doctor", help="检查本机依赖和配置")
     doctor_parser.add_argument("--json", action="store_true", dest="as_json", help="输出机器可读诊断 JSON")
+
+    configure_parser = subparsers.add_parser("configure-obsidian", help="把本机 Obsidian Vault 写入 config/local.json")
+    configure_parser.add_argument("--vault", type=Path, required=True, help="包含 .obsidian 的 Vault 根目录")
+    configure_parser.add_argument(
+        "--notes-subdir",
+        default=DEFAULT_NOTES_SUBDIR,
+        help="Vault 内用于保存本项目笔记的相对子目录",
+    )
+
     subparsers.add_parser("build-nav", help="重建 Obsidian 导航")
     prepare_parser = subparsers.add_parser("prepare", help="采集资料并创建 runtime 草稿任务")
     prepare_parser.add_argument("message", nargs="?", help="Bilibili 复制链接、短链或 BV 号")
@@ -43,6 +59,40 @@ def main() -> None:
     args = parser.parse_args()
 
     project_root = args.project_root.resolve() if args.project_root else find_project_root()
+
+    if args.command == "configure-obsidian":
+        try:
+            config_path = configure_obsidian(project_root, args.vault, args.notes_subdir)
+            settings = load_settings(project_root)
+        except ConfigurationError as error:
+            print(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "status": "failed",
+                        "code": error.code,
+                        "message": str(error),
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+            raise SystemExit(2)
+        print(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "status": "configured",
+                    "config_path": str(config_path),
+                    "vault_root": str(settings.vault_root),
+                    "notes_root": str(settings.notes_root),
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return
+
     settings = load_settings(project_root)
     if args.command == "doctor":
         if args.as_json:

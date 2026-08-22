@@ -9,6 +9,10 @@ from typing import Any
 
 SUPPORTED_TAXONOMY_VERSION = 1
 LOCAL_CONFIG_RELATIVE_PATH = Path("config/local.json")
+DEFAULT_NOTES_SUBDIR = "bilibili"
+OBSIDIAN_SNIPPET_NAMES = ("learning-lab.css", "video-note.css")
+YTDLP_INSTALL_URL = "https://github.com/yt-dlp/yt-dlp/wiki/Installation"
+YTDLP_WINDOWS_INSTALL_COMMAND = "winget install yt-dlp"
 
 
 class ConfigurationError(ValueError):
@@ -36,6 +40,10 @@ class Settings:
     taxonomy_path: Path
     taxonomy: dict[str, Any]
     notes_root: Path
+    vault_root: Path | None
+    notes_subdir: Path | None
+    notes_source: str
+    notes_is_fallback: bool
     navigation_dir: str
     runtime_root: Path
     cookie_file: Path
@@ -46,6 +54,16 @@ class Settings:
 def _resolve_path(project_root: Path, value: str) -> Path:
     path = Path(value).expanduser()
     return path if path.is_absolute() else project_root / path
+
+
+def _normalize_notes_subdir(value: str) -> Path:
+    path = Path(value.strip())
+    if not value.strip() or path.is_absolute() or path == Path(".") or ".." in path.parts:
+        raise ConfigurationError(
+            "notes_subdir_invalid",
+            "notes_subdir 必须是 Vault 内的相对子目录，且不能包含 ..。",
+        )
+    return path
 
 
 def validate_taxonomy(config: dict[str, Any]) -> None:
@@ -108,7 +126,7 @@ def _load_local_config(project_root: Path) -> tuple[Path, dict[str, str]]:
         raise ConfigurationError("local_config_invalid_json", f"本机配置不是有效 JSON：{path}") from exc
     if not isinstance(raw, dict):
         raise ConfigurationError("local_config_invalid_type", "本机配置必须是 JSON 对象")
-    allowed = {"taxonomy", "notes_root", "cookie_file", "ytdlp"}
+    allowed = {"taxonomy", "notes_root", "vault_root", "notes_subdir", "cookie_file", "ytdlp"}
     unknown = sorted(set(raw) - allowed)
     if unknown:
         raise ConfigurationError("local_config_unknown_key", "本机配置存在不支持字段：" + ", ".join(unknown))
@@ -117,7 +135,72 @@ def _load_local_config(project_root: Path) -> tuple[Path, dict[str, str]]:
         if not isinstance(value, str) or not value.strip():
             raise ConfigurationError("local_config_invalid_value", f"本机配置 {key} 必须是非空字符串")
         values[key] = value.strip()
+    if "notes_root" in values and ({"vault_root", "notes_subdir"} & values.keys()):
+        raise ConfigurationError(
+            "local_config_notes_conflict",
+            "notes_root 是旧版直接路径配置，不能与 vault_root / notes_subdir 同时使用。",
+        )
+    if "notes_subdir" in values and "vault_root" not in values:
+        raise ConfigurationError("local_config_notes_subdir_without_vault", "配置 notes_subdir 时必须同时配置 vault_root。")
     return path, values
+
+
+def _resolve_notes_location(
+    project_root: Path,
+    taxonomy: dict[str, Any],
+    local_config: dict[str, str],
+) -> tuple[Path, Path | None, Path | None, str, bool]:
+    env_notes_root = os.environ.get("BILI_LEARNING_NOTES_ROOT")
+    env_vault_root = os.environ.get("BILI_LEARNING_VAULT_ROOT")
+    env_notes_subdir = os.environ.get("BILI_LEARNING_NOTES_SUBDIR")
+    if env_notes_root and (env_vault_root or env_notes_subdir):
+        raise ConfigurationError(
+            "environment_notes_conflict",
+            "BILI_LEARNING_NOTES_ROOT 不能与 BILI_LEARNING_VAULT_ROOT / BILI_LEARNING_NOTES_SUBDIR 同时使用。",
+        )
+    if env_notes_subdir and not env_vault_root:
+        raise ConfigurationError(
+            "environment_notes_subdir_without_vault",
+            "BILI_LEARNING_NOTES_SUBDIR 需要同时设置 BILI_LEARNING_VAULT_ROOT。",
+        )
+
+    if env_notes_root:
+        return _resolve_path(project_root, env_notes_root), None, None, "environment_notes_root", False
+    if env_vault_root:
+        vault_root = _resolve_path(project_root, env_vault_root)
+        notes_subdir = _normalize_notes_subdir(env_notes_subdir or DEFAULT_NOTES_SUBDIR)
+        return vault_root / notes_subdir, vault_root, notes_subdir, "environment_vault", False
+
+    local_notes_root = local_config.get("notes_root")
+    if local_notes_root:
+        return _resolve_path(project_root, local_notes_root), None, None, "local_notes_root", False
+    local_vault_root = local_config.get("vault_root")
+    if local_vault_root:
+        vault_root = _resolve_path(project_root, local_vault_root)
+        notes_subdir = _normalize_notes_subdir(local_config.get("notes_subdir") or DEFAULT_NOTES_SUBDIR)
+        return vault_root / notes_subdir, vault_root, notes_subdir, "local_vault", False
+
+    notes_root = _resolve_path(project_root, taxonomy["notes_root"])
+    return notes_root, None, None, "taxonomy_fallback", True
+
+
+def configure_obsidian(project_root: Path, vault_root: Path, notes_subdir: str = DEFAULT_NOTES_SUBDIR) -> Path:
+    project_root = project_root.resolve()
+    vault_root = vault_root.expanduser().resolve()
+    if not vault_root.is_dir():
+        raise ConfigurationError("vault_root_missing", f"Vault 目录不存在：{vault_root}")
+    if not (vault_root / ".obsidian").is_dir():
+        raise ConfigurationError("vault_root_not_obsidian", f"未在该目录发现 .obsidian：{vault_root}")
+    normalized_subdir = _normalize_notes_subdir(notes_subdir)
+
+    path, local_config = _load_local_config(project_root)
+    updated = dict(local_config)
+    updated.pop("notes_root", None)
+    updated["vault_root"] = str(vault_root)
+    updated["notes_subdir"] = str(normalized_subdir)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(updated, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return path
 
 
 def find_ytdlp(project_root: Path, local_config: dict[str, str]) -> ExecutableResolution:
@@ -146,9 +229,10 @@ def load_settings(project_root: Path) -> Settings:
     taxonomy = json.loads(taxonomy_path.read_text(encoding="utf-8"))
     validate_taxonomy(taxonomy)
 
-    notes_root = _resolve_path(
+    notes_root, vault_root, notes_subdir, notes_source, notes_is_fallback = _resolve_notes_location(
         project_root,
-        os.environ.get("BILI_LEARNING_NOTES_ROOT") or local_config.get("notes_root") or taxonomy["notes_root"],
+        taxonomy,
+        local_config,
     )
     cookie_file = _resolve_path(
         project_root,
@@ -159,6 +243,10 @@ def load_settings(project_root: Path) -> Settings:
         taxonomy_path=taxonomy_path,
         taxonomy=taxonomy,
         notes_root=notes_root,
+        vault_root=vault_root,
+        notes_subdir=notes_subdir,
+        notes_source=notes_source,
+        notes_is_fallback=notes_is_fallback,
         navigation_dir=taxonomy["navigation_dir"],
         runtime_root=project_root / ".runtime" / "bilibili-learning",
         cookie_file=cookie_file,

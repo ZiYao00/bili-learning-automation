@@ -5,6 +5,7 @@ import os
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -17,7 +18,15 @@ from bili_learning.collector import (
     run_ytdlp,
     select_subtitle,
 )
-from bili_learning.config import ExecutableResolution, Settings, find_ytdlp, load_settings, validate_taxonomy
+from bili_learning.config import (
+    ConfigurationError,
+    ExecutableResolution,
+    Settings,
+    configure_obsidian,
+    find_ytdlp,
+    load_settings,
+    validate_taxonomy,
+)
 from bili_learning.doctor import doctor_report
 from bili_learning.frontmatter import parse_frontmatter, parse_frontmatter_list
 from bili_learning.input_resolver import resolve_input
@@ -220,6 +229,101 @@ def test_notes_root_comes_from_taxonomy(tmp_path: Path, taxonomy: dict, monkeypa
     assert settings.notes_root == tmp_path / "custom" / "notes"
 
 
+def test_vault_root_and_notes_subdir_override_taxonomy_fallback(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "bilibili-note-taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
+    vault = tmp_path / "vault"
+    (vault / ".obsidian").mkdir(parents=True)
+    (config_dir / "local.json").write_text(
+        json.dumps({"vault_root": str(vault), "notes_subdir": "03-Resources/Bilibili"}),
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("BILI_LEARNING_NOTES_ROOT", raising=False)
+    monkeypatch.delenv("BILI_LEARNING_VAULT_ROOT", raising=False)
+    monkeypatch.delenv("BILI_LEARNING_NOTES_SUBDIR", raising=False)
+
+    settings = load_settings(tmp_path)
+
+    assert settings.vault_root == vault
+    assert settings.notes_subdir == Path("03-Resources/Bilibili")
+    assert settings.notes_root == vault / "03-Resources" / "Bilibili"
+    assert settings.notes_source == "local_vault"
+    assert settings.notes_is_fallback is False
+
+
+def test_taxonomy_notes_root_is_marked_as_repository_fallback(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "bilibili-note-taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
+    monkeypatch.delenv("BILI_LEARNING_NOTES_ROOT", raising=False)
+    monkeypatch.delenv("BILI_LEARNING_VAULT_ROOT", raising=False)
+    monkeypatch.delenv("BILI_LEARNING_NOTES_SUBDIR", raising=False)
+
+    settings = load_settings(tmp_path)
+
+    assert settings.notes_root == tmp_path / "notes" / "bilibili"
+    assert settings.notes_is_fallback is True
+    assert settings.notes_source == "taxonomy_fallback"
+
+
+def test_legacy_notes_root_remains_supported(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "bilibili-note-taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
+    (config_dir / "local.json").write_text(json.dumps({"notes_root": "legacy/notes"}), encoding="utf-8")
+    monkeypatch.delenv("BILI_LEARNING_NOTES_ROOT", raising=False)
+    monkeypatch.delenv("BILI_LEARNING_VAULT_ROOT", raising=False)
+    monkeypatch.delenv("BILI_LEARNING_NOTES_SUBDIR", raising=False)
+
+    settings = load_settings(tmp_path)
+
+    assert settings.notes_root == tmp_path / "legacy" / "notes"
+    assert settings.vault_root is None
+    assert settings.notes_source == "local_notes_root"
+    assert settings.notes_is_fallback is False
+
+
+def test_notes_root_conflicts_with_vault_config(tmp_path: Path, taxonomy: dict) -> None:
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "bilibili-note-taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
+    (config_dir / "local.json").write_text(
+        json.dumps({"notes_root": "notes", "vault_root": "vault"}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigurationError) as error:
+        load_settings(tmp_path)
+    assert error.value.code == "local_config_notes_conflict"
+
+
+def test_configure_obsidian_preserves_other_local_values(tmp_path: Path, taxonomy: dict) -> None:
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "bilibili-note-taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
+    (config_dir / "local.json").write_text(
+        json.dumps({"ytdlp": "tools/yt-dlp.exe", "notes_root": "old/notes"}),
+        encoding="utf-8",
+    )
+    vault = tmp_path / "MyVault"
+    (vault / ".obsidian").mkdir(parents=True)
+
+    path = configure_obsidian(tmp_path, vault, "Resources/Bilibili")
+    saved = json.loads(path.read_text(encoding="utf-8"))
+
+    assert saved["ytdlp"] == "tools/yt-dlp.exe"
+    assert "notes_root" not in saved
+    assert saved["vault_root"] == str(vault.resolve())
+    assert saved["notes_subdir"] == str(Path("Resources/Bilibili"))
+
+
 def _complete_ai_regions(text: str) -> str:
     return (
         text.replace("> 待智能体根据字幕填写。", "> 这是结论。")
@@ -360,12 +464,28 @@ def _settings(tmp_path: Path, taxonomy: dict) -> Settings:
         taxonomy_path=taxonomy_path,
         taxonomy=taxonomy,
         notes_root=notes_root,
+        vault_root=None,
+        notes_subdir=None,
+        notes_source="test",
+        notes_is_fallback=False,
         navigation_dir="99-导航",
         runtime_root=runtime_root,
         cookie_file=cookie_file,
         ytdlp=ExecutableResolution(ytdlp, "test", ("test",)),
         local_config_path=tmp_path / "config" / "local.json",
     )
+
+
+def test_doctor_missing_ytdlp_only_reports_install_guidance(tmp_path: Path, taxonomy: dict) -> None:
+    settings = replace(_settings(tmp_path, taxonomy), ytdlp=ExecutableResolution(None, "missing", ("PATH:yt-dlp",)))
+
+    report = doctor_report(settings)
+    check = next(item for item in report["checks"] if item["code"] == "ytdlp_not_configured")
+
+    assert check["status"] == "FAIL"
+    assert check["windows_install_command"] == "winget install yt-dlp"
+    assert "不会自动安装" in check["detail"]
+    assert "github.com/yt-dlp/yt-dlp/wiki/Installation" in check["install_url"]
 
 
 def test_create_job_writes_runtime_draft_without_publishing_note(tmp_path: Path, taxonomy: dict) -> None:
@@ -540,6 +660,47 @@ def test_core_prepare_dry_run_returns_versioned_status_and_releases_reservation(
     assert not list(locks.glob("*.reservation.json"))
 
 
+def test_prepare_requires_explicit_notes_location_before_collection(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "bilibili-note-taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
+    called = False
+
+    def fail_if_called(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        nonlocal called
+        called = True
+        raise AssertionError("yt-dlp should not run before explicit notes configuration")
+
+    monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", fail_if_called)
+    payload, code = prepare_note(tmp_path, "BV1TXua68EYi")
+
+    assert code == 2
+    assert payload["status"] == "configuration_required"
+    assert payload["required"] == "vault_root"
+    assert called is False
+
+
+def test_prepare_reports_ytdlp_dependency_code_without_auto_install(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "bilibili-note-taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
+    (config_dir / "local.json").write_text(json.dumps({"notes_root": "notes/bilibili"}), encoding="utf-8")
+    monkeypatch.delenv("BILI_LEARNING_YTDLP", raising=False)
+    monkeypatch.setattr("bili_learning.config.shutil.which", lambda _name: None)
+
+    payload, code = prepare_note(tmp_path, "BV1TXua68EYi")
+
+    assert code == 1
+    assert payload["status"] == "failed"
+    assert payload["code"] == "ytdlp_not_configured"
+    assert "winget install yt-dlp" in payload["message"]
+    assert "不会自动安装" in payload["message"]
+
+
 def test_prepare_in_progress_returns_bound_job_dir(tmp_path: Path, taxonomy: dict) -> None:
     _write_e2e_config(tmp_path, taxonomy)
     settings = load_settings(tmp_path)
@@ -580,6 +741,9 @@ def _write_e2e_config(project_root: Path, taxonomy: dict) -> None:
     config_dir = project_root / "config"
     config_dir.mkdir()
     (config_dir / "bilibili-note-taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
+
+
+    (config_dir / "local.json").write_text(json.dumps({"notes_root": "notes/bilibili"}), encoding="utf-8")
 
 
 def _fake_ytdlp(_settings: Settings, job_dir: Path, canonical_url: str) -> None:

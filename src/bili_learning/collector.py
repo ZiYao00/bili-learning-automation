@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from .config import DependencyError, Settings
+from .config import YTDLP_INSTALL_URL, YTDLP_WINDOWS_INSTALL_COMMAND, DependencyError, Settings
 from .note_template import note_filename, write_skeleton
 from .quality import write_analysis_template
 from .runtime import cleanup_job, waiting_file_lock
@@ -47,7 +47,13 @@ def duration_text(seconds: float | int | None) -> str:
 def run_ytdlp(settings: Settings, job_dir: Path, canonical_url: str) -> None:
     ytdlp = settings.ytdlp.path
     if ytdlp is None:
-        raise DependencyError("ytdlp_not_configured", "未找到 yt-dlp；请设置 BILI_LEARNING_YTDLP、config/local.json 或将 yt-dlp 加入 PATH。")
+        raise DependencyError(
+            "ytdlp_not_configured",
+            "未检测到 yt-dlp；项目不会自动安装或内置可执行文件。"
+            f"Windows 推荐先运行 `{YTDLP_WINDOWS_INSTALL_COMMAND}`，安装后重新执行；"
+            f"官方安装说明：{YTDLP_INSTALL_URL}。"
+            "只有使用自定义位置时，才需要设置 BILI_LEARNING_YTDLP 或 config/local.json 的 ytdlp。",
+        )
     if not ytdlp.is_file():
         raise DependencyError("ytdlp_path_invalid", f"yt-dlp 路径不存在或不是文件（来源：{settings.ytdlp.source}）。")
     if not settings.cookie_file.is_file():
