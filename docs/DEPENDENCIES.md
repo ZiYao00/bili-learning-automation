@@ -5,7 +5,7 @@
 | 依赖 | 用途 | 配置方式 |
 | --- | --- | --- |
 | Python 3.10+ | 运行核心 package 与平台适配脚本 | 使用本机或接入智能体的 Python 环境 |
-| 智能体适配层 | 接收链接、调用核心流程、填写 AI 内容区域 | 按平台独立安装；本项目当前提供 Hermes 适配层 |
+| 智能体适配层 | 接收链接、调用核心流程、填写 AI 内容区域 | 按平台独立安装；当前提供 Hermes 与 WorkBuddy 适配层，Codex 可直接按共享协议使用 |
 | yt-dlp | 采集元数据、简介和字幕，不下载媒体 | `BILI_LEARNING_YTDLP`、`config/local.json` 或系统 PATH |
 | Bilibili Cookie | 获取需要登录态的字幕/元数据 | `BILI_LEARNING_COOKIE_FILE` |
 

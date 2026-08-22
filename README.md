@@ -1,73 +1,144 @@
 # B站视频转笔记
 
-将 Bilibili 视频自动整理为**字幕优先的 Obsidian 学习笔记**。默认流程只采集视频元数据、UP 主原始简介和可用中文字幕，不下载音视频；确定性内容由程序生成，Codex/Hermes 负责判断字幕是否足以支撑可靠笔记、提取高价值知识、动态组织正文并做覆盖复核。
+把 Bilibili 视频自动整理成**字幕优先的 Obsidian 学习笔记**。
 
-> Hermes Skill 标识为 `bili-learning-automation`，中文展示名统一为「B站视频转笔记」。
+你只需要发送一个 B站链接或 BV 号，系统会自动获取字幕、UP 主原始简介和元数据，再由智能体提取知识、整理正文、校验并写入 Obsidian。
+
+默认流程**不下载视频或音频**。
+
+> 第一次使用，建议直接从 [新手快速上手](docs/QUICKSTART.md) 开始。
+
+---
+
+## 它能帮你做什么
+
+日常使用可以理解成这一条流程：
+
+```text
+发送 B站链接 / BV号
+→ 获取字幕、简介、元数据
+→ 自动处理长字幕
+→ 智能体提取知识
+→ 生成“先看结论 + 知识正文”
+→ finalizer 校验
+→ 写入 Obsidian
+```
+
+适合：
+
+- B站教程、课程、技术分享；
+- ComfyUI / AI / 编程类长视频；
+- 想把“看视频”变成“可搜索、可复习的知识笔记”；
+- 手机端把链接发给 Hermes，电脑端自动完成整理。
+
+当前主要支持 **Hermes、WorkBuddy、Codex** 三个入口，核心逻辑共用，不为每个智能体复制一套实现。
+
+---
 
 ## 核心特点
 
-- 支持 BV 号、标准 Bilibili 视频链接、包含 BV 的复制文本，以及受控的 `b23.tv` 短链解析。
-- 默认使用 `yt-dlp --skip-download`，不下载视频或音频。
-- 保留 UP 主原始简介；简介获取状态区分 `present`、`confirmed_empty`、`failed`。
-- 每次成功转换生成一篇笔记；BVID 以 H1 下方的小字记录，文件名保持干净，同名时自动使用序号防覆盖。
-- Python 生成 Frontmatter、H1、简介、iframe、tags、`learning-page + video-note` cssclasses、输出路径和 runtime 质量报告骨架；所有新笔记先进入 `00-待整理`。
-- Codex/Hermes 先做来源充分性判断和知识清单，再填写“先看结论 + 动态知识正文”，成稿后完成覆盖复核。
-- Finalizer 校验真实元数据、简介、iframe、文件名、AI 区域和质量流程状态后才原子发布并刷新导航。
-- 临时字幕和元数据只保存在 `.runtime/bilibili-learning`，任务结束后清理。
-- Cookie 内容不进入日志、笔记或 Git。
+- 支持 BV 号、标准 Bilibili 链接、包含 BV 的复制文本和受支持的 `b23.tv` 短链；
+- 使用 `yt-dlp --skip-download`，默认不下载音视频；
+- 保留 UP 主原始简介和重要资源链接；
+- 字幕不足时宁可停止，也不靠模型常识补写事实；
+- 长字幕自动生成 transcript manifest 和分块，避免一次把超长 SRT 塞进上下文；
+- 极小尾块自动合并，减少无意义的额外 Agent 读取；
+- 新笔记先进入 `00-待整理`，学完以后再归档；
+- 文件名默认保留原视频标题，同名自动加 `（2）`、`（3）`，不覆盖旧笔记；
+- Frontmatter、BVID、播放器、tags、cssclasses、路径等确定性内容由程序生成；
+- Finalizer 通过后才正式发布，并自动清理 runtime 临时任务；
+- Cookie 内容不会进入日志、笔记或 Git。
 
-## 工作流程
+---
+
+## 第一次使用
+
+如果你是第一次安装，不建议从源码结构开始看。
+
+按下面顺序即可：
+
+1. 下载项目；
+2. 配置 Python、yt-dlp、Cookie 和笔记目录；
+3. 运行 doctor 检查环境；
+4. 把 CSS 安装到 Obsidian；
+5. 安装 Hermes / WorkBuddy 适配层，或者直接使用 Codex；
+6. 发送一个 B站链接测试。
+
+完整教程：
+
+**[新手快速上手 →](docs/QUICKSTART.md)**
+
+---
+
+## 日常怎么用
+
+安装完成以后，普通用户通常不需要再碰命令行。
+
+直接在已经接入的智能体里发送：
 
 ```text
-复制链接 / BV / b23.tv
-→ 输入解析与规范化
-→ yt-dlp 仅采集 metadata / description / subtitles
-→ taxonomy 给出标签与后续整理建议
-→ 程序在 runtime 生成确定性 Markdown 草稿与 analysis.json
-→ Codex/Hermes 判断来源充分性并形成 knowledge_outline
-→ 填写“先看结论 + 动态知识正文”并完成 coverage review
-→ finalizer 校验后原子发布
-→ 刷新 Obsidian 导航
-→ 清理临时 job
+https://www.bilibili.com/video/BVxxxxxxxxxx/
 ```
 
-## 环境要求
+或者：
 
-- 可执行本地脚本的智能体运行环境；
-- Python 3.10+；
-- `yt-dlp`；
-- 本机 Bilibili Netscape Cookie 文件；
-- Obsidian 或其他可读取 Markdown 的知识库。
-
-项目不会提交 Cookie、私人笔记和运行时资料。
-
-## 安装（Windows）
-
-普通使用者需要智能体运行环境、Python、yt-dlp、Cookie 和一个笔记目录。运行 skill 不要求安装测试工具；如需在本机运行 CLI、开发或测试，再创建项目独立环境：
-
-```powershell
-git clone https://github.com/ZiYao00/bili-learning-automation.git
-cd bili-learning-automation
-py -3 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
+```text
+BVxxxxxxxxxx
 ```
 
-`.venv` 仅用于当前机器，已被 Git 忽略。当前已提供 Hermes 与 WorkBuddy 适配层：Hermes 安装位置与验收见 [Hermes skill 安装](docs/HERMES-SKILL-INSTALL.md)；WorkBuddy 适配层在 `workbuddy-skills\bili-learning-automation\`，通过 junction 安装到 `~\.workbuddy\skills\bili-learning-automation`。
+正常情况下，智能体会自己完成采集、长字幕处理、知识整理、覆盖复核和 finalizer。
 
-## 多智能体使用
+如果使用 Hermes，当前设计用于 owner 私聊场景；WorkBuddy 和 Codex 复用同一套核心协议。
 
-核心脚本、taxonomy、笔记标准和 finalizer 保持智能体无关，但当前开发与验收优先保证 **Codex + Hermes + WorkBuddy** 三个入口可靠。统一输入/输出、清理和内容边界见 [智能体接入协议](docs/AGENT-INTEGRATION.md)。
+---
 
-- **Codex**：当前在本项目目录中工作时读取 `AGENTS.md`、接入协议和标准即可使用核心流程；目前不安装独立 Codex skill。
-- **Hermes**：已有微信私聊适配和已安装 skill，只保留入口特有规则，内容分析复用共享标准。
-- **WorkBuddy**：适配层位于 `workbuddy-skills\`，junction 安装到本机 WorkBuddy skills 目录；会话内用户提供链接/BV 号触发，复用同一套核心脚本与标准。
-- **其他智能体**：属于后续扩展目标；接入时增加薄适配层，不复制或改写核心流程与标准。
+## 长视频怎么处理
 
-## Obsidian 版式
+长视频不需要用户手工拆字幕。
 
-项目已经自带可直接安装的 Core + Video Note 样式：
+任务创建时程序会自动生成：
+
+```text
+.runtime/bilibili-learning/<job>/agent-work/
+├── transcript-manifest.json
+└── transcript/
+    ├── transcript-01.txt
+    ├── transcript-02.txt
+    └── ...
+```
+
+短字幕通常是一个 `direct` chunk；长字幕是 `chunked`。切块保持原字幕文字顺序和 cue 边界，不做语义删减、摘要或关键词过滤。
+
+Hermes / WorkBuddy / Codex 只负责读取已经准备好的 transcript，再完成知识判断和写作。
+
+---
+
+## 生成的笔记在哪里
+
+新笔记先进入：
+
+```text
+<notes_root>/00-待整理/
+```
+
+例如：
+
+```text
+00-待整理/
+└── H3智能一体化节点重磅升级.md
+```
+
+笔记主要阅读顺序：
+
+```text
+标题 / BV号
+→ 先看结论
+→ Bilibili 播放器
+→ 知识正文
+→ 视频资料
+```
+
+项目自带 Obsidian 样式：
 
 ```text
 obsidian/snippets/
@@ -75,146 +146,80 @@ obsidian/snippets/
 └── video-note.css
 ```
 
-第一次使用时，把这两个文件复制到**实际 Obsidian Vault 根目录**下的：
+安装教程见 [Obsidian 视觉样式](docs/OBSIDIAN-STYLING.md)。
 
-```text
-.obsidian/snippets/
-```
+---
 
-然后打开 **Obsidian → 设置 → 外观 → CSS 代码片段**，刷新列表并同时启用 `learning-lab` 与 `video-note`。`video-note.css` 依赖 `learning-lab.css`，不要只复制或只启用其中一个。
+## 学完以后再整理
 
-新笔记会自动写入 `learning-page + video-note` cssclasses，不需要手工修改 Frontmatter；阅读顺序固定为“先看结论 → 播放器 → 知识正文 → 视频资料”。如果 `notes_root` 只是某个 Vault 里的子目录，CSS 应安装到该 Vault 的 `.obsidian/snippets/`，不是安装到 `notes_root` 子目录。完整的新手教程、更新方式和故障排查见 [Obsidian 视觉样式](docs/OBSIDIAN-STYLING.md)。
+“转成笔记”和“知识归档”是两个阶段。
 
-## Quick Start
+刚生成的笔记先留在 `00-待整理`。当你确认已经学习完，可以让智能体执行“学习后整理”，统一完成：
 
-### 1. 配置笔记目录
+- 短标题；
+- 一句简介摘要；
+- taxonomy 建议分类；
+- 文件安全移动；
+- 导航刷新。
 
-默认笔记根目录是项目内的 `notes/bilibili`。新机器可以直接创建该目录，也可以指向现有 Obsidian Vault：
+这样可以避免把“还没看过的资料”直接伪装成已经整理好的知识库。
 
-```powershell
-$env:BILI_LEARNING_NOTES_ROOT = 'D:\YourObsidianVault\bilibili'
-```
+---
 
-这个路径是本机配置，不要提交到 Git。不要把其他人的盘符或目录链接当作通用默认值。
+## 三种智能体入口
 
-### 2. 配置 yt-dlp
+| 入口 | 适合谁 | 说明 |
+| --- | --- | --- |
+| Hermes | 想在微信里直接发链接的人 | `hermes-skills/bili-learning-automation/` |
+| WorkBuddy | 在 WorkBuddy 会话里使用 | `workbuddy-skills/bili-learning-automation/` |
+| Codex | 开发、测试、维护项目 | 读取 `AGENTS.md` 和 `docs/AGENT-INTEGRATION.md` |
 
-优先顺序：
+这些只是**薄适配层**。核心 collector、transcript、taxonomy、finalizer 和内容标准保持共用。
 
-1. 环境变量 `BILI_LEARNING_YTDLP`；
-2. Git 忽略的本机配置 `config/local.json`；
-3. 系统 `PATH` 中的 `yt-dlp`；
+安装说明：
 
-新机器建议优先把 `yt-dlp` 加入 PATH，或显式设置环境变量。已部署机器可将本机路径写入 `config/local.json`，该文件不会进入 Git。详见 [配置说明](docs/CONFIGURATION.md)。
+- [Hermes Skill 安装](docs/HERMES-SKILL-INSTALL.md)
+- [WorkBuddy Skill 安装](docs/WORKBUDDY-SKILL-INSTALL.md)
 
-### 3. 配置 Cookie
+---
 
-默认位置：
+## 常见状态
 
-```text
-key/bilibili_cookies.txt
-```
+| 状态 | 代表什么 |
+| --- | --- |
+| `materials_ready` | 字幕、简介等材料已经准备完成 |
+| `in_progress` | 同一个 BV 号已经有活动任务，防止并发冲突 |
+| `subtitle_unavailable` | 没有取得可用中文字幕 |
+| `source_insufficient` | 现有字幕 / 简介不足以写可靠笔记 |
+| `note_ready` | Finalizer 校验通过并发布成功 |
+| `note_invalid` | 草稿没有通过最终校验 |
+| `failed` | 配置、采集或运行失败 |
 
-也可以设置：
+`in_progress` 不等于“这个视频以后不能再转”。当前 job 结束后，同一个 BV 号仍可再次生成新笔记。
 
-```text
-BILI_LEARNING_COOKIE_FILE
-```
+更完整解释见 [新手快速上手](docs/QUICKSTART.md#11-常见状态是什么意思)。
 
-只检查文件是否存在；不要把 Cookie 内容提交到仓库。
-
-### 4. 检查配置
-
-无需安装 package，可直接运行：
-
-```powershell
-python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py
-```
-
-供 Hermes、Codex 或其他自动化工具解析的 JSON 诊断：
-
-```powershell
-python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py --json
-```
-
-开发环境也可以：
-
-```powershell
-python -m pip install -e ".[dev]"
-bili-learning doctor
-```
-
-### 5. 使用
-
-在已接入智能体的允许入口中发送：
-
-```text
-BV1xxxxxxxxxx
-```
-
-或 Bilibili 的复制链接 / 受支持短链。Hermes 当前限定为 owner 私聊；其他智能体须遵守 [智能体接入协议](docs/AGENT-INTEGRATION.md) 的授权与输入边界。
-
-正式 collector 入口仍然是：
-
-```powershell
-python .\hermes-skills\bili-learning-automation\scripts\prepare_ytdlp_bilibili_note.py "<复制链接或 BV>"
-```
-
-所有智能体也可直接使用核心 CLI：
-
-```powershell
-bili-learning prepare "<复制链接或 BV>"
-bili-learning finalize --job '<job_dir>' --note '<draft_path>'
-bili-learning organize --note '<已学习笔记>' --title '<短标题>' --intro '<一句简介摘要>'
-```
-
-Hermes 保留原脚本路径作为兼容启动壳，调用的是同一核心 CLI。
-
-## 收件箱、命名与后续整理
-
-所有新笔记先发布到：
-
-```text
-notes/bilibili/00-待整理/
-```
-
-这里是“尚未阅读”的统一收件箱。taxonomy 不再自动把新笔记直接放进模型/主题目录；它只决定 tags 与建议分类，供学习后整理。这样不会把未学习的资料伪装成已整理知识。
-
-收集阶段保留 B站原视频标题，不做 AI 标题改写。每次成功转换生成一篇笔记：
-
-```text
-{原视频标题}.md
-```
-
-例如：
-
-```text
-H3智能一体化节点重磅升级.md
-```
-
-H1 默认使用原视频标题，BVID 以小字显示：
-
-```md
-# H3智能一体化节点重磅升级
-
-<small>BV号：BV16g8J6AEZD</small>
-```
-
-若同目录出现相同原视频标题，系统使用 `（2）`、`（3）` 等无语义序号，绝不覆盖。重复链接可再次转换；仅在同一 BVID 仍有活动任务时返回 `in_progress`，防止并发冲突。BVID 不作为 tag 或文件名后缀。
-
-学习后可通过统一 `organize` 命令一次完成短标题、简介摘要和目录归档；默认按 tags 推断 taxonomy 建议目录，也可显式指定目标目录。详见 [智能体接入协议](docs/AGENT-INTEGRATION.md)。
+---
 
 ## 配置
 
-默认 taxonomy：
+普通用户推荐使用：
 
 ```text
-config/bilibili-note-taxonomy.json
+config/local.json
 ```
 
-其中 `notes_root` 是 collector、duplicate detection、finalizer 和 navigation 共用的唯一默认笔记根目录。
+示例：
 
-可覆盖：
+```json
+{
+  "ytdlp": "G:\\Program\\yt-dlp\\yt-dlp.exe",
+  "notes_root": "D:\\Notes\\MyVault\\bilibili",
+  "cookie_file": "D:\\Private\\bilibili_cookies.txt"
+}
+```
+
+也支持环境变量：
 
 - `BILI_LEARNING_TAXONOMY`
 - `BILI_LEARNING_NOTES_ROOT`
@@ -223,28 +228,73 @@ config/bilibili-note-taxonomy.json
 
 详见 [配置说明](docs/CONFIGURATION.md)。
 
-## 数据与隐私边界
+---
 
-长期数据：
+## 出问题先运行 doctor
 
-- 私人 Markdown 笔记；
-- 自动生成的 Obsidian 导航。
+```powershell
+python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py
+```
 
-临时数据：
+结构化输出：
+
+```powershell
+python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py --json
+```
+
+doctor 会检查 yt-dlp、Cookie 文件、taxonomy、notes/runtime 写权限和关键文档，不读取 Cookie 内容，也不访问 Bilibili。
+
+常见错误见 [故障排查](docs/TROUBLESHOOTING.md)。
+
+---
+
+## 文档导航
+
+| 文档 | 适合什么时候看 |
+| --- | --- |
+| [新手快速上手](docs/QUICKSTART.md) | 第一次安装、第一次生成笔记 |
+| [配置说明](docs/CONFIGURATION.md) | 换电脑、换 Vault、改 yt-dlp / Cookie 路径 |
+| [Hermes Skill 安装](docs/HERMES-SKILL-INSTALL.md) | 安装、更新、验证 Hermes Skill |
+| [WorkBuddy Skill 安装](docs/WORKBUDDY-SKILL-INSTALL.md) | 安装、更新、验证 WorkBuddy 适配层 |
+| [Obsidian 视觉样式](docs/OBSIDIAN-STYLING.md) | 安装 CSS、样式不生效 |
+| [故障排查](docs/TROUBLESHOOTING.md) | 看到错误状态或任务卡住 |
+| [智能体接入协议](docs/AGENT-INTEGRATION.md) | 接入新 Agent / 维护适配层 |
+| [架构说明](docs/ARCHITECTURE.md) | 想了解内部流程 |
+| [开发说明](docs/DEVELOPMENT.md) | 修改代码、跑测试、维护 CI |
+
+---
+
+## 数据与隐私
+
+长期数据主要是正式 Markdown 笔记和导航。
+
+临时任务位于：
 
 ```text
 .runtime/bilibili-learning/
 ```
 
-本地敏感数据：
+敏感凭据默认位于：
 
 ```text
 key/
 ```
 
-默认不进入 Git：Cookie、私人笔记、runtime、历史 archive、materials、测试抓取输出、本地 `bili-note` / `web-access` 副本。
+以下内容默认不进入 Git：
+
+- Cookie；
+- 私人笔记；
+- runtime 临时任务；
+- 本机 `config/local.json`；
+- 虚拟环境和测试缓存。
+
+不要手工删除正在工作的 job、reservation 或锁文件，也不要绕过 finalizer 直接发布 runtime 草稿。
+
+---
 
 ## 开发与测试
+
+开发环境：
 
 ```powershell
 py -3 -m venv .venv
@@ -254,39 +304,18 @@ python -m ruff check .
 python -m pytest -q
 ```
 
-公共测试不需要真实 Cookie，也不应访问真实 Bilibili 账号。GitHub Actions 在 Windows 和 Linux 上执行 compile、Ruff 和 pytest。
+公共测试不需要真实 Cookie，也不应访问真实 Bilibili 账号。
 
-详见 [开发说明](docs/DEVELOPMENT.md)。
+---
 
 ## Legacy
 
-`hermes-skills/bili-learning-automation/scripts/prepare_bilibili_learning.py` 是旧的 Chrome/CDP / `bili-note` / `web-access` 路线，不是当前默认流程。本轮保留文件仅用于历史兼容，不应作为新集成入口。
+`hermes-skills/bili-learning-automation/scripts/prepare_bilibili_learning.py` 属于旧 Chrome/CDP / `bili-note` / `web-access` 路线，不是当前默认入口。
 
-详见 [Legacy 说明](docs/LEGACY.md)。
+新接入统一使用 yt-dlp 字幕优先流程。详见 [Legacy 说明](docs/LEGACY.md)。
 
-## 故障排查
-
-优先运行：
-
-```powershell
-python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py
-```
-
-常见问题见 [故障排查](docs/TROUBLESHOOTING.md)。
-
-## 项目结构
-
-```text
-config/                         taxonomy
-src/bili_learning/              可测试的核心 Python package
-hermes-skills/bili-learning-automation/ Hermes Skill 与兼容入口脚本
-obsidian/snippets/               可直接复制到 Vault 的 Core + Video Note CSS
-docs/                           架构、配置、标准和维护文档
-tests/                          无账号依赖的自动测试
-notes/                          私人 Obsidian 笔记，默认不提交
-.runtime/                       临时 job，默认不提交
-```
+---
 
 ## 许可证
 
-本项目尚未选择发布许可证。仓库公开不等于授权他人使用或再分发；第三方依赖遵循各自许可证。选择 LICENSE 前应由仓库所有者单独确认。
+本项目尚未选择发布许可证。仓库公开不等于授权他人使用或再分发；第三方依赖遵循各自许可证。

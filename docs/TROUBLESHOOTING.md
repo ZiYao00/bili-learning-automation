@@ -1,48 +1,332 @@
 # 故障排查
 
-优先执行：
+遇到问题时，不建议一上来就删 `.runtime`、删锁文件或重装全部环境。
+
+先运行：
 
 ```powershell
 python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py
 ```
 
-## 未找到 yt-dlp
+如果需要给智能体分析：
 
-设置 `BILI_LEARNING_YTDLP`，或把 `yt-dlp` 加入 PATH。
+```powershell
+python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py --json
+```
 
-## Cookie 文件不存在
+doctor 不访问 Bilibili，也不读取 Cookie 内容。
 
-确认 `BILI_LEARNING_COOKIE_FILE`，或在本机提供默认的 `key/bilibili_cookies.txt`。不要把 Cookie 内容复制到日志、Issue 或 README。
+---
 
-## `subtitle_unavailable`
+## 1. 先看状态，不要先猜原因
 
-表示没有取得 `ai-zh` 或 `zh.*` 字幕。默认流程不会因此下载音视频，也不会自动转 ASR。
+| 状态 | 含义 | 推荐处理 |
+| --- | --- | --- |
+| `materials_ready` | 采集完成，等待智能体写笔记 | 正常继续 |
+| `in_progress` | 同 BV 已有活动任务 | 不重复采集；等待或由适配层安全续做陈旧 job |
+| `subtitle_unavailable` | 没有取得可用中文字幕 | 本次停止，不自动下载视频做 ASR |
+| `source_insufficient` | 字幕 / 简介不足以写可靠笔记 | 换资料更完整的视频 |
+| `note_ready` | Finalizer 校验通过 | 完成 |
+| `note_invalid` | 草稿未通过最终校验 | 看错误原因，不绕过 finalizer |
+| `failed` | 配置、采集或运行失败 | 先 doctor，再按下面对应项检查 |
 
-## `failed: 无法确认 UP 主原始简介`
+---
 
-元数据没有提供可确认的 description 状态。根据项目规则，这不能当成“视频确实没有简介”，任务必须停止。
+## 2. `in_progress`：为什么不能马上重新采集
 
-## `note_invalid`
+`in_progress` 是并发保护。
 
-Finalizer 会检查真实 Frontmatter 值、原视频 H1、H1 下方 BVID 小字、完整简介结构、iframe、规范 tags、两个 AI 内容区域和质量流程状态。无效草稿不会发布；job 会在清理阶段从 runtime 精确删除，同时释放正式路径，便于重新发起任务。不要绕过 finalizer。
+如果 Hermes、WorkBuddy 或其他入口正在处理同一个 BV，第二个入口再次采集可能造成：
 
-## `organize` 失败
+- 同一视频重复下载字幕；
+- 两个 Agent 同时改 analysis / draft；
+- 两个 finalizer 竞争同一输出；
+- 临时 job 和锁状态混乱。
 
-确认 `--note` 是 notes root 内的正式笔记、`--title` 与 `--intro` 非空、`--category`（如提供）是项目内相对目录。不要手动移动文件；核心会在安全发布后删除旧位置并重建导航。
+所以活动任务期间不会重复采集。
 
-## Obsidian 笔记有内容但没有新版样式
+这**不代表视频以后不能再次转换**。当前 job 结束并被清理后，可以重新生成另一篇笔记。
 
-先确认本仓库的两个文件：
+### Hermes 遇到旧的未完成 job
+
+新版 Hermes 适配层会优先使用 collector 返回的绑定 `job_dir`。
+
+只有同时满足以下条件时才续做：
+
+- reservation 已明显陈旧；
+- job 必需文件完整；
+- transcript manifest 和 chunks 完整；
+- 草稿 AI 区仍未填写；
+- `analysis.json` 仍处于 pending。
+
+这样可以接回“会话中断但材料已经采集完成”的任务，同时避免抢占真正还在执行的任务。
+
+不要手工删除 reservation / lock 来强制绕过。
+
+---
+
+## 3. 未找到 yt-dlp
+
+常见提示：
+
+```text
+ytdlp_not_configured
+ytdlp_path_invalid
+ytdlp_not_executable
+```
+
+推荐检查顺序：
+
+1. `config/local.json` 是否填写了正确 `ytdlp`；
+2. `BILI_LEARNING_YTDLP` 是否覆盖了本机配置；
+3. 文件是否真的存在；
+4. yt-dlp 是否可以直接运行；
+5. 如果依赖 PATH，当前 Agent 进程是否继承到了正确 PATH。
+
+配置说明见 [CONFIGURATION.md](CONFIGURATION.md)。
+
+---
+
+## 4. Cookie 文件不存在
+
+先确认配置里保存的是**Cookie 文件路径**，不是 Cookie 内容。
+
+可能来源：
+
+```text
+config/local.json
+BILI_LEARNING_COOKIE_FILE
+key/bilibili_cookies.txt
+```
+
+不要把 Cookie 内容复制到：
+
+- README；
+- Issue；
+- 日志；
+- 聊天记录；
+- Git。
+
+如果 Cookie 文件存在但 yt-dlp 仍然无法获取登录态资料，可能需要重新导出有效 Cookie。
+
+---
+
+## 5. `subtitle_unavailable`
+
+这表示没有取得：
+
+```text
+ai-zh
+或
+zh.*
+```
+
+可用字幕。
+
+项目默认策略是**字幕优先、宁缺毋滥**，因此不会自动：
+
+- 下载视频；
+- 下载音频；
+- 调 ASR 补字幕；
+- 用模型常识代替原视频内容。
+
+如果这个视频本身没有可用字幕，本次不生成笔记是正常行为。
+
+---
+
+## 6. `failed: 无法确认 UP 主原始简介`
+
+项目会区分：
+
+```text
+present
+confirmed_empty
+failed
+```
+
+只有元数据明确提供空字符串，才能认为 UP 主简介“确认为空”。
+
+如果 description 字段缺失、类型异常或不同来源不一致，不能擅自推断“视频没有简介”，任务会停止。
+
+这是数据完整性保护，不建议绕过。
+
+---
+
+## 7. `note_invalid`
+
+Finalizer 会检查：
+
+- Frontmatter；
+- H1；
+- BVID；
+- 视频简介结构；
+- iframe；
+- tags；
+- `BILI_AI_SUMMARY`；
+- `BILI_AI_BODY`；
+- 来源充分性；
+- `knowledge_outline`；
+- coverage review。
+
+没有通过就不会正式发布。
+
+不要为了“先生成出来再说”而绕过 finalizer，因为这样会把半成品混入正式 Obsidian 笔记。
+
+---
+
+## 8. Hermes 更新了 Skill，但好像还在使用旧版本
+
+先确认安装是 Junction：
+
+```powershell
+Get-Item "$env:LOCALAPPDATA\hermes\skills\bili-learning-automation" |
+  Format-List FullName,LinkType,Target
+```
+
+`Target` 应指向当前仓库：
+
+```text
+<project-root>\hermes-skills\bili-learning-automation
+```
+
+然后在 Hermes 会话发送：
+
+```text
+/reload-skills
+```
+
+再要求 Hermes：
+
+```text
+重新读取当前安装的 SKILL.md，不要根据之前会话记忆回答。
+```
+
+完整教程见 [Hermes Skill 安装](HERMES-SKILL-INSTALL.md)。
+
+---
+
+## 9. Hermes 会分析，但不继续执行
+
+先不要改核心 Skill。
+
+优先排查：
+
+1. Hermes 主程序是否正常；
+2. Gateway 是否正常；
+3. 当前模型是否适合 Agent / Tool Use；
+4. Hermes 的工具执行约束是否启用；
+5. 当前 Skill 是否已经 reload；
+6. doctor 是否全绿。
+
+如果 Codex / WorkBuddy 可以完成同一个任务，而 Hermes 经常停在“准备做”“需要你选择下一步”，更可能是 Hermes 模型或 Agent 调度问题，而不是 collector / finalizer 本身。
+
+---
+
+## 10. 长视频读取很慢
+
+新版流程不会让 Agent 自己把整份超长 SRT 硬塞进上下文。
+
+任务准备阶段会自动生成：
+
+```text
+agent-work/
+├── transcript-manifest.json
+└── transcript/
+    ├── transcript-01.txt
+    ├── transcript-02.txt
+    └── ...
+```
+
+单个 chunk 在工具限制内时应优先一次读完；只有工具明确截断时才继续读取剩余部分。
+
+如果日志里仍看到 Agent 主动把一个正常 chunk 再拆成很多小段，优先检查适配层和模型执行行为，而不是继续缩小 transcript chunk。
+
+---
+
+## 11. Obsidian 笔记有内容，但没有样式
+
+确认这两个文件：
 
 ```text
 obsidian/snippets/learning-lab.css
 obsidian/snippets/video-note.css
 ```
 
-已经复制到**当前打开 Vault 根目录**的 `.obsidian/snippets/`，并在 **设置 → 外观 → CSS 代码片段** 中同时启用。`video-note.css` 依赖 `learning-lab.css`，只启用扩展文件不完整。
+已经复制到**当前打开 Vault 根目录**的：
 
-如果 `BILI_LEARNING_NOTES_ROOT` 是 Vault 内的子目录，不要把 CSS 放到这个子目录下；应放到真正包含 `.obsidian` 的 Vault 根目录。新生成笔记应自动带有 `learning-page` 与 `video-note` 两个 cssclasses。完整教程见 `docs/OBSIDIAN-STYLING.md`。
+```text
+.obsidian/snippets/
+```
 
-## 短链无法解析
+然后在：
 
-只允许 Bilibili 官方域名，且限制重定向次数和超时。无法解析时重新从 Bilibili 使用“复制链接”。
+```text
+Obsidian → 设置 → 外观 → CSS 代码片段
+```
+
+同时启用：
+
+```text
+learning-lab
+video-note
+```
+
+`video-note.css` 依赖 `learning-lab.css`。
+
+如果 `notes_root` 只是 Vault 的一个子目录，CSS 仍然应该放在 Vault 根目录的 `.obsidian/snippets/`。
+
+完整教程见 [Obsidian 视觉样式](OBSIDIAN-STYLING.md)。
+
+---
+
+## 12. 短链无法解析
+
+项目只允许受支持的 Bilibili 官方域名，并限制重定向次数和超时。
+
+如果 `b23.tv` 无法解析，最简单的处理是回到 Bilibili，重新使用“复制链接”，再发送标准链接。
+
+不要把不明来源的重定向域名加入白名单来绕过安全限制。
+
+---
+
+## 13. `organize` 失败
+
+检查：
+
+- `--note` 是否位于 notes root 内；
+- 笔记是否已经正式发布；
+- `--title` 是否非空；
+- `--intro` 是否非空；
+- `--category`（如果提供）是否是项目内允许的相对目录。
+
+不要手工移动文件后再让导航脚本猜当前状态。
+
+正确流程是由 `organize` 完成安全移动和导航重建。
+
+---
+
+## 14. 不建议的“修复方式”
+
+遇到异常时，优先不要做这些操作：
+
+```text
+手工删除整个 .runtime
+手工删除 reservation
+手工删除 lock
+绕过 finalizer
+直接复制 runtime 草稿到 notes
+把 Cookie 内容贴给 Agent
+为了无字幕自动下载视频做 ASR
+```
+
+这些操作可能让当前问题暂时消失，但会破坏并发保护、清理边界或数据可信度。
+
+更好的顺序是：
+
+```text
+看 status
+→ doctor
+→ 检查对应配置 / adapter
+→ 保留现场定位
+→ 再决定是否重新发起任务
+```
