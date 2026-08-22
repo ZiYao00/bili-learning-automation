@@ -212,10 +212,10 @@ def write_handoff(job_dir: Path, payload: dict[str, Any]) -> Path:
         "# B站视频转笔记任务\n\n"
         "1. 先读取 `job.json`、`transcript_manifest_path`、`agent_work_dir` 与共享内容标准。manifest 的 `chunks` 已按 cue 完整边界生成；`direct` 读取唯一 transcript，`chunked` 按 manifest 顺序逐块阅读，不要再把原始 SRT 整份塞入上下文。允许在 `agent_work_dir` 继续创建逐块知识摘录、索引或中间梳理文件。\n"
         "2. 先判断字幕与简介是否足以支撑可信学习笔记，并填写 runtime 的 `analysis_path`。来源不足时不要编造正文。\n"
-        "3. 来源充分时，先在 `knowledge_outline` 中列出应保护的重要知识，再编辑 `draft_path`。不要改 Frontmatter、H1、视频资料、资源获取提示、iframe、文件名、路径、tags、cssclasses 或 marker。核心已从简介/字幕保守识别三连、充电、评论关键词等条件资料；若资料本体不在来源中，Agent 不得自行补写。\n"
-        "4. 只填写两个 AI 区域：短的“先看结论”和根据视频内容动态组织的知识正文；不要强制套用步骤、坑点或实践清单。按共享标准根据知识关系选择 Table / Grid / Card / Risk / Resource / Chip，不为了好看强行卡片化。Grid 内的 Card 必须使用嵌套 Markdown：外层 `> [!grid-3]`，子卡片必须以 `> > [!card]` 开始，不能写成单层 `> [!card]`。\n"
-        "5. 正文只使用字幕或原始简介支持的事实。参数、公式、限制、专名、比较、作者明确推荐、兼容性、资源等高价值信息不能仅为缩短篇幅而删除；有检索价值的同类成员和“原则 + 可直接使用值”也要避免二次压缩。\n"
-        "6. 成稿后重新对照字幕/knowledge_outline 做覆盖复核；确认无重要遗漏和无来源外补写后，将 `coverage_review.status` 设为 `passed` 并填写 notes。\n"
+        "3. 来源充分时先做知识提取，再写正文。普通视频可直接形成 `knowledge_outline`；长视频、百科型、参数密集或全程干货内容，必须先按 transcript chunk / 自然主题在 `agent_work_dir` 建立事实清单，再合并成 `knowledge_outline`。事实清单尽量使用原子条目，显式保留具体成员、数值/上下限、A/B 关系、来源/继承关系、适用条件、例外、冲突、兼容性与作者评价；不要在这一阶段把多个具体事实压成“某类方案/若干成员/注意兼容性”这样的主题概括。不要改 Frontmatter、H1、视频资料、资源获取提示、iframe、文件名、路径、tags、cssclasses 或 marker。核心已从简介/字幕保守识别三连、充电、评论关键词等条件资料；若资料本体不在来源中，Agent 不得自行补写。\n"
+        "4. 只填写两个 AI 区域：短的“先看结论”和根据视频内容动态组织的知识正文；不要强制套用步骤、坑点或实践清单。正文可以压缩表达，但不能压缩事实关系：如果视频明确给出成员之间的来源、兼容、步数、限制或推荐差异，正文必须保留这些关系，而不是只留下名称列表。按共享标准根据知识关系选择 Table / Grid / Card / Risk / Resource / Chip，不为了好看强行卡片化。Grid 内的 Card 必须使用嵌套 Markdown：外层 `> [!grid-3]`，子卡片必须以 `> > [!card]` 开始，不能写成单层 `> [!card]`。\n"
+        "5. 正文只使用字幕或原始简介支持的事实。参数、公式、限制、专名、比较、作者明确推荐、兼容性、资源等高价值信息不能仅为缩短篇幅而删除；有检索价值的同类成员和“原则 + 可直接使用值”也要避免二次压缩。Learning Lab 或外部检索得到的扩展知识不属于本任务来源，除非用户明确提供并要求加入。\n"
+        "6. 成稿后必须重新按 manifest 顺序抽查/复读原 transcript，而不是只对照自己生成的 `knowledge_outline`。知识密集型内容应同时对照事实清单与正文，重点检查：成员是否只剩类别、关系是否只剩名称、原则是否丢了可直接使用值、默认值是否丢了例外、比较是否只保留一边。发现遗漏先修正文，再将 `coverage_review.status` 设为 `passed` 并填写 notes。\n"
         "7. 写完立即运行 finalizer；无论成功或失败都必须 finalizer 清理 job。\n",
         encoding="utf-8",
     )

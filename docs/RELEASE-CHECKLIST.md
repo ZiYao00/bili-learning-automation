@@ -1,0 +1,102 @@
+# v1.0 Release Checklist
+
+This document defines the release-freeze gate for `bili-learning-automation` v1.0.0.
+
+The project is currently in **Feature Freeze**. Until v1.0.0 is released, only release-blocking fixes, documentation corrections, packaging/version metadata, security fixes, and verification work should be accepted. New features should wait for a later minor release.
+
+---
+
+## Release criteria
+
+v1.0.0 is ready when all of the following are true:
+
+- [x] Core workflow is stable in normal daily use.
+- [x] Default collection path does not download video or audio.
+- [x] Subtitle-first source policy and source-insufficiency guard are implemented.
+- [x] Long transcript preparation and tiny-tail merge behavior are covered by tests.
+- [x] Finalizer is the only successful publication gate.
+- [x] New notes do not overwrite existing notes with the same title.
+- [x] Obsidian Vault binding and repository-fallback protection are implemented.
+- [x] yt-dlp is detected rather than silently bundled or installed.
+- [x] Cookie contents are excluded from logs, notes, examples, and Git by design.
+- [x] Hermes, WorkBuddy, and Codex share the same core workflow and content rules.
+- [x] Chinese README and beginner documentation are present.
+- [x] English README is present as a public project overview.
+- [x] Repository license wording is consistent with `LICENSE`.
+- [x] Ruff passes in the existing project virtual environment.
+- [x] Public pytest suite passes.
+- [x] Source, Hermes, and WorkBuddy compatibility scripts compile successfully.
+- [ ] Fresh-install / clean-room walkthrough must be rerun after the 2026-08-22 dense-note extraction and compact-template corrections. The earlier baseline acceptance is retained in `docs/reports/2026-08-22-v1.0-release-acceptance.md`, but it no longer represents the exact release candidate.
+- [ ] `pyproject.toml` version is changed from the current development version to `1.0.0` immediately before release.
+- [ ] Changelog receives the final `1.0.0` release entry/date.
+- [ ] Final diff review confirms no local credentials, private notes, runtime jobs, captured test materials, or machine-specific configuration are staged.
+- [ ] CI is green on the exact commit selected for the release tag.
+- [ ] GitHub Release `v1.0.0` is created from that verified commit.
+
+---
+
+## Clean-room walkthrough
+
+The final manual acceptance test should simulate a new user rather than an experienced maintainer.
+
+Use a fresh clone or otherwise isolated checkout and verify only the documented path:
+
+1. Clone the repository.
+2. Confirm `config/local.json` does not already exist.
+3. Follow `docs/QUICKSTART.md` without relying on remembered local setup.
+4. Copy `config/local.json.example` to `config/local.json` and set a test Vault/Cookie path.
+5. Run doctor before doing a real collection.
+6. Confirm missing yt-dlp produces installation guidance rather than an automatic install attempt.
+7. Confirm an unbound Vault returns `configuration_required` and does not start collection.
+8. Install/enable both Obsidian CSS snippets and confirm doctor recognizes them.
+9. Install one supported agent entry point using its documented instructions.
+10. Convert one normal Bilibili video with usable Chinese subtitles.
+11. Confirm the note lands in `00-待整理` and the original video title is preserved as the filename.
+12. Convert the same video again after the first job is complete and confirm the existing note is not overwritten.
+13. Confirm the generated note contains the expected metadata, summary/body structure, video resources, uploader description, and any source-supported conditional resource instructions.
+14. Confirm the finalizer reports `note_ready` before treating the task as successful.
+15. Confirm `.runtime` temporary job data is removed after successful finalization.
+16. Confirm no Cookie content appears in logs, notes, Git diff, or generated examples.
+
+A failure in steps 3-16 is a release blocker if it prevents the documented default workflow or violates the stated security/data boundary.
+
+---
+
+## Final release sequence
+
+Do not add features during this sequence.
+
+1. Complete the clean-room walkthrough.
+2. Fix only release-blocking defects or documentation mismatches found by that walkthrough.
+3. Change `pyproject.toml` to `version = "1.0.0"`.
+4. Add the final `## [1.0.0] - YYYY-MM-DD` changelog entry.
+5. Run:
+
+```powershell
+python -m compileall -q src hermes-skills/bili-learning-automation/scripts
+python -m ruff check .
+python -m pytest -q
+git diff --check
+```
+
+6. Review the complete Git diff and staged file list for credentials and local-only data.
+7. Push the release commit and require CI to pass.
+8. Tag that exact commit as `v1.0.0` and create the GitHub Release.
+
+---
+
+## What should wait until after v1.0
+
+Unless required to fix a release blocker, defer these categories until a later release:
+
+- new video platforms;
+- new agent platforms or large adapter redesigns;
+- automatic ASR/media-download fallback;
+- new LLM provider abstractions;
+- Web UI or desktop UI;
+- major taxonomy redesign;
+- new note-layout systems;
+- unrelated CSS redesign;
+- speculative performance optimization without a reproduced problem.
+
+For v1.0, stability, reproducibility, documentation, and data safety take priority over feature count.

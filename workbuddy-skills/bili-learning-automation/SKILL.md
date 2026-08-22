@@ -59,16 +59,16 @@ runner="$HOME/.workbuddy/skills/bili-learning-automation/scripts/bridge.ps1"
    - 其它 `failed`：报告短错误，不声称完成。
    - 只有 `materials_ready` 才继续。
 
-3. `materials_ready` 时读取 `handoff_path`、`job.json`、`analysis_path`、`agent_work_dir` 与 `transcript_manifest_path`，并遵循项目共享的 `docs\AGENT-INTEGRATION.md` 与 `docs\standards\` 内容标准。程序已把原始 SRT 无语义删减地整理成适合 Agent 阅读的 transcript：manifest 为 `direct` 时读取唯一 chunk；为 `chunked` 时严格按 `chunks` 顺序逐块阅读，**不要**把原始 SRT 整份塞入上下文，也不要自行按固定比例重新切分。处理长字幕时可在 `agent_work_dir` 创建当前 job 专用的中间梳理文件。来源不足时在 `analysis.json` 记录原因，不得靠常识补全。所有临时文件都属于当前 job，由 finalizer 与 failsafe 统一清理；不得写到项目其他目录，也不得手工删除 job、reservation 或锁文件。
+3. `materials_ready` 时读取 `handoff_path`、`job.json`、`analysis_path`、`agent_work_dir` 与 `transcript_manifest_path`，并遵循项目共享的 `docs\AGENT-INTEGRATION.md` 与 `docs\standards\` 内容标准。程序已把原始 SRT 无语义删减地整理成适合 Agent 阅读的 transcript：manifest 为 `direct` 时读取唯一 chunk；为 `chunked` 时严格按 `chunks` 顺序逐块阅读，**不要**把原始 SRT 整份塞入上下文，也不要自行按固定比例重新切分。处理长字幕、百科型或参数密集内容时，在 `agent_work_dir` 创建事实清单或逐块中间梳理文件，先外化具体成员、数值、关系、适用条件、例外、冲突、兼容性和作者评价，再合并为 `knowledge_outline`；不要先压成几个主题概括。来源不足时在 `analysis.json` 记录原因，不得靠常识补全。所有临时文件都属于当前 job，由 finalizer 与 failsafe 统一清理；不得写到项目其他目录，也不得手工删除 job、reservation 或锁文件。
 
 4. 来源充分时，先填写 `knowledge_outline`，再只编辑 `draft_path` 的两个 marker：
 
    - `BILI_AI_SUMMARY`：短的“先看结论”；
    - `BILI_AI_BODY`：根据视频真实信息结构动态组织的知识正文。
 
-   不强制套用“怎么做 / 容易踩坑 / 我来实践”。参数、公式、限制、专名、A/B 差异、兼容性、作者明确推荐和重要资源等高价值信息，不能只为缩短篇幅而删除。正文只写字幕或原始简介支持的事实。Frontmatter 与 `learning-page + video-note` cssclasses 由程序负责，不得修改。
+   不强制套用“怎么做 / 容易踩坑 / 我来实践”。参数、公式、限制、专名、A/B 差异、兼容性、作者明确推荐和重要资源等高价值信息，不能只为缩短篇幅而删除；表达可以压缩，但字幕明确给出的成员来源、继承、步数、适用条件、例外和冲突关系必须保留。正文只写字幕或原始简介支持的事实。Frontmatter 与 `learning-page + video-note` cssclasses 由程序负责，不得修改。
 
-5. 成稿后重新对照字幕或 `knowledge_outline` 做覆盖复核；确认无重要遗漏、无来源外补写后，将 `coverage_review.status` 设为 `passed` 并填写 notes。不要把 runtime 路径、job 文件名、analysis 文件、证据编号或采集状态写进主笔记。
+5. 成稿后必须重新按 manifest 顺序抽查或复读原 transcript；`knowledge_outline` 只能辅助检查，不能替代回看字幕。知识密集型内容还要对照事实清单，确认成员关系、可直接使用值、例外和比较没有被二次压缩；修正遗漏后再将 `coverage_review.status` 设为 `passed` 并填写 notes。不要把 runtime 路径、job 文件名、analysis 文件、证据编号或采集状态写进主笔记。
 
 6. 写完后立即运行 finalizer：
 

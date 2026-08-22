@@ -140,20 +140,20 @@ cssclasses:
 
 `learning-page` 启用 Core，`video-note` 启用视频扩展。Codex、Hermes、WorkBuddy 和用户都不需要为了样式手工添加这两个 class。
 
-`video-note.css` 会把视频原标题控制在比通用学习页更紧凑的字号，并放宽长标题的可用行宽；这只影响 `learning-page + video-note`，不会改动其它 Learning Lab 笔记。
+`video-note.css` 会把视频原标题压到只比正文略大、略粗的层级，并放宽长标题的可用行宽；同时收紧播放器、资源区和原始简介的上下留白。这只影响 `learning-page + video-note`，不会改动其它 Learning Lab 笔记。
 
 正式阅读顺序是：
 
 ```text
 标题 / 作者 · 日期 · 时长 · BVID
 → 先看结论
-→ 动态知识正文
 → 视频资料
-   ├── 原视频（Bilibili 播放器）
-   ├── 资料获取方式（存在时）
-   ├── UP 主资源（存在时）
-   ├── 视频简介（存在真实内容时）
+   ├── Bilibili 播放器
+   ├── 资料获取（存在时，紧凑 Callout）
+   ├── UP 主资源（存在时，紧凑链接组）
+   ├── 视频简介（存在真实内容时，紧凑段落）
    └── UP 主原始简介（折叠）
+→ 动态知识正文
 ```
 
 Agent 会根据知识关系选择 Table / Grid / Card / Chip / Risk / Resource 等语义组件；具体规则见 `docs/standards/CODEX-VIDEO-NOTE-GUIDE.md`。

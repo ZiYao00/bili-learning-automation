@@ -21,4 +21,4 @@
 
 Hermes `SKILL.md` 只是 Hermes/微信入口适配层；WorkBuddy 适配层在 `workbuddy-skills\` 下，通过 junction 安装到本机 `~\.workbuddy\skills\`。Codex 在仓库内直接遵循本文件与共享协议。未来其他智能体只增加薄适配层，不应改变共享核心规则。
 
-准备提交 / 推送当前这轮内容质量与 Obsidian 版式升级时，先阅读 `docs/reports/2026-08-21-pre-push-handoff.md`，按其中的范围、安全边界和验收项复核；不要把 `ComfyUI-Learning-Lab` 的独立工作区混入本仓库提交。
+准备 v1.0 提交 / 推送 / Release 时，先阅读 `docs/RELEASE-CHECKLIST.md`，按其中的 Feature Freeze、安全边界、clean-room 与发布门禁复核；`docs/reports/2026-08-21-pre-push-handoff.md` 仅保留为历史交接记录，不得用其中旧版本口径覆盖当前实现与正式文档。不要把 `ComfyUI-Learning-Lab` 的独立工作区混入本仓库提交。

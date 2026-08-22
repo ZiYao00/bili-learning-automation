@@ -1,5 +1,24 @@
 # Changelog
 
+## [Unreleased]
+
+### Documentation
+
+- 进入 v1.0 Feature Freeze：停止继续堆叠新功能，新增 `docs/RELEASE-CHECKLIST.md` 作为正式版发布门禁与 clean-room 验收清单。
+- 新增 `README.en.md` 英文项目说明，并在中英文 README 之间提供语言切换入口。
+- 统一 README 与 `LICENSE` 的授权口径，移除旧的“尚未选择发布许可证”残留说明。
+- 完成 v1.0 clean-room 发布验收：真实 Bilibili → yt-dlp → transcript → Agent → finalizer 链路通过，确认默认不下载媒体、重复视频不覆盖、无效草稿不发布、runtime 可清理；验收记录见 `docs/reports/2026-08-22-v1.0-release-acceptance.md`。
+- 同步 `docs/ARCHITECTURE.md` 与 `AGENTS.md` 的现行发布口径，移除旧阅读顺序、1 小时 reservation 窗口和历史 pre-push handoff 的控制面残留。
+
+### Changed
+
+- 知识密集型/百科型视频新增“原子事实清单 → knowledge_outline → 正文”的语义保护流程；coverage review 必须重新回到原 transcript，避免同一个 Agent 只对照自己生成的 outline 而遗漏成员关系、具体值、例外和兼容性。
+- 视频资料提前到“先看结论”之后、知识正文之前；移除“原视频”三级标题，播放器改为单行结构，UP 主资源与视频简介改为紧凑展示，条件资料提示同步压缩。
+- `video-note.css` 升级为 v0.2：视频原标题只比正文略大、略粗，并收紧播放器、资源、简介与原始简介的纵向留白。
+- `organize` 同时兼容旧版 `### 视频简介` 和新版紧凑 `video-note-overview`；validator 同步校验新的阅读顺序。
+
+> 以上修复发生在早先 clean-room 基线验收之后，因此正式 v1.0 Release 前必须重新执行 clean-room / 真实 E2E；`pyproject.toml` 暂时继续保持当前开发版本。
+
 ## [0.1.1] - 2026-08-22
 
 ### Added

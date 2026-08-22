@@ -1,9 +1,9 @@
 /*
- * Video Note — Learning Lab Extension v0.1
+ * Video Note — Learning Lab Extension v0.2
  * Requires: learning-lab.css Core v0.3+
  * Scope: notes with cssclasses: [learning-page, video-note]
  * Namespace: --vn-* / video-note-*
- * Goal: keep long source-driven video notes easy to scan without changing their Markdown semantics.
+ * Goal: keep source-driven video notes compact and easy to scan without changing their knowledge semantics.
  */
 
 .learning-page.video-note {
@@ -11,54 +11,82 @@
   --vn-source-surface: var(--ll-surface-soft);
 }
 
-/* ---------- Long video titles ---------- */
+/* ---------- Compact video title ---------- */
 
 .learning-page.video-note h1 {
-  max-width: 34ch;
-  font-size: clamp(1.6rem, 2.6vw, 2rem);
-  line-height: 1.18;
-  letter-spacing: -0.02em;
+  max-width: 46ch;
+  margin-bottom: 0.2rem;
+  font-size: clamp(1.26rem, 1.55vw, 1.38rem);
+  font-weight: 700;
+  line-height: 1.28;
+  letter-spacing: -0.012em;
 }
 
 .learning-page.video-note .video-note-meta {
   display: block;
-  margin: 0.25rem 0 1rem;
+  margin: 0.12rem 0 0.65rem;
   color: var(--ll-muted);
-  font-size: 0.82rem;
-  line-height: 1.5;
+  font-size: 0.8rem;
+  line-height: 1.45;
 }
 
 .learning-page.video-note .video-note-empty-description {
   display: block;
-  margin: 0.8rem 0 1.2rem;
+  margin: 0.4rem 0 0.65rem;
   color: var(--ll-muted);
-  font-size: 0.84rem;
+  font-size: 0.82rem;
 }
 
-/* ---------- Bilibili player ---------- */
+/* ---------- Compact video materials ---------- */
 
+.learning-page.video-note h2[data-heading="视频资料"] {
+  margin-top: 0.9rem;
+  margin-bottom: 0.4rem;
+}
+
+.learning-page.video-note iframe.video-note-player,
 .learning-page.video-note iframe[src*="player.bilibili.com"] {
   display: block;
   width: 100%;
   aspect-ratio: 16 / 9;
-  margin: 1.15rem 0 1.8rem;
+  margin: 0.55rem 0 0.7rem;
   border: 1px solid var(--ll-border) !important;
   border-radius: var(--vn-player-radius);
   background: #000;
   overflow: hidden;
 }
 
+.learning-page.video-note .video-note-resource-links,
+.learning-page.video-note .video-note-overview {
+  margin: 0.42rem 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.learning-page.video-note .video-note-resource-links {
+  color: var(--ll-muted);
+}
+
+.learning-page.video-note .video-note-resource-links strong,
+.learning-page.video-note .video-note-overview strong {
+  color: var(--ll-text);
+}
+
+.learning-page.video-note .video-note-resource-links a {
+  white-space: normal;
+}
+
 /* ---------- Source appendix ---------- */
 
 .learning-page.video-note details.video-note-source-details {
-  margin: 1rem 0 1.5rem;
-  padding: 0.8rem 0.95rem;
+  margin: 0.45rem 0 0.75rem;
+  padding: 0.55rem 0.7rem;
   border: 1px solid var(--ll-border);
   border-radius: var(--ll-radius-md);
   background: var(--vn-source-surface);
   color: var(--ll-muted);
-  font-size: 0.88rem;
-  line-height: 1.62;
+  font-size: 0.82rem;
+  line-height: 1.5;
 }
 
 .learning-page.video-note details.video-note-source-details > summary {
@@ -68,13 +96,17 @@
 }
 
 .learning-page.video-note details.video-note-source-details[open] > summary {
-  margin-bottom: 0.7rem;
+  margin-bottom: 0.5rem;
 }
 
 /* ---------- Dense knowledge pages ---------- */
 
 .learning-page.video-note .callout[data-callout="summary"] {
-  margin-top: 0.9rem;
+  margin-top: 0.7rem;
+}
+
+.learning-page.video-note .callout[data-callout="resource"] {
+  margin-block: 0.45rem;
 }
 
 .learning-page.video-note .callout[data-callout="risk"],
@@ -86,11 +118,12 @@
 @media (max-width: 720px) {
   .learning-page.video-note h1 {
     max-width: none;
-    font-size: clamp(1.42rem, 5.8vw, 1.72rem);
+    font-size: clamp(1.22rem, 4.8vw, 1.32rem);
   }
 
+  .learning-page.video-note iframe.video-note-player,
   .learning-page.video-note iframe[src*="player.bilibili.com"] {
-    margin-block: 0.95rem 1.45rem;
+    margin-block: 0.5rem 0.65rem;
     border-radius: var(--ll-radius-md);
   }
 }

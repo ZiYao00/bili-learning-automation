@@ -1,5 +1,7 @@
 # B站视频转笔记
 
+[简体中文](README.md) | [English](README.en.md)
+
 把 Bilibili 视频自动整理成**字幕优先的 Obsidian 学习笔记**。
 
 你只需要发送一个 B站链接或 BV 号，系统会自动获取字幕、UP 主原始简介和元数据，再由智能体提取知识、整理正文、校验并写入 Obsidian。
@@ -137,9 +139,11 @@ Hermes / WorkBuddy / Codex 只负责读取已经准备好的 transcript，再完
 ```text
 标题 / 作者 · 日期 · 时长 · BV号
 → 先看结论
+→ 视频资料（播放器 / 资料获取 / UP 主资源 / 视频简介）
 → 知识正文
-→ 视频资料（原视频 / 资料获取方式 / UP 主资源 / 视频简介）
 ```
+
+视频资料采用紧凑结构：播放器直接位于“视频资料”下，不再增加“原视频”三级标题；资源和简介尽量压成单行/自动换行，完整 UP 主原始简介继续折叠。知识密集型视频会先建立原子事实清单，再形成正文，并在完成前重新回看原 transcript，减少参数、成员关系和例外条件被二次压缩。
 
 项目自带 Obsidian 样式：
 
@@ -271,6 +275,7 @@ doctor 会检查 yt-dlp、Cookie 文件、taxonomy、Vault/CSS、notes/runtime �
 | [智能体接入协议](docs/AGENT-INTEGRATION.md) | 接入新 Agent / 维护适配层 |
 | [架构说明](docs/ARCHITECTURE.md) | 想了解内部流程 |
 | [开发说明](docs/DEVELOPMENT.md) | 修改代码、跑测试、维护 CI |
+| [v1.0 发布清单](docs/RELEASE-CHECKLIST.md) | Feature Freeze、clean-room 验收与正式 Release 前检查 |
 
 ---
 
@@ -328,4 +333,4 @@ python -m pytest -q
 
 ## 许可证
 
-本项目尚未选择发布许可证。仓库公开不等于授权他人使用或再分发；第三方依赖遵循各自许可证。
+本项目采用 [PolyForm Noncommercial 1.0.0](LICENSE)。允许个人学习、研究、测试和兴趣项目等非商业使用；商业使用不在该许可证授权范围内。第三方依赖继续遵循各自许可证。

@@ -8,7 +8,7 @@
 → yt-dlp 仅采集元数据、UP 主简介、ai-zh/zh 字幕
 → taxonomy 生成 tags 与后续整理建议；原视频标题的新笔记进入 00-待整理
 → Python 在 runtime 写入确定性 Markdown 草稿与 analysis.json
-→ Codex/Hermes 判断来源充分性并形成 knowledge_outline
+→ 接入智能体（Codex / Hermes / WorkBuddy）判断来源充分性并形成 knowledge_outline
 → 智能体填写“先看结论 + 动态知识正文”并完成 coverage review
 → finalizer 校验质量流程状态、真实元数据与结构后原子发布
 → navigation 原子刷新
@@ -31,14 +31,14 @@
 程序负责：
 
 - canonical URL；
-- H1 下方的 BVID 小字；
+- H1 下方的“作者 · 发布日期 · 时长 · BVID”元信息行；
 - Frontmatter；
 - H1；
 - 原始简介；
 - iframe；
 - tags；
 - `learning-page + video-note` cssclasses；
-- 阅读顺序（Summary → Player → AI Body → Source）；
+- 阅读顺序（Summary → Video Materials / Player / Source → AI Body）；
 - 输出路径；
 - 导航。
 
@@ -47,10 +47,10 @@ taxonomy 的 route.path 不直接决定新文件的路径。新笔记统一先�
 接入智能体只负责字幕理解与语义内容：
 
 - 判断字幕与简介是否足以支撑可信学习笔记；
-- 形成 runtime `knowledge_outline`；
+- 形成 runtime `knowledge_outline`；知识密集型内容先在 `agent_work_dir` 建立原子事实清单，避免在知识提取阶段先丢具体成员、关系和可直接使用值；
 - 写短的“先看结论”；
 - 根据视频真实信息结构组织动态知识正文；
-- 成稿后完成覆盖复核。
+- 成稿后重新回到原 transcript 完成覆盖复核，而不是只检查智能体自己生成的 outline。
 
 章节、表格和步骤形式由内容决定；确定性骨架仍由程序控制，避免 LLM 重写元数据、简介或路径。
 
@@ -68,7 +68,7 @@ taxonomy 的 route.path 不直接决定新文件的路径。新笔记统一先�
 ## 可靠性原则
 
 - 文件名使用原视频标题，同名时在预约锁保护下使用递增序号，避免覆盖。已完成视频允许再次转换并生成新笔记。
-- 同一 BVID 仅在活动 collector、智能体写作与 finalizer 期间使用 reservation 防止并发；任务结束后释放 reservation，允许再次转换。残留 reservation 超过 1 小时且对应 job 不再活动时可自动恢复。
+- 同一 BVID 仅在活动 collector、智能体写作与 finalizer 期间使用 reservation 防止并发；任务结束后释放 reservation，允许再次转换。残留 reservation 超过 2 小时且对应 job 不再活动时可自动恢复。
 - Finalizer 校验真实值，而非仅检查字段名；无效草稿不会进入笔记库，随 runtime job 一起清理。草稿的 `BILI_AI_*` marker 只用于校验，发布时会移除，因此正式 Obsidian 笔记不含机器标记。
 - 导航采用临时文件后原子替换。
 - 不同 BVID 可并行处理；导航重建使用独占锁串行执行，避免多个 finalizer 交叉覆盖同一组导航页。当前不会自动删除旧导航页，以免误删用户手写内容。

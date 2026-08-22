@@ -196,7 +196,7 @@ def _description_overview(description: str) -> str | None:
 def render_resource_access_notices(notices: list[dict[str, str]]) -> str:
     if not notices:
         return ""
-    lines = ["### 资料获取方式", ""]
+    lines = ["**资料获取**", ""]
     for notice in notices:
         condition = html.escape(str(notice.get("condition") or "需按 UP 主说明操作"))
         resource = html.escape(str(notice.get("resource") or "附加资料"))
@@ -204,15 +204,13 @@ def render_resource_access_notices(notices: list[dict[str, str]]) -> str:
         source_text = html.escape(str(notice.get("text") or "").strip())
         lines.extend(
             [
-                "> [!resource] UP 主提供的附加资料",
-                f"> **资料**：{resource}  ",
-                f"> **获取条件 / 方式**：{condition}  ",
-                f"> **来源**：{source}",
+                f"> [!resource] {resource} · {condition}",
+                f"> 来源：{source}；当前采集内容未包含该资料本体，本笔记不自行补写。",
             ]
         )
         if source_text:
-            lines.append(f"> **原始说明**：{source_text}")
-        lines.extend([">", "> 当前采集内容未包含该资料本体，本笔记不自行补写。", ""])
+            lines.append(f"> <small>原始说明：{source_text}</small>")
+        lines.append("")
     return "\n".join(lines).rstrip()
 
 
@@ -230,13 +228,7 @@ def render_video_materials(job: dict[str, Any]) -> str:
     result = [
         "## 视频资料",
         "",
-        "### 原视频",
-        "",
-        "<iframe",
-        f'  src="https://player.bilibili.com/player.html?bvid={bvid}&autoplay=0&danmaku=0"',
-        '  style="width:100%;aspect-ratio:16/9;border:0;"',
-        "  allowfullscreen>",
-        "</iframe>",
+        f'<iframe class="video-note-player" src="https://player.bilibili.com/player.html?bvid={bvid}&autoplay=0&danmaku=0" allowfullscreen></iframe>',
     ]
 
     notice_block = render_resource_access_notices(notices)
@@ -244,11 +236,13 @@ def render_video_materials(job: dict[str, Any]) -> str:
         result.extend(["", notice_block])
 
     if resources:
-        result.extend(["", "### UP 主资源", ""])
-        result.extend(f"- [{label}]({url})" for label, url in resources)
+        resource_links = " · ".join(
+            f'<a href="{html.escape(url, quote=True)}">{html.escape(label)}</a>' for label, url in resources
+        )
+        result.extend(["", f'<div class="video-note-resource-links"><strong>UP 主资源</strong>：{resource_links}</div>'])
 
     if overview:
-        result.extend(["", "### 视频简介", "", overview])
+        result.extend(["", f'<p class="video-note-overview"><strong>视频简介</strong>：{html.escape(overview)}</p>'])
 
     if status == "present":
         normalized_description = html.unescape(description)
@@ -300,10 +294,10 @@ def render_note_skeleton(job: dict[str, Any]) -> str:
         "> [!summary] 先看结论\n"
         f"> {PLACEHOLDER_TEXT}。\n"
         f"{AI_MARKERS['summary'][1]}\n\n"
+        f"{materials}\n\n"
         f"{AI_MARKERS['body'][0]}\n"
         f"{PLACEHOLDER_TEXT}。根据视频实际内容组织知识正文；不要套固定章节。\n"
-        f"{AI_MARKERS['body'][1]}\n\n"
-        f"{materials}\n"
+        f"{AI_MARKERS['body'][1]}\n"
     )
 
 

@@ -13,8 +13,8 @@
 1. 把原始收到的文本交给 collector。
 2. collector 先检查笔记位置。若返回 `configuration_required`，适配层必须停止采集并向用户索取 Obsidian Vault 根目录（包含 `.obsidian` 的目录），通过统一 `configure-obsidian` 入口写入本机配置后再重试原请求；不得静默使用仓库内 fallback。若返回 `failed` 且 `code = ytdlp_not_configured`，只向用户提供安装指引（Windows 推荐 `winget install yt-dlp`），不得自动安装、下载或把 `yt-dlp.exe` 放入 Skill / 仓库；安装完成后再重试。collector 返回 `materials_ready` 时再读取 `handoff_path`、`job.json`、`analysis_path`、`agent_work_dir`、`transcript_manifest_path` 和共享内容标准。`in_progress` 不得重新采集；若响应带绑定 `job_dir`，适配层只能在确认该 job 已明显陈旧且仍处于未写作状态、必需文件完整时续做同一 job，否则继续视为活动任务。程序会把原始 SRT 整理为 runtime-only transcript；短字幕为单块 `direct`，长字幕为按完整 cue 边界生成的 `chunked` 清单。
 3. 先判断字幕与简介是否足以支撑可信学习笔记，并填写 runtime 的 `analysis.json`。
-4. 来源充分时先形成 `knowledge_outline`，再编辑 `draft_path` 中的 `BILI_AI_SUMMARY` 与 `BILI_AI_BODY` 两个区域。
-5. 成稿后重新对照字幕或 `knowledge_outline` 做覆盖复核；确认无重要遗漏、无来源外补写后，将 `coverage_review.status` 设为 `passed` 并填写 notes。
+4. 来源充分时先做知识提取，再编辑 `draft_path`。普通视频可直接形成 `knowledge_outline`；百科型、参数密集或全程干货内容应先在 `agent_work_dir` 按 transcript chunk / 自然主题建立原子事实清单，再合并成 `knowledge_outline`。事实清单优先保留具体成员、数值、关系、适用条件、例外、冲突、兼容性和作者评价，避免先压成主题概括。
+5. 成稿后必须重新按 manifest 顺序抽查或复读原 transcript；`knowledge_outline` 只能作为辅助，不能替代回看字幕。知识密集型内容同时对照事实清单，确认成员、关系、可直接使用值、例外和比较都没有被二次压缩，再将 `coverage_review.status` 设为 `passed` 并填写 notes。
 6. 无论写作成功、失败或中断，都必须运行 finalizer 清理 job。
 7. 只有 finalizer 返回 `note_ready` 且 `temporary_data_removed: true` 才能报告完成。
 
@@ -67,11 +67,11 @@
 
 这不是机械保留规则。广告价格、活动口播或与学习目标无关的数字是否保留，应由智能体根据长期参考价值判断。
 
-长字幕或知识密集内容允许先按语义章节/时间段分段提取，再合并、去重和组织。不要把固定 Map-Reduce 流程强加给所有短视频。
+长字幕或知识密集内容允许先按语义章节/时间段分段提取，再合并、去重和组织。知识密集型内容应先建立原子事实清单，再写最终正文；表达可以压缩，但具体成员及其来源、继承、步数、适用条件、冲突和兼容关系不能被压成一个类别名或名称列表。不要把固定 Map-Reduce 流程强加给所有短视频。
 
 ## 最终笔记结构
 
-程序负责：Frontmatter、H1、标题下方元信息行、UP 主资源、条件资料获取提示、原始简介、iframe、tags、cssclasses、文件名和路径。UP 主资源标题由程序根据原始简介中的资源小节、原标签和 URL 平台规范化，例如 `GitHub 插件 · MieNodes`、`工作流（夸克网盘）`、`国际站 · 体验地址`；重复 URL 去重，已包含平台名的标签不重复追加平台。正式阅读顺序固定为：**标题 / 元信息 → 先看结论 → 动态知识正文 → 视频资料**。播放器移动到“视频资料 → 原视频”，让知识正文优先进入阅读主链；“资料获取方式 / UP 主资源 / 视频简介”仅在存在对应内容时出现，UP 主原始简介继续折叠保留。
+程序负责：Frontmatter、H1、标题下方元信息行、UP 主资源、条件资料获取提示、原始简介、iframe、tags、cssclasses、文件名和路径。UP 主资源标题由程序根据原始简介中的资源小节、原标签和 URL 平台规范化，例如 `GitHub 插件 · MieNodes`、`工作流（夸克网盘）`、`国际站 · 体验地址`；重复 URL 去重，已包含平台名的标签不重复追加平台。正式阅读顺序固定为：**标题 / 元信息 → 先看结论 → 视频资料 → 动态知识正文**。播放器直接位于“视频资料”下，不再增加“原视频”三级标题；资料获取提示使用紧凑 Callout，UP 主资源使用紧凑链接组，视频简介使用紧凑段落，完整原始简介继续折叠保留。
 
 智能体负责两个区域：
 
@@ -82,7 +82,7 @@
 
 ## 覆盖复核
 
-程序可以检查结构和流程状态，但不能可靠判断“知识有没有漏”。因此成稿后必须由智能体完成语义复核。
+程序可以检查结构和流程状态，但不能可靠判断“知识有没有漏”。因此成稿后必须由智能体完成语义复核，而且复核必须重新回到原 transcript；不能只拿自己生成的 `knowledge_outline` 检查自己。
 
 至少检查：
 

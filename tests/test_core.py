@@ -18,6 +18,7 @@ from bili_learning.collector import (
     description_state,
     run_ytdlp,
     select_subtitle,
+    write_handoff,
 )
 from bili_learning.config import (
     ConfigurationError,
@@ -194,13 +195,25 @@ def test_prepare_agent_transcript_merges_a_tiny_tail_chunk(tmp_path: Path) -> No
     assert "尾巴" in combined
 
 
+def test_agent_handoff_protects_dense_note_fact_relationships(tmp_path: Path) -> None:
+    job_dir = tmp_path / "job"
+    job_dir.mkdir()
+    handoff = write_handoff(job_dir, {})
+    text = handoff.read_text(encoding="utf-8")
+    assert "建立事实清单" in text
+    assert "不能压缩事实关系" in text
+    assert "重新按 manifest 顺序抽查/复读原 transcript" in text
+    assert "而不是只对照自己生成的 `knowledge_outline`" in text
+    assert "Learning Lab 或外部检索得到的扩展知识不属于本任务来源" in text
+
+
 def test_description_renders_compact_resources_and_preserves_raw_source() -> None:
     description = "节点升级说明\n工作流地址：\nhttps://example.com/workflow\n仓库：https://example.com/repo"
     rendered = quote_description(description, "present")
     assert "## 视频资料" in rendered
-    assert "### 视频简介" in rendered
-    assert "- [工作流地址](https://example.com/workflow)" in rendered
-    assert "- [仓库](https://example.com/repo)" in rendered
+    assert '<p class="video-note-overview"><strong>视频简介</strong>：节点升级说明</p>' in rendered
+    assert '<a href="https://example.com/workflow">工作流地址</a>' in rendered
+    assert '<a href="https://example.com/repo">仓库</a>' in rendered
     assert '<details class="video-note-source-details">' in rendered
     assert "<summary>UP 主原始简介</summary>" in rendered
     assert description in rendered
@@ -215,9 +228,9 @@ def test_description_resource_labels_include_section_type_and_platform() -> None
         "工作流：https://pan.quark.cn/s/workflow"
     )
     rendered = quote_description(description, "present")
-    assert "[GitHub 插件 · MieNodes](https://github.com/MieMieeeee/ComfyUI-MieNodes)" in rendered
-    assert "[MiniMax H3 模型提示词指令（飞书）](https://example.feishu.cn/wiki/prompt)" in rendered
-    assert "[工作流（夸克网盘）](https://pan.quark.cn/s/workflow)" in rendered
+    assert '<a href="https://github.com/MieMieeeee/ComfyUI-MieNodes">GitHub 插件 · MieNodes</a>' in rendered
+    assert '<a href="https://example.feishu.cn/wiki/prompt">MiniMax H3 模型提示词指令（飞书）</a>' in rendered
+    assert '<a href="https://pan.quark.cn/s/workflow">工作流（夸克网盘）</a>' in rendered
     assert description in rendered
 
 
@@ -243,10 +256,10 @@ def test_video_materials_filter_separator_context_deduplicate_and_normalize_enti
         }
     )
     compact = rendered.split("<details", 1)[0]
-    assert "### 视频简介" not in compact
+    assert "video-note-overview" not in compact
     assert "在线工作流区域" not in compact
-    assert "[国际站 · 体验地址](https://example.com/demo)" in rendered
-    assert "[国内站 · 体验地址](https://example.cn/demo)" in rendered
+    assert '<a href="https://example.com/demo">国际站 · 体验地址</a>' in rendered
+    assert '<a href="https://example.cn/demo">国内站 · 体验地址</a>' in rendered
     assert "夸克网盘（夸克网盘）" not in rendered
     compact_resources = rendered.split('<details class="video-note-source-details">', 1)[0]
     assert compact_resources.count("https://pan.quark.cn/s/demo") == 1
@@ -263,7 +276,7 @@ def test_video_materials_keep_real_overview_before_resource_section() -> None:
             "resource_access_notices": [],
         }
     )
-    assert "### 视频简介\n\n这是一个新的工作流教程" in rendered
+    assert '<p class="video-note-overview"><strong>视频简介</strong>：这是一个新的工作流教程</p>' in rendered
 
 
 def test_video_materials_omit_empty_overview_but_keep_player_and_resources() -> None:
@@ -275,10 +288,10 @@ def test_video_materials_omit_empty_overview_but_keep_player_and_resources() -> 
             "resource_access_notices": [],
         }
     )
-    assert "### 原视频" in rendered
+    assert "### 原视频" not in rendered
     assert "player.bilibili.com/player.html?bvid=BV1EXAMPLE" in rendered
-    assert "### UP 主资源" in rendered
-    assert "### 视频简介" not in rendered
+    assert "video-note-resource-links" in rendered
+    assert "video-note-overview" not in rendered
 
 
 def test_resource_access_detects_explicit_conditions_without_inventing_materials(tmp_path: Path) -> None:
@@ -320,7 +333,7 @@ def test_resource_access_does_not_join_generic_engagement_with_unrelated_templat
     assert detect_resource_access_notices("", subtitle) == []
 
 
-def test_note_skeleton_prioritizes_reading_before_player() -> None:
+def test_note_skeleton_places_materials_before_knowledge_body() -> None:
     job = {
         "author": "示例UP主",
         "published": "2026-08-22",
@@ -339,7 +352,7 @@ def test_note_skeleton_prioritizes_reading_before_player() -> None:
     body_at = rendered.index("BILI_AI_BODY_START")
     materials_at = rendered.index("## 视频资料")
     player_at = rendered.index("player.bilibili.com")
-    assert summary_at < body_at < materials_at < player_at
+    assert summary_at < materials_at < player_at < body_at
 
 
 def test_taxonomy_rejects_duplicate_route_ids(taxonomy: dict) -> None:
@@ -662,9 +675,9 @@ def test_create_job_writes_runtime_draft_without_publishing_note(tmp_path: Path,
     assert parse_frontmatter_list(draft_text, "cssclasses") == ["learning-page", "video-note"]
     assert (
         draft_text.find("<!-- BILI_AI_SUMMARY_START -->")
-        < draft_text.find("<!-- BILI_AI_BODY_START -->")
         < draft_text.find("## 视频资料")
         < draft_text.find("https://player.bilibili.com/player.html")
+        < draft_text.find("<!-- BILI_AI_BODY_START -->")
     )
 
 
@@ -1056,8 +1069,8 @@ def test_organize_note_adds_learning_intro_when_source_has_only_resources(tmp_pa
     target = organize_note(settings, source, "整理后标题", "学习后补充的一句简介。")
     text = target.read_text(encoding="utf-8")
     assert metadata_line(job) in text
-    assert "### 视频简介\n\n学习后补充的一句简介。" in text
-    assert text.index("### 视频简介") < text.index('<details class="video-note-source-details">')
+    assert '<p class="video-note-overview"><strong>视频简介</strong>：学习后补充的一句简介。</p>' in text
+    assert text.index("video-note-overview") < text.index('<details class="video-note-source-details">')
 
 
 def test_organize_note_migrates_a_legacy_description_and_bvid_filename(tmp_path: Path, taxonomy: dict) -> None:
@@ -1075,8 +1088,8 @@ def test_organize_note_migrates_a_legacy_description_and_bvid_filename(tmp_path:
     assert target.name == "整理后标题.md"
     assert bvid_line("BV1TXua68EYi") in text
     assert "## 视频资料" in text
-    assert "### UP 主资源" in text
-    assert "[工作流](https://example.com/workflow)" in text
+    assert '<div class="video-note-resource-links"><strong>UP 主资源</strong>：' in text
+    assert '<a href="https://example.com/workflow">工作流</a>' in text
     assert '<details class="video-note-source-details">' in text
     assert "<summary>UP 主原始简介</summary>" in text
 

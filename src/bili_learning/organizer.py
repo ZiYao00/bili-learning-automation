@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import os
 import re
 import uuid
@@ -86,6 +87,17 @@ def _rewrite_title_and_intro(text: str, title: str, intro: str) -> str:
             flags=re.MULTILINE,
         )
 
+    overview_pattern = r'(<p class="video-note-overview"><strong>视频简介</strong>：)(.*?)(</p>)'
+    result, count = re.subn(
+        overview_pattern,
+        lambda match: match.group(1) + html.escape(intro) + match.group(3),
+        result,
+        count=1,
+        flags=re.DOTALL,
+    )
+    if count == 1:
+        return result
+
     patterns = (
         r"(^### 视频简介\r?\n\r?\n)(.*?)(?=\r?\n\r?\n### |\r?\n\r?\n<details|\r?\n\r?\n## |\Z)",
         r"(^## 视频简介\r?\n\r?\n)(.*?)(?=\r?\n\r?\n## |\r?\n\r?\n<details|\Z)",
@@ -103,12 +115,13 @@ def _rewrite_title_and_intro(text: str, title: str, intro: str) -> str:
 
     details_marker = '<details class="video-note-source-details">'
     details_at = result.find(details_marker)
+    compact_intro = f'<p class="video-note-overview"><strong>视频简介</strong>：{html.escape(intro)}</p>'
     if details_at >= 0:
-        return result[:details_at].rstrip() + f"\n\n### 视频简介\n\n{intro}\n\n" + result[details_at:]
+        return result[:details_at].rstrip() + f"\n\n{compact_intro}\n\n" + result[details_at:]
 
     video_materials_at = result.find("## 视频资料")
     if video_materials_at >= 0:
-        return result.rstrip() + f"\n\n### 视频简介\n\n{intro}\n"
+        return result.rstrip() + f"\n\n{compact_intro}\n"
 
     raise ValueError("笔记缺少标准视频资料区，无法整理")
 

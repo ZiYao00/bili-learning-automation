@@ -61,6 +61,7 @@ def validate_note(note: Path, job: dict[str, Any]) -> list[str]:
 
     description_block = render_video_materials(job)
     description_at = text.find(description_block)
+    description_end = description_at + len(description_block) if description_at >= 0 else -1
     iframe_url = "https://player.bilibili.com/player.html?bvid=" + job["bvid"]
     iframe_at = text.find(iframe_url)
     summary_at = text.find(AI_MARKERS["summary"][0])
@@ -70,9 +71,9 @@ def validate_note(note: Path, job: dict[str, Any]) -> list[str]:
     if iframe_at < 0:
         errors.append("缺少正确的官方播放器 iframe")
     if min(summary_at, iframe_at, body_at, description_at) >= 0 and not (
-        summary_at < body_at < description_at <= iframe_at
+        summary_at < description_at <= iframe_at < description_end < body_at
     ):
-        errors.append("阅读顺序必须为先看结论 → 知识正文 → 视频资料，播放器放在视频资料内")
+        errors.append("阅读顺序必须为先看结论 → 视频资料 → 知识正文，播放器保留在视频资料内")
 
     for key, (start, end) in AI_MARKERS.items():
         start_at = text.find(start)
