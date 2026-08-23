@@ -199,6 +199,22 @@ See [Obsidian Styling](docs/OBSIDIAN-STYLING.md).
 
 These are thin adapters. The project intentionally keeps the content and validation rules in a shared core rather than maintaining separate implementations for each agent.
 
+### Model choice and observed test results
+
+This project does not require or bind users to any specific LLM. Different models share the same note structure, source boundaries, and `light` writing standard; the project does not maintain model-specific Markdown templates. Final note quality is strongly affected by long-context understanding, relationship reconstruction, factual fidelity, and writing quality.
+
+The table below summarizes observed results from the current fixed video samples and Agent environments. It is reference data only, not a mandatory recommendation or permanent ranking:
+
+| Test environment | Observed result | Main strengths / risks |
+| --- | --- | --- |
+| ChatGPT · GPT-5.6 Sol | Highest overall quality in the current samples | Strong knowledge relationships, experiment details, judgment, and reading organization. |
+| WorkBuddy · GLM-5.2 | High quality | Good coverage and relationship reconstruction; stable on long-form material. |
+| Claude client · Volcengine Ark `ark-code-latest` proxy | High quality | This run was close to the top tier; proxy backends may change, so reproducible tests should record the actual backend model. |
+| Hermes · Doubao-Seed-2.1-Turbo | Rich expansion | Higher risk of actively inferring uncertain proper nouns, numbers, or units; requires stricter review. |
+| Codex · Treea (Medium) | Generally reliable but compressed | Tends to retain major conclusions while compressing secondary relationships, experiments, and failure details. |
+
+Model versions, Agent hosts, proxy backends, and reasoning settings can all change the outcome. Users should retest against their own cost, speed, and quality requirements.
+
 ---
 
 ## Daily usage

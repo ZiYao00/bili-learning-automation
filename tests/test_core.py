@@ -226,6 +226,27 @@ def test_agent_handoff_light_mode_is_short_and_direct(tmp_path: Path) -> None:
     assert "workflow_status" not in text
 
 
+def test_light_workflow_defines_semantic_quality_without_length_target() -> None:
+    workflow = Path("docs/standards/LIGHT-WORKFLOW.md").read_text(encoding="utf-8")
+
+    assert "不要预设章节数量、文章字数、KB 大小或压缩比" in workflow
+    assert "关系、选择条件、原因、实测证据、失败表现和作者判断" in workflow
+    assert "不要根据常识猜成一个看起来合理的答案" in workflow
+    assert "应显式保留冲突" in workflow
+    assert "不要在正文末尾追加“来源提供的资源”" in workflow
+
+
+def test_public_docs_keep_model_choice_neutral() -> None:
+    readme = Path("README.md").read_text(encoding="utf-8")
+    development = Path("docs/DEVELOPMENT.md").read_text(encoding="utf-8")
+
+    assert "本项目不绑定或强制使用任何特定 LLM" in readme
+    assert "仅用于提供选择参考，不构成强制要求或固定排名" in readme
+    assert "项目不指定默认或必选 LLM" in development
+    assert "当前真实回归测试的默认基准是" not in readme
+    assert "当前默认基准为" not in development
+
+
 def test_description_renders_compact_resources_and_preserves_raw_source() -> None:
     description = "节点升级说明\n工作流地址：\nhttps://example.com/workflow\n仓库：https://example.com/repo"
     rendered = quote_description(description, "present")
