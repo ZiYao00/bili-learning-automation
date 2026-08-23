@@ -44,21 +44,13 @@ python -m pytest -q
 
 ## Obsidian 样式维护
 
-仓库内提交可直接安装的样式副本：
-
-```text
-obsidian/snippets/
-├── learning-lab.css
-└── video-note.css
-```
-
-当前版本与 `ComfyUI-Learning-Lab` Design System v0.3 / Video Note v0.1 对齐，但本项目运行和安装不能依赖另一个本地仓库。后续如果从 Learning Lab 同步新版 CSS，应把两个文件视为一组进行复核，避免 Core 与 Extension 版本错配。
+共享 CSS 的唯一真源为 <https://github.com/ZiYao00/obsidian-learning-snippets>；本项目的依赖声明在 `config/obsidian-style.json`。本项目不保留 `learning-lab.css` / `video-note.css` 副本，也不建立指向共享仓库的项目级 junction。升级共享 CSS 时，在共享仓库中把 Core 与 Extension 视为一组复核，再同步到 Vault，避免版本错配。
 
 同步后至少确认：
 
 - `video-note.css` 声明的 Core 版本与 `learning-lab.css` 一致；
 - `src/bili_learning/frontmatter.py` 生成的 `learning-page` / `video-note` class 与 CSS 选择器一致；
-- README 与 `docs/OBSIDIAN-STYLING.md` 仍指向本仓库的 `obsidian/snippets/`；
+- README 与 `docs/OBSIDIAN-STYLING.md` 仍指向共享仓库和 `config/obsidian-style.json`；
 - 无 CSS 时 Markdown 仍可正常阅读。
 
 ## 提交前验收
@@ -74,7 +66,7 @@ git diff --check
 
 本轮涉及内容质量与版式升级时，还应确认：
 
-- `obsidian/snippets/learning-lab.css` 与 `obsidian/snippets/video-note.css` 已被 Git 跟踪；
+- `config/obsidian-style.json` 正确声明 `learning-lab.css` 与 `video-note.css`，且本仓库没有跟踪 CSS 副本；
 - 新生成笔记含 `learning-page + video-note`；
 - Finalizer 仍拒绝未完成 `coverage_review` 或 `source_insufficient` 的任务；
 - 示例与文档不再要求固定“怎么做 / 容易踩坑 / 我来实践”四段式；

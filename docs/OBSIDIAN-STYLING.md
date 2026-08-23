@@ -1,14 +1,6 @@
 # Obsidian 视觉样式
 
-本项目自带视频学习笔记需要的两份 CSS，不依赖其他仓库：
-
-```text
-bili-learning-automation/
-└── obsidian/
-    └── snippets/
-        ├── learning-lab.css
-        └── video-note.css
-```
+视频学习笔记使用共享 CSS 仓库：<https://github.com/ZiYao00/obsidian-learning-snippets>。本项目的具体依赖由 `config/obsidian-style.json` 声明：`learning-lab.css` 是 Core，`video-note.css` 是本项目所需 Extension。本项目不再维护这两份 CSS 的副本。
 
 - `learning-lab.css`：Core Design System，负责阅读宽度、标题层级、Callout、Grid、Card、Badge、Chip、Table 和响应式布局。
 - `video-note.css`：Video Note Extension，依赖 Core，只处理长视频标题、Bilibili 播放器、来源附录等视频笔记特有样式。
@@ -66,17 +58,9 @@ D:\Notes\MyVault\.obsidian\snippets\
 
 如果 `.obsidian\snippets\` 不存在，可以手动创建 `snippets` 文件夹。
 
-### 3. 复制两份 CSS
+### 3. 从共享仓库安装两份 CSS
 
-从仓库：
-
-```text
-obsidian\snippets\
-├── learning-lab.css
-└── video-note.css
-```
-
-复制到：
+从共享仓库的 `snippets\` 目录安装到：
 
 ```text
 你的 Vault\.obsidian\snippets\
@@ -177,7 +161,7 @@ Agent 会根据知识关系选择 Table / Grid / Card / Chip / Risk / Meta / Res
 
 ## 更新项目后如何同步 CSS
 
-以后 `git pull` 或升级本项目后，如果 `obsidian/snippets/` 中的 CSS 有更新：
+以后共享仓库更新 CSS 后：
 
 1. 先确认自己是否修改过 Vault 中的 CSS；
 2. 需要升级时同时更新 `learning-lab.css` 和 `video-note.css`；
@@ -199,9 +183,9 @@ Agent 会根据知识关系选择 Table / Grid / Card / Chip / Risk / Meta / Res
 
 ## 维护约定
 
-本仓库提交可直接使用的 CSS 副本，确保项目能够独立安装和使用。维护设计系统时应同时检查：
+本项目只声明并使用共享 CSS，不复制或独立维护。维护设计系统时应同时检查：
 
 - `learning-lab.css` Core 与 `video-note.css` Extension 的版本依赖是否匹配；
 - 本项目生成的 `cssclasses` 是否仍与选择器一致；
-- `docs/OBSIDIAN-STYLING.md`、`docs/QUICKSTART.md` 与 README 的安装路径是否仍准确；
+- `config/obsidian-style.json`、`docs/OBSIDIAN-STYLING.md`、`docs/QUICKSTART.md` 与 README 的共享仓库链接是否仍准确；
 - 真实视频笔记在浅色 / 深色和窄分栏下是否仍可读。

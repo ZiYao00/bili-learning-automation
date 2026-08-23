@@ -26,8 +26,8 @@
 - `hermes-skills/bili-learning-automation/scripts/`：只定位项目根目录并转发到核心 CLI 的兼容入口。
 - `config/bilibili-note-taxonomy.json`：模型别名、tags、后续整理建议和默认 `notes_root`。
 - `docs/standards/`：人类可读的笔记质量与版式语义标准。
-- `obsidian/snippets/`：随仓库提交、可直接安装到 Obsidian Vault 的 `learning-lab.css` Core 与 `video-note.css` Extension。
-- `docs/OBSIDIAN-STYLING.md`：CSS 安装、作用域、升级同步和无样式降级规则。当前副本与 `ComfyUI-Learning-Lab` Design System v0.3 / Video Note v0.2 对齐，但运行时不依赖另一个本地仓库。
+- `config/obsidian-style.json`：共享 CSS 依赖契约，声明本项目需要的 `learning-lab.css` Core、`video-note.css` Extension 与 Frontmatter class。
+- `docs/OBSIDIAN-STYLING.md`：共享 CSS 安装、作用域、同步和无样式降级规则。CSS 唯一真源是 `obsidian-learning-snippets` 仓库，运行时从 Vault 加载。
 
 ## 确定性边界
 

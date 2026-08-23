@@ -274,13 +274,7 @@ Doctor 不访问 Bilibili，也不读取 Cookie 内容。
 
 ## 8. CSS 为什么要知道 Vault 根
 
-仓库内的样式文件位于：
-
-```text
-obsidian/snippets/
-├── learning-lab.css
-└── video-note.css
-```
+本项目的样式依赖由 `config/obsidian-style.json` 声明；CSS 唯一真源是 <https://github.com/ZiYao00/obsidian-learning-snippets>。本项目需要 `learning-lab.css` 与 `video-note.css`，但不在仓库内维护副本。
 
 它们应该安装到：
 
@@ -294,7 +288,7 @@ obsidian/snippets/
 <notes_root>/.obsidian/snippets/
 ```
 
-程序只负责诊断 CSS 是否存在，**不会静默覆盖**用户已经修改过的 CSS。具体安装、启用和升级方式见 [Obsidian 样式教程](OBSIDIAN-STYLING.md)。
+程序只负责诊断 Vault 中 CSS 是否存在，**不会静默覆盖**用户已经修改过的 CSS。具体安装、启用和升级方式见 [Obsidian 样式教程](OBSIDIAN-STYLING.md)。
 
 ---
 

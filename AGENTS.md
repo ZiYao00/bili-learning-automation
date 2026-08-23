@@ -34,6 +34,12 @@
 - 视频简介抓取失败不能当作视频没有简介。
 - 只有 finalizer 返回 `note_ready` 且临时数据清理成功，才能声称完成。
 
+## 共享 Obsidian 样式依赖
+
+共享 CSS 的唯一真源是：<https://github.com/ZiYao00/obsidian-learning-snippets>。
+
+修改笔记版式或 Frontmatter 前，先读取 `config\obsidian-style.json`。本项目只使用 `learning-lab.css` Core 与 `video-note.css` Extension；不得在此仓库复制、重建、fork 或独立修改共享 CSS，也不得把受 Git 跟踪的项目目录 junction 到共享仓库。需要改共享视觉系统时，修改共享仓库，再同步到 Obsidian Vault。
+
 Hermes 与 WorkBuddy 的 `SKILL.md` 只是入口适配层，不应复制或改写核心规则。
 
 准备 v1.0 提交、推送或 Release 时，先阅读 `docs/RELEASE-CHECKLIST.md`。不要把 `ComfyUI-Learning-Lab` 的独立工作区混入本仓库提交。

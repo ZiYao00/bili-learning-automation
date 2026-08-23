@@ -146,15 +146,7 @@ Hermes / WorkBuddy / Codex 只负责读取已经准备好的 transcript，再完
 
 播放器与来源区不再显示额外标题：播放器直接位于“先看结论”之后，UP 主资源以逐条链接列表展示，视频简介保持紧凑，UP 主原文（完整说明与链接）继续折叠留档。默认 `light` 模式完整读取 transcript 后直接生成正文，再独立做一次排版优化；需要 Fact Ledger、Semantic Draft 与 Layout Plan 时可切换为 `strict`。
 
-项目自带 Obsidian 样式：
-
-```text
-obsidian/snippets/
-├── learning-lab.css
-└── video-note.css
-```
-
-安装教程见 [Obsidian 视觉样式](docs/OBSIDIAN-STYLING.md)。
+本项目使用共享 Learning Lab 样式系统：<https://github.com/ZiYao00/obsidian-learning-snippets>。所需的 `learning-lab.css` 与 `video-note.css` 见 [样式依赖声明](config/obsidian-style.json)，安装教程见 [Obsidian 视觉样式](docs/OBSIDIAN-STYLING.md)。本项目不再维护 CSS 副本。
 
 ---
 

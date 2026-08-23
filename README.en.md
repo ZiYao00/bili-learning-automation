@@ -169,15 +169,9 @@ It does **not** read Cookie contents and does **not** access Bilibili.
 
 ## Obsidian styling
 
-The repository includes:
+This project uses the shared [Obsidian Learning Snippets](https://github.com/ZiYao00/obsidian-learning-snippets) repository. Its required Core and extension are declared in [`config/obsidian-style.json`](config/obsidian-style.json); this repository does not maintain duplicate CSS copies.
 
-```text
-obsidian/snippets/
-├── learning-lab.css
-└── video-note.css
-```
-
-Copy both files to:
+Install the declared `learning-lab.css` and `video-note.css` files to:
 
 ```text
 <vault_root>/.obsidian/snippets/

@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "repository": "https://github.com/ZiYao00/obsidian-learning-snippets",
+  "core": "snippets/learning-lab.css",
+  "extensions": ["snippets/video-note.css"],
+  "cssclasses": ["learning-page", "video-note"]
+}

@@ -123,15 +123,9 @@ python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning
 
 ## 5. 安装 Obsidian 样式
 
-仓库已经包含两份样式：
+本项目使用共享 [Obsidian Learning Snippets](https://github.com/ZiYao00/obsidian-learning-snippets)；所需的 `learning-lab.css` 与 `video-note.css` 已在 [`config/obsidian-style.json`](../config/obsidian-style.json) 声明。本项目不再保存这两份 CSS 副本。
 
-```text
-obsidian/snippets/
-├── learning-lab.css
-└── video-note.css
-```
-
-把它们复制到当前 Obsidian Vault 的：
+把共享仓库中的两份 CSS 安装到当前 Obsidian Vault 的：
 
 ```text
 .obsidian/snippets/
@@ -359,7 +353,7 @@ git pull
 
 因为 Hermes Skill 推荐通过 Junction 指向仓库源码，所以不需要重新复制 Skill。
 
-如果 `obsidian/snippets/` 中的 CSS 有更新，再覆盖 Vault 里的两份 CSS，并在 Obsidian 中刷新代码片段。
+如果共享 `obsidian-learning-snippets` 仓库中的 CSS 有更新，按 [Obsidian 样式教程](OBSIDIAN-STYLING.md) 将所需两份 CSS 同步到 Vault，再在 Obsidian 中刷新代码片段。
 
 ---
 

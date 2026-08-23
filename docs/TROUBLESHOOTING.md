@@ -252,14 +252,7 @@ agent-work/
 
 ## 11. Obsidian 笔记有内容，但没有样式
 
-确认这两个文件：
-
-```text
-obsidian/snippets/learning-lab.css
-obsidian/snippets/video-note.css
-```
-
-已经复制到**当前打开 Vault 根目录**的：
+确认共享 <https://github.com/ZiYao00/obsidian-learning-snippets> 中、并由 [`config/obsidian-style.json`](../config/obsidian-style.json) 声明的 `learning-lab.css` 和 `video-note.css`，已经安装到**当前打开 Vault 根目录**的：
 
 ```text
 .obsidian/snippets/

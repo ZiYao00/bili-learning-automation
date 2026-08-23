@@ -157,14 +157,7 @@ D:\Notes\MyVault
 
 ## 6. CSS 需要另外安装吗
 
-需要把仓库中的：
-
-```text
-obsidian\snippets\learning-lab.css
-obsidian\snippets\video-note.css
-```
-
-放到：
+需要把共享 <https://github.com/ZiYao00/obsidian-learning-snippets> 中、由 `config\obsidian-style.json` 声明的 `learning-lab.css` 与 `video-note.css` 放到：
 
 ```text
 <vault_root>\.obsidian\snippets\
