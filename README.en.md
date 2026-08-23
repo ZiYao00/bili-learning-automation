@@ -2,112 +2,202 @@
 
 [简体中文](README.md) | [English](README.en.md)
 
-Turn Bilibili videos into **subtitle-first Obsidian learning notes**.
+Turn a Bilibili video link into a **durable, searchable Obsidian learning note**.
 
-Send a Bilibili URL or BV ID. The project collects available Chinese subtitles, the uploader's original description, and video metadata, then lets an agent extract the useful knowledge, write the note, review coverage, and publish it to Obsidian.
+The project uses a **subtitle-first** workflow: by default it collects Chinese subtitles, the uploader's original description, and video metadata without downloading video or audio. An Agent then extracts knowledge, reviews coverage, writes the learning content, and hands the draft back to a deterministic finalizer for publication.
 
-The default workflow **does not download video or audio**.
+> **In one sentence:** this is not a “compress the video into a few bullets” tool. It tries to preserve parameters, versions, tools, steps, comparisons, failure cases, limitations, and useful resource links so the video becomes knowledge you can actually reuse later.
 
-> First-time users should start with the [Quick Start guide](docs/QUICKSTART.md). The detailed operational documentation is currently maintained in Chinese.
+**License:** [PolyForm Noncommercial 1.0.0](LICENSE). Non-commercial use is allowed; commercial use is not granted by the current license.
+
+> First-time users should start with the **[Quick Start](docs/QUICKSTART.md)**. The detailed operational documentation is currently maintained in Chinese and is Windows-first.
 
 ---
 
-## What it does
+## Why this project exists
 
-The normal workflow is:
+Tutorials and technical videos often contain much more value than a short summary can preserve:
+
+- parameters, values, limits, and practical presets;
+- models, nodes, plugins, LoRAs, versions, and installation prerequisites;
+- A/B differences, compatibility, conflicts, and selection rules;
+- timing, quality changes, failure behavior, and trade-offs from real tests;
+- GitHub repositories, models, workflows, and other resources from the uploader description;
+- capability boundaries: when a method is useful and when it is not.
+
+`bili-learning-automation` is designed to **protect this reusable knowledge first**, rather than optimize for the shortest possible output.
+
+---
+
+## 30-second workflow
 
 ```text
 Bilibili URL / BV ID
-→ collect subtitles, description, and metadata
-→ prepare long transcripts
-→ agent extracts knowledge
-→ write a concise summary + structured learning content
-→ finalizer validates the result
-→ publish to Obsidian
+        ↓
+yt-dlp collects subtitles, description, metadata
+        ↓
+prepare transcript / chunk long subtitles
+        ↓
+Agent checks whether the source is sufficient
+        ↓
+extract knowledge + write key takeaways and learning content
+        ↓
+re-check the transcript for coverage
+        ↓
+finalizer validates the draft
+        ↓
+publish to Obsidian / 00-待整理
 ```
 
-It is designed for:
-
-- tutorials, courses, and technical videos on Bilibili;
-- AI, ComfyUI, programming, and other knowledge-dense content;
-- people who want searchable and reviewable notes instead of a watch-history backlog;
-- workflows where a link is sent from a phone and processed by a local agent on a computer.
-
-The project currently provides entry points for **Hermes, WorkBuddy, and Codex**. They share the same collector, transcript preparation, taxonomy, note rules, and finalizer.
+The default collector uses `yt-dlp --skip-download`, so **video and audio are not downloaded**.
 
 ---
 
-## Key features
+## How it differs from a normal video summarizer
 
-- Accepts BV IDs, standard Bilibili URLs, copied text containing a BV ID, and supported `b23.tv` short links.
-- Uses `yt-dlp --skip-download`; media is not downloaded in the default path.
-- Preserves the uploader's original description and useful resource links.
-- Conservatively recognizes explicit resource-access conditions such as likes/favorites/coins, charging, comment keywords, direct messages, or group access. It never invents a template or file that was not present in the source material.
-- Stops when the available source is insufficient instead of filling factual gaps from model knowledge.
-- Converts long subtitles into a transcript manifest and ordered chunks so agents do not need to load an entire long SRT at once.
-- Uses the lightweight writing flow by default: read the full transcript, write the note directly, then run a separate layout pass. A strict auditable flow remains available.
-- Merges tiny trailing transcript chunks to avoid wasteful extra reads.
-- Publishes new notes to `00-待整理` first; knowledge organization is a separate post-learning step.
-- Uses the original video title as the filename and adds `（2）`, `（3）`, etc. instead of overwriting an existing note.
-- Generates deterministic metadata, resource sections, tags, CSS classes, paths, and filenames in code rather than asking the LLM to rewrite them.
-- Publishes only after the finalizer returns `note_ready`.
-- Keeps Cookie contents out of logs, notes, and Git.
+### 1. It can stop when the source is not good enough
+
+Factual content in the note may only come from:
+
+- the current video's subtitles;
+- the uploader's original description.
+
+If subtitles are badly incomplete, critical details exist only on screen, or important terms are too damaged to support a reliable note, the Agent can return `source_insufficient` instead of filling gaps with model knowledge.
+
+### 2. Long videos are not summarized before writing
+
+Long subtitles are converted into an ordered transcript manifest and chunks. Chunking is only a transport mechanism for the Agent; it does not perform semantic summarization, keyword filtering, or early compression.
+
+This lets 20-40 minute or longer technical videos retain parameters, relationships, experiments, and failure cases instead of collapsing into a few topic headings.
+
+### 3. Uncertain proper nouns keep search clues without pretending certainty
+
+Bilibili subtitles are often generated from speech. When model names, plugin names, or other proper nouns are mistranscribed:
+
+- if the source confirms the name, use the confirmed form;
+- if the name is strongly implied but not confirmable, keep the subtitle form and mark it as unconfirmed;
+- if the name cannot be identified, preserve the useful role, parameters, relationships, and experiment results while omitting the spelling.
+
+This avoids both extremes: losing an entire knowledge point because one word is wrong, or silently “correcting” the subtitle from model memory.
+
+### 4. The LLM only owns the parts that require reasoning
+
+The program generates deterministic content such as:
+
+- Frontmatter;
+- H1 and author/date/duration/BVID metadata;
+- Bilibili player;
+- uploader description and resource links;
+- tags and CSS classes;
+- filenames, paths, and overwrite protection;
+- finalizer validation and runtime cleanup.
+
+The Agent mainly writes two regions:
+
+- **Key takeaways** for fast value judgment;
+- **Learning content** organized around the actual information in the video.
+
+### 5. New notes go to an inbox first
+
+Every new note is first published to:
+
+```text
+00-待整理/
+```
+
+Only after you have actually studied it should the optional organization flow shorten the title, add a one-line description, suggest a taxonomy category, move the file safely, and rebuild navigation.
 
 ---
 
-## Requirements
+## What the generated note looks like
 
-For a normal Windows setup you need:
+```text
+Title
+Author · published date · duration · BVID
+
+Key takeaways
+
+Bilibili player
+Uploader resources / access conditions / original description
+
+Dynamic learning content
+├── parameters and configuration
+├── comparisons
+├── steps and prerequisites
+├── experiments
+├── failure cases
+├── risks and limitations
+└── other reusable knowledge from the source
+```
+
+There is no fixed five-section template and no target H2 count, word count, or file size. A simple video can stay short; an encyclopedia-style tutorial can be long.
+
+The project uses the shared [Obsidian Learning Snippets](https://github.com/ZiYao00/obsidian-learning-snippets) visual system. The Markdown remains readable even when CSS is disabled.
+
+---
+
+## Good fits
+
+This project is a strong fit for:
+
+- Bilibili tutorials, courses, and technical walkthroughs;
+- ComfyUI, AI, image/video generation, local models, programming, and other parameter-heavy content;
+- people who want long-term reference notes instead of one-time summaries;
+- phone-to-computer Agent workflows;
+- existing Obsidian users who want video learning to become part of their knowledge base.
+
+It is a weaker fit for:
+
+- videos without usable Chinese subtitles;
+- tutorials where almost all critical information exists only on screen;
+- media-download or media-archival workflows;
+- workflows that expect the LLM to invent missing tutorial details beyond the source.
+
+---
+
+## Core capabilities
+
+- Accepts BV IDs, normal Bilibili URLs, copied text containing a BV ID, and supported `b23.tv` short links.
+- Uses `yt-dlp --skip-download` by default.
+- Preserves uploader descriptions, resource links, and explicit resource-access conditions.
+- Does not invent templates, workflows, parameters, or resources that are missing from the source.
+- Prepares long transcripts automatically and merges tiny trailing chunks.
+- Allows the same BVID to be converted again; filenames use `（2）`, `（3）`, etc. instead of overwriting existing notes.
+- Provides a default `light` writing flow and an optional auditable `strict` flow.
+- Publishes only after the finalizer validates the draft, then removes runtime job data.
+- Hermes, WorkBuddy, and Codex share one core implementation and one content standard.
+- Cookie files, private notes, and machine-local configuration are ignored by Git by default.
+
+---
+
+## Quick start
+
+### 1. Requirements
+
+A normal Windows setup needs:
 
 | Requirement | Purpose |
 | --- | --- |
-| Python 3.10+ | Runs the core package and adapter scripts |
-| yt-dlp | Collects metadata, descriptions, and subtitles |
-| Bilibili Cookie file | Usually required for authenticated subtitle/metadata access |
-| Obsidian Vault or Markdown destination | Stores generated notes |
-| Hermes, WorkBuddy, or Codex | Reads the prepared transcript and writes the knowledge sections |
+| Python 3.10+ | Runs the core scripts |
+| yt-dlp | Collects subtitles, descriptions, and metadata |
+| Bilibili Cookie file | Usually needed for authenticated subtitle/metadata access |
+| Obsidian Vault | Stores the generated notes |
+| Hermes / WorkBuddy / Codex | Reads the transcript and writes the learning content |
 
-The project does not bundle `yt-dlp.exe` and does not install it automatically.
-
-On Windows, if `yt-dlp` is not already available in `PATH`:
+The repository does **not** bundle or auto-install `yt-dlp.exe`.
 
 ```powershell
 winget install yt-dlp
 ```
 
----
-
-## Installation
-
-Clone the repository:
+### 2. Clone the repository
 
 ```powershell
 git clone https://github.com/ZiYao00/bili-learning-automation.git
 cd bili-learning-automation
 ```
 
-For normal Hermes / WorkBuddy usage, the core runtime has no third-party Python package dependency.
-
-For development and testing:
-
-```powershell
-py -3 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
-```
-
----
-
-## Configuration
-
-The recommended machine-local configuration is:
-
-```text
-config/local.json
-```
-
-Copy the example first:
+### 3. Create machine-local configuration
 
 ```powershell
 Copy-Item .\config\local.json.example .\config\local.json
@@ -124,102 +214,42 @@ Example:
 }
 ```
 
-Where:
+`config/local.json` is ignored by Git and is intended for machine-specific paths.
 
-- `vault_root` is the Obsidian Vault directory that directly contains `.obsidian`;
-- `notes_subdir` is the relative directory used by this project inside the Vault;
-- `cookie_file` points to a Netscape-format Bilibili Cookie file;
-- `workflow_mode` is `light` by default; use `strict` to restore the staged Fact Ledger / Semantic Draft / Layout Plan workflow.
-
-`config/local.json` is ignored by Git.
-
-You may also use environment variables:
-
-- `BILI_LEARNING_TAXONOMY`
-- `BILI_LEARNING_VAULT_ROOT`
-- `BILI_LEARNING_NOTES_SUBDIR`
-- `BILI_LEARNING_NOTES_ROOT` (legacy compatibility)
-- `BILI_LEARNING_YTDLP`
-- `BILI_LEARNING_COOKIE_FILE`
-- `BILI_LEARNING_WORKFLOW_MODE` (`light` / `strict`)
-
-See [Configuration](docs/CONFIGURATION.md) for the full behavior and precedence rules.
-
----
-
-## Run the environment check
-
-Before the first real conversion, run:
+### 4. Run doctor
 
 ```powershell
 python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py
 ```
 
-For structured output:
+Doctor checks Python, yt-dlp, Cookie-file presence, the Vault, CSS, taxonomy, and write permissions. It **does not read Cookie contents and does not access Bilibili**.
 
-```powershell
-python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py --json
-```
+### 5. Install Obsidian styling
 
-The doctor checks Python, taxonomy, note/runtime write access, Vault configuration, Obsidian CSS, yt-dlp, Cookie-file presence, and required project documents.
-
-It does **not** read Cookie contents and does **not** access Bilibili.
-
----
-
-## Obsidian styling
-
-This project uses the shared [Obsidian Learning Snippets](https://github.com/ZiYao00/obsidian-learning-snippets) repository. Its required Core and extension are declared in [`config/obsidian-style.json`](config/obsidian-style.json); this repository does not maintain duplicate CSS copies.
-
-Install the declared `learning-lab.css` and `video-note.css` files to:
+Follow [Obsidian Styling](docs/OBSIDIAN-STYLING.md) and install:
 
 ```text
-<vault_root>/.obsidian/snippets/
+learning-lab.css
+video-note.css
 ```
 
-Then enable both snippets in:
+into:
 
 ```text
-Obsidian → Settings → Appearance → CSS snippets
+.obsidian/snippets/
 ```
 
-`video-note.css` extends `learning-lab.css`, so both should be enabled.
+Then enable both snippets in Obsidian.
 
-See [Obsidian Styling](docs/OBSIDIAN-STYLING.md).
+### 6. Choose an Agent entry point
 
----
-
-## Agent entry points
-
-| Agent | Typical use | Adapter |
+| Agent | Typical use | Documentation |
 | --- | --- | --- |
-| Hermes | Send a Bilibili link from a private chat / phone workflow | `hermes-skills/bili-learning-automation/` |
-| WorkBuddy | Convert links inside a WorkBuddy session | `workbuddy-skills/bili-learning-automation/` |
-| Codex | Development, testing, and direct project maintenance | Read `AGENTS.md`, then follow the selected `workflow_mode` |
+| Hermes | Send links from a phone/private chat and process them on a computer | [Installation](docs/HERMES-SKILL-INSTALL.md) |
+| WorkBuddy | Convert links inside a WorkBuddy session | [Installation](docs/WORKBUDDY-SKILL-INSTALL.md) |
+| Codex | Development, testing, and direct project work | Read `AGENTS.md` first |
 
-These are thin adapters. The project intentionally keeps the content and validation rules in a shared core rather than maintaining separate implementations for each agent.
-
-### Model choice and observed test results
-
-This project does not require or bind users to any specific LLM. Different models share the same note structure, source boundaries, and `light` writing standard; the project does not maintain model-specific Markdown templates. Final note quality is strongly affected by long-context understanding, relationship reconstruction, factual fidelity, and writing quality.
-
-The table below summarizes observed results from the current fixed video samples and Agent environments. It is reference data only, not a mandatory recommendation or permanent ranking:
-
-| Test environment | Observed result | Main strengths / risks |
-| --- | --- | --- |
-| ChatGPT · GPT-5.6 Sol | Highest overall quality in the current samples | Strong knowledge relationships, experiment details, judgment, and reading organization. |
-| WorkBuddy · GLM-5.2 | High quality | Good coverage and relationship reconstruction; stable on long-form material. |
-| Claude client · Volcengine Ark `ark-code-latest` proxy | High quality | This run was close to the top tier; proxy backends may change, so reproducible tests should record the actual backend model. |
-| Hermes · Doubao-Seed-2.1-Turbo | Rich expansion | Higher risk of actively inferring uncertain proper nouns, numbers, or units; requires stricter review. |
-| Codex · Treea (Medium) | Generally reliable but compressed | Tends to retain major conclusions while compressing secondary relationships, experiments, and failure details. |
-
-Model versions, Agent hosts, proxy backends, and reasoning settings can all change the outcome. Users should retest against their own cost, speed, and quality requirements.
-
----
-
-## Daily usage
-
-After installation and configuration, send a supported agent either:
+### 7. Send a link
 
 ```text
 https://www.bilibili.com/video/BVxxxxxxxxxx/
@@ -231,70 +261,58 @@ or:
 BVxxxxxxxxxx
 ```
 
-The agent should handle collection, transcript preparation, source sufficiency checks, knowledge extraction, coverage review, finalization, and publication automatically.
+The normal path does not require manually selecting subtitles, filenames, or note destinations.
+
+See the full **[Quick Start](docs/QUICKSTART.md)** for detailed setup.
 
 ---
 
-## Long videos
+## Agents and models
 
-Long subtitles are prepared under the current runtime job:
+The project is **not tied to a specific LLM**. Agents are thin adapters; collector, transcript preparation, taxonomy, content rules, validation, and finalization live in the shared core.
 
-```text
-.runtime/bilibili-learning/<job>/agent-work/
-├── transcript-manifest.json
-└── transcript/
-    ├── transcript-01.txt
-    ├── transcript-02.txt
-    └── ...
-```
+Final note quality still depends on capabilities such as:
 
-Chunking preserves subtitle order and complete cue boundaries. It is a transport mechanism for the agent, not a semantic summary or keyword filter.
+- long-context understanding;
+- factual fidelity for parameters and proper nouns;
+- reconstructing relationships between multiple options;
+- preserving experimental evidence;
+- writing and information organization.
 
-Runtime files are temporary and are cleaned by the finalizer / failsafe path.
+The project has been tested across multiple Agent/LLM environments, including same-video A/B runs. The README intentionally does not maintain a permanent model ranking because model versions, proxy backends, pricing, and capabilities change. For benchmarks, use fixed BVIDs and the same project/Skill version.
 
 ---
 
-## Note output
+## Writing modes
 
-New notes are first published to:
-
-```text
-<notes_root>/00-待整理/
-```
-
-The primary reading order is:
+### `light` - default
 
 ```text
-Title / author · date · duration · BV ID
-→ Key takeaways
-→ Video resources
-   → Bilibili player
-   → Compact resource-access instructions when explicitly present
-   → Compact uploader-resource links
-   → Compact video overview + folded raw description
-→ Learning content
+read the full transcript
+→ source-sufficiency check
+→ write the note directly
+→ separate layout pass
+→ re-check transcript coverage
+→ finalizer
 ```
 
-The resource section is intentionally compact: there is no extra “Original video” heading, resource links are grouped, and the full uploader description remains folded. For dense encyclopedia-style videos, the agent first builds an atomic fact ledger before the final outline/body and must re-check the original transcript before marking coverage as passed, reducing semantic compression of values, member relationships, exceptions, and compatibility details.
+Best for normal daily use.
 
-After you have actually studied a note, the separate organization flow can shorten the title, add a one-line description, suggest a taxonomy category, move the file safely, and rebuild navigation.
+### `strict` - optional
 
----
+Adds:
 
-## Common statuses
+```text
+Fact Ledger
+→ knowledge_outline
+→ Semantic Draft
+→ Layout Plan
+→ Source Recheck
+```
 
-| Status | Meaning |
-| --- | --- |
-| `configuration_required` | No explicit Obsidian Vault has been bound yet; collection does not start |
-| `materials_ready` | Subtitle/description materials are prepared for the agent |
-| `in_progress` | An active job already exists for the same BV ID |
-| `subtitle_unavailable` | No usable Chinese subtitle was obtained |
-| `source_insufficient` | The available source is insufficient for a reliable learning note |
-| `note_ready` | Finalizer validation passed and the note was published |
-| `note_invalid` | The draft failed final validation |
-| `failed` | Configuration, collection, or runtime processing failed |
+Useful for auditing intermediate stages, debugging knowledge loss, or running quality regressions.
 
-`in_progress` is a concurrency safeguard, not a permanent deduplication rule. The same video can be converted again after the active job is finished.
+Most users should keep the default `light` mode.
 
 ---
 
@@ -302,66 +320,81 @@ After you have actually studied a note, the separate organization flow can short
 
 The following are ignored by Git by default:
 
-- Cookie files;
-- private notes;
-- `.runtime` jobs;
-- machine-local `config/local.json`;
-- archives and temporary materials;
-- virtual environments and test caches.
+```text
+key/                 # Cookie / local credentials
+config/local.json    # machine-specific paths
+notes/**             # private learning notes
+.runtime/            # temporary jobs
+.codex-backups/      # local backups
+archive/ materials/  # local materials
+```
 
-Do not paste Cookie contents into issues, logs, example configuration, or agent conversations.
+The public repository should only contain generic examples such as `config/local.json.example`.
 
-Do not manually remove active runtime jobs, reservations, or lock files, and do not bypass the finalizer to publish an unfinished draft.
+> Cookie files are credentials. Do not paste Cookie contents into README files, issues, pull requests, logs, or Agent conversations.
 
-See [Security](SECURITY.md).
+See [SECURITY.md](SECURITY.md).
+
+---
+
+## Common statuses
+
+| Status | Meaning |
+| --- | --- |
+| `configuration_required` | No real Obsidian Vault is bound, so collection does not start |
+| `materials_ready` | Subtitles, description, and metadata are ready |
+| `in_progress` | Another active job is processing the same BVID |
+| `subtitle_unavailable` | No usable Chinese subtitle was obtained |
+| `source_insufficient` | The current source is not sufficient for a reliable note |
+| `note_ready` | Finalizer validation passed and the note was published |
+| `note_invalid` | The draft failed final validation |
+| `failed` | Configuration, collection, or runtime processing failed |
+
+`in_progress` is only concurrency protection. The same BVID can be converted again after the active job ends.
+
+---
+
+## Documentation
+
+| Document | Purpose |
+| --- | --- |
+| [Quick Start](docs/QUICKSTART.md) | Complete the first conversion from scratch |
+| [Configuration](docs/CONFIGURATION.md) | Vault, Cookie, yt-dlp, and environment variables |
+| [Hermes Skill Installation](docs/HERMES-SKILL-INSTALL.md) | Hermes integration |
+| [WorkBuddy Skill Installation](docs/WORKBUDDY-SKILL-INSTALL.md) | WorkBuddy integration |
+| [Obsidian Styling](docs/OBSIDIAN-STYLING.md) | CSS installation and troubleshooting |
+| [Troubleshooting](docs/TROUBLESHOOTING.md) | Common failure states |
+| [Agent Integration Protocol](docs/AGENT-INTEGRATION.md) | New Agent/adaptor development |
+| [Architecture](docs/ARCHITECTURE.md) | collector → transcript → Agent → finalizer |
+| [Development](docs/DEVELOPMENT.md) | Tests, quality regressions, and maintenance |
+| [Release Checklist](docs/RELEASE-CHECKLIST.md) | Public release checks |
 
 ---
 
 ## Development and tests
 
 ```powershell
-python -m compileall -q src hermes-skills/bili-learning-automation/scripts
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[dev]"
 python -m ruff check .
 python -m pytest -q
 ```
 
 Public tests do not require a real Cookie and should not access a real Bilibili account.
 
-CI runs on Windows and Linux with Python 3.10 and 3.12.
-
-See [Development](docs/DEVELOPMENT.md).
-
 ---
 
-## Legacy path
+## Legacy
 
-`hermes-skills/bili-learning-automation/scripts/prepare_bilibili_learning.py` belongs to the older Chrome/CDP + `bili-note` + `web-access` workflow and is not the default entry point.
+The older Chrome/CDP + `bili-note` + `web-access` workflow is retained as historical compatibility material but is **not the default path**.
 
-New integrations should use the yt-dlp subtitle-first flow.
-
-See [Legacy](docs/LEGACY.md).
-
----
-
-## Documentation
-
-The detailed documentation is currently maintained in Chinese:
-
-- [Quick Start](docs/QUICKSTART.md)
-- [Configuration](docs/CONFIGURATION.md)
-- [Hermes Skill Installation](docs/HERMES-SKILL-INSTALL.md)
-- [WorkBuddy Skill Installation](docs/WORKBUDDY-SKILL-INSTALL.md)
-- [Obsidian Styling](docs/OBSIDIAN-STYLING.md)
-- [Troubleshooting](docs/TROUBLESHOOTING.md)
-- [Agent Integration Protocol](docs/AGENT-INTEGRATION.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Development](docs/DEVELOPMENT.md)
-- [v1.0 Release Checklist](docs/RELEASE-CHECKLIST.md)
+New integrations should use the yt-dlp subtitle-first pipeline. See [Legacy](docs/LEGACY.md).
 
 ---
 
 ## License
 
-This project is licensed under [PolyForm Noncommercial 1.0.0](LICENSE). Personal study, research, testing, hobby projects, and other noncommercial uses are permitted under the license; commercial use is outside the granted scope.
+This project uses [PolyForm Noncommercial 1.0.0](LICENSE).
 
-Third-party dependencies remain subject to their own licenses.
+Personal learning, research, testing, and other non-commercial use are allowed. Commercial use is outside the scope of the current license. Third-party dependencies remain subject to their own licenses.

@@ -41,13 +41,13 @@ WorkBuddy Skill 目录：
 
 ## 3. Windows 安装
 
-先在 PowerShell 进入你实际克隆的项目目录，例如：
+先在 PowerShell 进入你实际克隆的项目目录：
 
 ```powershell
-Set-Location 'G:\GitHub\bili-learning-automation'
+Set-Location '<repo-root>'
 ```
 
-这里的 `G:\GitHub\...` **只是示例**。项目可以放在任何目录；新版 WorkBuddy Skill 不再依赖这个绝对路径。
+将 `<repo-root>` 替换为你的实际路径。项目可以放在任何目录；新版 WorkBuddy Skill 不依赖固定绝对路径。
 
 然后：
 
@@ -106,9 +106,7 @@ $HOME/.workbuddy/skills/bili-learning-automation/scripts/bridge.ps1
 因此仓库无论位于：
 
 ```text
-C:\Users\...\GitHub\bili-learning-automation
-D:\AI\bili-learning-automation
-G:\GitHub\bili-learning-automation
+<repo-root>
 ```
 
 都不需要修改 SKILL.md。

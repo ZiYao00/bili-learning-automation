@@ -1,13 +1,13 @@
 # Changelog
 
-## [Unreleased]
+## [1.0.0] - 2026-08-23
 
 ### Documentation
 
 - 进入 v1.0 Feature Freeze：停止继续堆叠新功能，新增 `docs/RELEASE-CHECKLIST.md` 作为正式版发布门禁与 clean-room 验收清单。
 - 新增 `README.en.md` 英文项目说明，并在中英文 README 之间提供语言切换入口。
 - 统一 README 与 `LICENSE` 的授权口径，移除旧的“尚未选择发布许可证”残留说明。
-- 完成 v1.0 clean-room 发布验收：真实 Bilibili → yt-dlp → transcript → Agent → finalizer 链路通过，确认默认不下载媒体、重复视频不覆盖、无效草稿不发布、runtime 可清理；验收记录见 `docs/reports/2026-08-22-v1.0-release-acceptance.md`。
+- 记录 v1.0 clean-room 发布验收基线：真实 Bilibili → yt-dlp → transcript → Agent → finalizer 链路通过，确认默认不下载媒体、重复视频不覆盖、无效草稿不发布、runtime 可清理；验收记录见 `docs/reports/2026-08-22-v1.0-release-acceptance.md`。
 - 同步 `docs/ARCHITECTURE.md` 与 `AGENTS.md` 的现行发布口径，移除旧阅读顺序、1 小时 reservation 窗口和历史 pre-push handoff 的控制面残留。
 
 ### Added
@@ -31,7 +31,7 @@
 - `video-note.css` 升级为 v0.2：视频原标题只比正文略大、略粗，并收紧播放器、资源、简介与原始简介的纵向留白。
 - `organize` 同时兼容旧版 `### 视频简介` 和新版紧凑 `video-note-overview`；validator 同步校验新的阅读顺序。
 
-> 以上修复发生在早先 clean-room 基线验收之后，因此正式 v1.0 Release 前必须重新执行 clean-room / 真实 E2E；`pyproject.toml` 暂时继续保持当前开发版本。
+> 本版本的最终发布仍以同一提交的 clean-room / 真实 E2E 和 CI 结果为准。
 
 ## [0.1.1] - 2026-08-22
 
@@ -60,7 +60,7 @@
 
 - Obsidian 首次绑定流程：新增 `vault_root + notes_subdir` 配置模型、`configure-obsidian` 统一入口，以及 Vault / CSS doctor 检查；未显式配置时新采集返回 `configuration_required`，不再静默写入仓库 fallback。
 - yt-dlp 首次使用改为“只检测、不代安装”：默认通过 PATH 自动发现，缺失时 doctor/collector 返回 `winget install yt-dlp` 与官方安装入口；仓库和 Skill 不内置 `yt-dlp.exe`。
-- WorkBuddy 新增动态 `scripts/bridge.py`，通过安装 Junction 的真实位置解析项目根目录，移除本机 `G:\GitHub\...` 与固定 `.venv` 路径依赖。
+- WorkBuddy 新增动态 `scripts/bridge.py`，通过安装 Junction 的真实位置解析项目根目录，移除机器专属项目路径与固定 `.venv` 路径依赖。
 - `src/bili_learning` 核心 package，集中管理配置、输入解析、分类、模板、校验、导航和 doctor。
 - 原视频标题文件名 + 同名序号防覆盖规则；BVID 固定显示在 H1 下方，活动任务期间使用 reservation 防并发。
 - Bilibili 短链受控解析。

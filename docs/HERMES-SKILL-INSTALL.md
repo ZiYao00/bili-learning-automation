@@ -34,10 +34,10 @@ Hermes 默认从这里加载用户 Skill：
 
 ## 2. 确认项目目录
 
-以下示例假设项目位于：
+以下示例使用 `<repo-root>` 表示你实际克隆的项目根目录：
 
 ```text
-G:\GitHub\bili-learning-automation
+<repo-root>
 ```
 
 如果你的项目在其他位置，把路径替换成自己的即可。
@@ -45,7 +45,7 @@ G:\GitHub\bili-learning-automation
 先确认源目录存在：
 
 ```powershell
-Test-Path 'G:\GitHub\bili-learning-automation\hermes-skills\bili-learning-automation'
+Test-Path '<repo-root>\hermes-skills\bili-learning-automation'
 ```
 
 应该返回：
@@ -70,7 +70,7 @@ Get-Item $target -ErrorAction SilentlyContinue | Format-List FullName,LinkType,T
 可以直接创建 Junction：
 
 ```powershell
-$source = 'G:\GitHub\bili-learning-automation\hermes-skills\bili-learning-automation'
+$source = '<repo-root>\hermes-skills\bili-learning-automation'
 $target = "$env:LOCALAPPDATA\hermes\skills\bili-learning-automation"
 New-Item -ItemType Junction -Path $target -Target $source
 ```
@@ -90,7 +90,7 @@ Get-Item $target | Format-List FullName,LinkType,Target
 ```text
 FullName : C:\Users\<你>\AppData\Local\hermes\skills\bili-learning-automation
 LinkType : Junction
-Target   : {G:\GitHub\bili-learning-automation\hermes-skills\bili-learning-automation}
+Target   : {<repo-root>\hermes-skills\bili-learning-automation}
 ```
 
 如果它已经指向当前仓库，就不需要再安装。
@@ -311,7 +311,7 @@ Hermes 不自动安装，也不要把 `yt-dlp.exe` 复制到 Skill 或仓库。�
 推荐结构：
 
 ```text
-G:\GitHub\bili-learning-automation\
+<repo-root>\
 └── hermes-skills\bili-learning-automation\
     └── SKILL.md
 

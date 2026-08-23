@@ -13,10 +13,10 @@ feat/inbox-organize-flow
 本交接只针对：
 
 ```text
-G:\GitHub\bili-learning-automation
+<repo-root>
 ```
 
-`G:\GitHub\ComfyUI-Learning-Lab` 是另一个独立仓库，即使它当前也有未提交变化，也不要混入本次 commit / push。
+另一个本地独立仓库不属于本次提交范围，即使它当前也有未提交变化，也不要混入本次 commit / push。
 
 ## 本轮应形成的完整能力
 

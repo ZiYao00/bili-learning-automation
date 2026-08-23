@@ -72,7 +72,7 @@ Benchmark 重点比较：
 
 ## 提交前验收
 
-准备 commit / push 前，先复核当前 diff，确认没有把 Cookie、`.runtime`、私人笔记、测试抓取材料或本机路径提交进去，然后运行：
+准备 commit / push 前，先复核当前 diff，确认没有把 Cookie、`.runtime`、私人笔记、测试抓取材料、本机绝对路径或其它机器特征提交进去；同时确认 Git author / committer 邮箱是维护者愿意公开的地址。然后运行：
 
 ```powershell
 python -m compileall -q src hermes-skills/bili-learning-automation/scripts

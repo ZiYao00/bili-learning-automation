@@ -98,7 +98,7 @@ Netscape 格式 Bilibili Cookie 文件路径。这里只写路径，不要把 Co
 
 控制 Agent 的写作流程：
 
-- `light`：当前默认实验模式。完整读字幕后直接写笔记，内容完成再做一次排版优化；不创建 Fact Ledger、Semantic Draft 或 Layout Plan。
+- `light`：当前默认模式。完整读字幕后直接写笔记，内容完成再做一次排版优化；不创建 Fact Ledger、Semantic Draft 或 Layout Plan。
 - `strict`：保留此前的分阶段严格流程，用于需要可审计中间文件和阶段门禁的任务。
 
 推荐先使用：
@@ -303,6 +303,7 @@ notes_subdir
 notes_root      # 旧版兼容
 cookie_file
 taxonomy
+workflow_mode
 ```
 
 推荐新配置：
@@ -311,7 +312,8 @@ taxonomy
 {
   "vault_root": "D:\\Notes\\MyVault",
   "notes_subdir": "bilibili",
-  "cookie_file": "D:\\Private\\bilibili_cookies.txt"
+  "cookie_file": "D:\\Private\\bilibili_cookies.txt",
+  "workflow_mode": "light"
 }
 ```
 

@@ -231,7 +231,7 @@ def test_light_workflow_defines_semantic_quality_without_length_target() -> None
 
     assert "不要预设章节数量、文章字数、KB 大小或压缩比" in workflow
     assert "关系、选择条件、原因、实测证据、失败表现和作者判断" in workflow
-    assert "不要根据常识猜成一个看起来合理的答案" in workflow
+    assert "不得根据模型记忆静默修正为某个看起来合理的正式名称" in workflow
     assert "应显式保留冲突" in workflow
     assert "不要在正文末尾追加“来源提供的资源”" in workflow
 
@@ -240,8 +240,8 @@ def test_public_docs_keep_model_choice_neutral() -> None:
     readme = Path("README.md").read_text(encoding="utf-8")
     development = Path("docs/DEVELOPMENT.md").read_text(encoding="utf-8")
 
-    assert "本项目不绑定或强制使用任何特定 LLM" in readme
-    assert "仅用于提供选择参考，不构成强制要求或固定排名" in readme
+    assert "本项目**不绑定特定 LLM**" in readme
+    assert "README 不维护固定模型排名" in readme
     assert "项目不指定默认或必选 LLM" in development
     assert "当前真实回归测试的默认基准是" not in readme
     assert "当前默认基准为" not in development
