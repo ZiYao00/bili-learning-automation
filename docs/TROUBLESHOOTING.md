@@ -1,4 +1,6 @@
-# 故障排查
+# 疑难解答 / 故障排查
+
+> 文档类型：**疑难解答**。按“状态 / 症状 → 原因 → 处理方式”查找，不需要从头通读。
 
 遇到问题时，不建议一上来就删 `.runtime`、删锁文件或重装全部环境。
 
@@ -15,6 +17,20 @@ python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning
 ```
 
 doctor 不访问 Bilibili，也不读取 Cookie 内容。
+
+快速定位：
+
+| 你看到的问题 | 先看 |
+| --- | --- |
+| 返回 `configuration_required` / `in_progress` / `note_invalid` 等状态 | [第 1 节：状态表](#1-先看状态不要先猜原因) |
+| 找不到 yt-dlp | [第 3 节：未找到 yt-dlp](#3-未找到-yt-dlp) |
+| Cookie 不存在或登录态失效 | [第 4 节：Cookie 文件不存在](#4-cookie-文件不存在) |
+| 没有字幕 | [第 5 节：subtitle_unavailable](#5-subtitle_unavailable) |
+| Hermes 更新后仍像旧版本 | [第 8 节](#8-hermes-更新了-skill但好像还在使用旧版本) |
+| Hermes 只分析、不继续执行 | [第 9 节](#9-hermes-会分析但不继续执行) |
+| 长视频处理慢 | [第 10 节](#10-长视频读取很慢) |
+| Obsidian 有内容但没样式 | [第 11 节](#11-obsidian-笔记有内容但没有样式) |
+| `organize` 失败 | [第 13 节](#13-organize-失败) |
 
 ---
 
