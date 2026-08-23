@@ -26,11 +26,11 @@ v1.0.0 is ready when all of the following are true:
 - [x] Ruff passes in the existing project virtual environment.
 - [x] Public pytest suite passes.
 - [x] Source, Hermes, and WorkBuddy compatibility scripts compile successfully.
-- [ ] Fresh-install / clean-room walkthrough must be rerun after the 2026-08-22 dense-note extraction and compact-template corrections. The earlier baseline acceptance is retained in `docs/reports/2026-08-22-v1.0-release-acceptance.md`, but it no longer represents the exact release candidate.
+- [x] Fresh-install / clean-room walkthrough rerun after the 2026-08-22 dense-note extraction and compact-template corrections; see `docs/reports/2026-08-23-v1.0-cleanroom-acceptance.md`.
 - [x] `pyproject.toml` version is changed from the current development version to `1.0.0` immediately before release.
-- [ ] Changelog receives the final `1.0.0` release entry/date.
-- [ ] Final diff review confirms no local credentials, private notes, runtime jobs, captured test materials, or machine-specific configuration are staged.
-- [ ] Public tracked documentation contains no maintainer-specific absolute paths, Vault/backup locations, private identifiers, or machine-only examples; generic placeholders are used instead.
+- [x] Changelog contains the final `1.0.0` release entry/date.
+- [x] Final diff review confirms no local credentials, private notes, runtime jobs, captured test materials, or machine-specific configuration are staged.
+- [x] Public tracked documentation contains no maintainer-specific absolute paths, Vault/backup locations, private identifiers, or machine-only examples; generic placeholders are used instead.
 - [ ] Git author/committer identity for the release commit uses an email address the maintainer intentionally wants to expose publicly (for privacy, prefer a GitHub `noreply` address when appropriate).
 - [x] Older public commits that contained an unintended private email were separately reviewed and rewritten before this release candidate; the public refs were revalidated before promotion.
 - [ ] CI is green on the exact commit selected for the release tag.

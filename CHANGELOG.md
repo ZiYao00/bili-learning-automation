@@ -31,7 +31,7 @@
 - `video-note.css` 升级为 v0.2：视频原标题只比正文略大、略粗，并收紧播放器、资源、简介与原始简介的纵向留白。
 - `organize` 同时兼容旧版 `### 视频简介` 和新版紧凑 `video-note-overview`；validator 同步校验新的阅读顺序。
 
-> 本版本的最终发布仍以同一提交的 clean-room / 真实 E2E 和 CI 结果为准。
+> 最终 clean-room / 真实 E2E 结果见 `docs/reports/2026-08-23-v1.0-cleanroom-acceptance.md`；CI 以最终 Release tag 指向的提交为准。
 
 ## [0.1.1] - 2026-08-22
 
