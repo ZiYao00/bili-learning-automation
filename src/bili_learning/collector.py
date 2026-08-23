@@ -14,6 +14,7 @@ from .resource_access import detect_resource_access_notices
 from .runtime import cleanup_job, waiting_file_lock
 from .taxonomy import classify
 from .transcript import prepare_agent_transcript
+from .workflow import write_agent_work_templates
 
 MEDIA_SUFFIXES = {".mp3", ".m4a", ".wav", ".mp4", ".webm", ".flv", ".m4s", ".part"}
 STALE_SECONDS = 2 * 60 * 60
@@ -169,6 +170,7 @@ def create_job(
         analysis_path = job_dir / "analysis.json"
         agent_work_dir = job_dir / "agent-work"
         agent_work_dir.mkdir(parents=True, exist_ok=True)
+        workflow_paths = write_agent_work_templates(agent_work_dir)
         transcript = prepare_agent_transcript(subtitle, agent_work_dir)
         resource_access_notices = detect_resource_access_notices(description, subtitle)
         payload: dict[str, Any] = {
@@ -191,6 +193,7 @@ def create_job(
             "draft_path": str(draft_path),
             "analysis_path": str(analysis_path),
             "agent_work_dir": str(agent_work_dir),
+            **workflow_paths,
             "transcript_manifest_path": transcript["manifest_path"],
             "transcript_mode": transcript["mode"],
             "transcript_chunk_count": transcript["chunk_count"],
@@ -210,12 +213,12 @@ def write_handoff(job_dir: Path, payload: dict[str, Any]) -> Path:
     handoff = job_dir / "agent_handoff.md"
     handoff.write_text(
         "# B站视频转笔记任务\n\n"
-        "1. 先读取 `job.json`、`transcript_manifest_path`、`agent_work_dir` 与共享内容标准。manifest 的 `chunks` 已按 cue 完整边界生成；`direct` 读取唯一 transcript，`chunked` 按 manifest 顺序逐块阅读，不要再把原始 SRT 整份塞入上下文。允许在 `agent_work_dir` 继续创建逐块知识摘录、索引或中间梳理文件。\n"
+        "1. 先读取 `job.json`、`transcript_manifest_path`、`agent_work_dir`、`fact_ledger_path`、`semantic_draft_path`、`layout_plan_path` 与共享内容标准；知识密集型任务还必须读取 `docs/standards/KNOWLEDGE-DENSE-WORKFLOW.md`。manifest 的 `chunks` 已按 cue 完整边界生成；`direct` 读取唯一 transcript，`chunked` 按 manifest 顺序逐块阅读，不要再把原始 SRT 整份塞入上下文。\n"
         "2. 先判断字幕与简介是否足以支撑可信学习笔记，并填写 runtime 的 `analysis_path`。来源不足时不要编造正文。\n"
-        "3. 来源充分时先做知识提取，再写正文。普通视频可直接形成 `knowledge_outline`；长视频、百科型、参数密集或全程干货内容，必须先按 transcript chunk / 自然主题在 `agent_work_dir` 建立事实清单，再合并成 `knowledge_outline`。事实清单尽量使用原子条目，显式保留具体成员、数值/上下限、A/B 关系、来源/继承关系、适用条件、例外、冲突、兼容性与作者评价；不要在这一阶段把多个具体事实压成“某类方案/若干成员/注意兼容性”这样的主题概括。不要改 Frontmatter、H1、视频资料、资源获取提示、iframe、文件名、路径、tags、cssclasses 或 marker。核心已从简介/字幕保守识别三连、充电、评论关键词等条件资料；若资料本体不在来源中，Agent 不得自行补写。\n"
-        "4. 只填写两个 AI 区域：短的“先看结论”和根据视频内容动态组织的知识正文；不要强制套用步骤、坑点或实践清单。正文可以压缩表达，但不能压缩事实关系：如果视频明确给出成员之间的来源、兼容、步数、限制或推荐差异，正文必须保留这些关系，而不是只留下名称列表。按共享标准根据知识关系选择 Table / Grid / Card / Risk / Resource / Chip，不为了好看强行卡片化。Grid 内的 Card 必须使用嵌套 Markdown：外层 `> [!grid-3]`，子卡片必须以 `> > [!card]` 开始，不能写成单层 `> [!card]`。\n"
-        "5. 正文只使用字幕或原始简介支持的事实。参数、公式、限制、专名、比较、作者明确推荐、兼容性、资源等高价值信息不能仅为缩短篇幅而删除；有检索价值的同类成员和“原则 + 可直接使用值”也要避免二次压缩。Learning Lab 或外部检索得到的扩展知识不属于本任务来源，除非用户明确提供并要求加入。\n"
-        "6. 成稿后必须重新按 manifest 顺序抽查/复读原 transcript，而不是只对照自己生成的 `knowledge_outline`。知识密集型内容应同时对照事实清单与正文，重点检查：成员是否只剩类别、关系是否只剩名称、原则是否丢了可直接使用值、默认值是否丢了例外、比较是否只保留一边。发现遗漏先修正文，再将 `coverage_review.status` 设为 `passed` 并填写 notes。\n"
+        "3. 长视频、百科型、参数密集或实测证据多的内容，必须先完成 `fact_ledger_path`：按 manifest 顺序记录原子事实，显式保留具体成员、数值/上下限、版本、A/B 关系、来源/继承、适用条件、例外、冲突、兼容性、作者评价，以及“配置 → 耗时 / 质量 / 失败表现”的证据链。`knowledge_outline` 只是 Fact Ledger 的上层索引，不是事实清单或最终目录；不得先压成几个主题名。普通短视频可将 Fact Ledger 的 `workflow_status` 标记为 `not_applicable`，但必须填写 `workflow_reason`；其余情况完成后标记为 `complete`。仍不得用模型常识补全。\n"
+        "4. Fact Ledger 完成后，先在 `semantic_draft_path` 写内容完成稿；本阶段不要编辑最终 `draft_path`。Semantic Draft 先用普通 Markdown 自然聚类事实，不为卡片数量或页面简洁删知识；章节数量只改变事实如何分组，不改变事实保留预算。一个 H2 可以通过 H3、表格和列表承载很多事实。内容稿完成后把 Semantic Draft 的 `workflow_status` 标记为 `complete`。不要改 Frontmatter、H1、播放器与来源区、资源获取提示、iframe、文件名、路径、tags、cssclasses 或 marker。\n"
+        "5. Semantic Draft 内容完成后才进入 `layout_plan_path` 与 Layout Pass：只把现有关系转换成 Table / Grid / Card / Risk / Meta / Resource / Chip / Metric，不重新摘要或选择事实。整页只保留一个最高优先级 Summary；Grid 内 Card 必须使用嵌套 `> > [!card]`。排版计划完成并确认事实无损后，把 Layout Plan 的 `workflow_status` 标记为 `complete`，再把短结论与完整正文写入 `draft_path` 的两个 AI 区域。正文仍只能使用字幕或原始简介支持的事实；外部知识除非用户明确要求，否则不得并入。\n"
+        "6. 最终排版后重新按 manifest 顺序抽查/复读原 transcript，并同时对照 Fact Ledger、Semantic Draft 与最终正文。重点检查：章节减少时事实是否也被误删；成员是否只剩类别；关系是否只剩名称；原则是否丢了可直接使用值；推荐区间是否丢了例外；实测是否还保留配置、耗时与结果；Layout Pass 前后的事实是否一致。发现遗漏先修正文，再将 `coverage_review.status` 设为 `passed` 并填写 notes。\n"
         "7. 写完立即运行 finalizer；无论成功或失败都必须 finalizer 清理 job。\n",
         encoding="utf-8",
     )

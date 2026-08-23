@@ -10,8 +10,17 @@
 - 完成 v1.0 clean-room 发布验收：真实 Bilibili → yt-dlp → transcript → Agent → finalizer 链路通过，确认默认不下载媒体、重复视频不覆盖、无效草稿不发布、runtime 可清理；验收记录见 `docs/reports/2026-08-22-v1.0-release-acceptance.md`。
 - 同步 `docs/ARCHITECTURE.md` 与 `AGENTS.md` 的现行发布口径，移除旧阅读顺序、1 小时 reservation 窗口和历史 pre-push handoff 的控制面残留。
 
+### Added
+
+- collector 为每个任务创建 runtime-only 的 `fact-ledger.md`、`semantic-draft.md` 与 `layout-plan.md`，并在 job / `materials_ready` 中返回对应路径，用于分离事实保全、内容成稿与视觉排版；继续沿用 `analysis.json schema_version: 1`。
+- 新增 `docs/standards/KNOWLEDGE-DENSE-WORKFLOW.md`，固化知识密集型视频的 `Fact Ledger → Semantic Draft → Layout Pass → Source Recheck` 工作流。
+
 ### Changed
 
+- 知识密集型笔记改为分阶段生成：章节数量只决定事实分组，不改变事实保留预算；Semantic Draft 完成后才进行 Layout Pass，排版不得再次摘要、重新选择或删除事实；最终 coverage review 同时对照原 transcript、Fact Ledger、Semantic Draft 与正式正文。
+- finalizer 通过 runtime 工作文件的 `workflow_status` 与最小内容检查，拒绝跳过 Fact Ledger / Semantic Draft / Layout Pass 的新任务；短且简单的视频可将 Fact Ledger 标记为 `not_applicable`，但必须说明原因。旧 job 不含新字段时保持兼容。
+- validator 现在拒绝同一视频笔记出现多个最高优先级 Summary，并阻止三份 runtime 工作文件名泄漏到正式笔记。
+- 去除知识正文的固定章节偏置：`knowledge_outline` 明确只做事实保护，不与最终 H2 一一对应；写正文前先按共同对象、因果、流程、比较、前提和使用场景自然聚类，不预设章节数量；完整“五段式”百科示例改为互不相同的结构片段库。
 - 知识密集型/百科型视频新增“原子事实清单 → knowledge_outline → 正文”的语义保护流程；coverage review 必须重新回到原 transcript，避免同一个 Agent 只对照自己生成的 outline 而遗漏成员关系、具体值、例外和兼容性。
 - 视频资料提前到“先看结论”之后、知识正文之前；移除“原视频”三级标题，播放器改为单行结构，UP 主资源与视频简介改为紧凑展示，条件资料提示同步压缩。
 - `video-note.css` 升级为 v0.2：视频原标题只比正文略大、略粗，并收紧播放器、资源、简介与原始简介的纵向留白。

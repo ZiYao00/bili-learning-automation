@@ -55,6 +55,7 @@ from bili_learning.runtime import (
 from bili_learning.taxonomy import classify
 from bili_learning.transcript import prepare_agent_transcript
 from bili_learning.validator import validate_note
+from bili_learning.workflow import validate_agent_workflow, write_agent_work_templates
 
 
 @pytest.fixture
@@ -200,11 +201,15 @@ def test_agent_handoff_protects_dense_note_fact_relationships(tmp_path: Path) ->
     job_dir.mkdir()
     handoff = write_handoff(job_dir, {})
     text = handoff.read_text(encoding="utf-8")
-    assert "建立事实清单" in text
-    assert "不能压缩事实关系" in text
+    assert "fact_ledger_path" in text
+    assert "semantic_draft_path" in text
+    assert "layout_plan_path" in text
+    assert "Fact Ledger" in text
+    assert "章节数量只改变事实如何分组" in text
+    assert "Layout Pass" in text
+    assert "一个最高优先级 Summary" in text
     assert "重新按 manifest 顺序抽查/复读原 transcript" in text
-    assert "而不是只对照自己生成的 `knowledge_outline`" in text
-    assert "Learning Lab 或外部检索得到的扩展知识不属于本任务来源" in text
+    assert "配置、耗时与结果" in text
 
 
 def test_description_renders_compact_resources_and_preserves_raw_source() -> None:
@@ -499,6 +504,61 @@ def _write_passed_analysis(path: Path) -> None:
     )
 
 
+def _complete_agent_workflow(payload: dict[str, object]) -> None:
+    fact_ledger = Path(str(payload["fact_ledger_path"]))
+    fact_text = fact_ledger.read_text(encoding="utf-8")
+    fact_text = fact_text.replace("workflow_status: pending", "workflow_status: complete", 1)
+    fact_text = fact_text.replace(
+        "| F001 |  |  |  | pending |",
+        "| F001 | transcript-01 / 00:00:00 | 核心知识与关键限制。 | 来源充分，正文需保留。 | 正文已保留 |",
+        1,
+    )
+    fact_ledger.write_text(fact_text, encoding="utf-8")
+
+    semantic_draft = Path(str(payload["semantic_draft_path"]))
+    semantic_text = semantic_draft.read_text(encoding="utf-8")
+    semantic_text = semantic_text.replace("workflow_status: pending", "workflow_status: complete", 1)
+    semantic_text += "\n## 核心知识\n\n这是根据字幕完成的语义内容稿，保留关键参数、限制、比较关系与使用条件。\n"
+    semantic_draft.write_text(semantic_text, encoding="utf-8")
+
+    layout_plan = Path(str(payload["layout_plan_path"]))
+    layout_text = layout_plan.read_text(encoding="utf-8")
+    layout_text = layout_text.replace("workflow_status: pending", "workflow_status: complete", 1)
+    layout_text = layout_text.replace(
+        "|  |  |  | pending |",
+        "| 核心知识 | 普通标题与列表 | 没有需要强制卡片化的并列关系 | passed |",
+        1,
+    )
+    layout_plan.write_text(layout_text, encoding="utf-8")
+
+
+def test_agent_workflow_stage_gate_requires_completed_runtime_files(tmp_path: Path) -> None:
+    agent_work_dir = tmp_path / "agent-work"
+    paths = write_agent_work_templates(agent_work_dir)
+    payload: dict[str, object] = {"agent_work_dir": str(agent_work_dir), **paths}
+
+    pending_errors = validate_agent_workflow(payload)
+    assert sum("尚未完成" in error for error in pending_errors) == 3
+
+    _complete_agent_workflow(payload)
+    assert validate_agent_workflow(payload) == []
+
+
+def test_agent_workflow_allows_simple_video_to_skip_fact_ledger_with_reason(tmp_path: Path) -> None:
+    agent_work_dir = tmp_path / "agent-work"
+    paths = write_agent_work_templates(agent_work_dir)
+    payload: dict[str, object] = {"agent_work_dir": str(agent_work_dir), **paths}
+    _complete_agent_workflow(payload)
+
+    fact_ledger = Path(str(payload["fact_ledger_path"]))
+    fact_text = fact_ledger.read_text(encoding="utf-8")
+    fact_text = fact_text.replace("workflow_status: complete", "workflow_status: not_applicable", 1)
+    fact_text = fact_text.replace('workflow_reason: ""', 'workflow_reason: "短视频只有一个简单观点，无需独立事实账本。"', 1)
+    fact_ledger.write_text(fact_text, encoding="utf-8")
+
+    assert validate_agent_workflow(payload) == []
+
+
 def test_dense_note_standard_keeps_execution_and_empirical_evidence() -> None:
     guide = (Path(__file__).parents[1] / "docs" / "standards" / "CODEX-VIDEO-NOTE-GUIDE.md").read_text(
         encoding="utf-8"
@@ -511,6 +571,33 @@ def test_dense_note_standard_keeps_execution_and_empirical_evidence() -> None:
         assert "配置 → 耗时" in text
     assert "960×544" in guide
     assert "84 秒" in guide
+
+
+def test_note_standard_prevents_fixed_section_templates() -> None:
+    root = Path(__file__).parents[1]
+    guide = (root / "docs" / "standards" / "CODEX-VIDEO-NOTE-GUIDE.md").read_text(encoding="utf-8")
+    integration = (root / "docs" / "AGENT-INTEGRATION.md").read_text(encoding="utf-8")
+    example = (root / "docs" / "standards" / "STANDARD-VIDEO-NOTE-EXAMPLE.md").read_text(encoding="utf-8")
+    dense_workflow = (root / "docs" / "standards" / "KNOWLEDGE-DENSE-WORKFLOW.md").read_text(encoding="utf-8")
+
+    assert "不存在一一对应关系" in guide
+    assert "没有“目标章节数量”" in guide
+    assert "自然聚类" in guide
+    assert "章节数量只决定事实如何分组" in integration
+    assert "结构片段库（不是目录模板）" in example
+    assert "## 01 · 核心规格" not in example
+    assert "## 05 · 提示词结构" not in example
+    assert "Fact Ledger" in guide
+    assert "Semantic Draft" in guide
+    assert "不得改变事实保留预算" in guide
+    assert "Layout Pass" in guide
+    assert "fact_ledger_path" in integration
+    assert "semantic_draft_path" in integration
+    assert "layout_plan_path" in integration
+    assert "少章节不等于少知识" in example
+    assert "Source Assessment" in dense_workflow
+    assert "Layout Pass" in dense_workflow
+    assert "第二次摘要" in dense_workflow
 
 
 def test_validator_checks_real_metadata_and_markers(tmp_path: Path) -> None:
@@ -537,6 +624,30 @@ def test_validator_checks_real_metadata_and_markers(tmp_path: Path) -> None:
         note.read_text(encoding="utf-8").replace('author: "UP"', 'author: "OTHER"'), encoding="utf-8"
     )
     assert any("author" in error for error in validate_note(note, job))
+
+
+def test_validator_rejects_multiple_summary_callouts(tmp_path: Path) -> None:
+    note = tmp_path / "重复总结.md"
+    analysis = tmp_path / "analysis.json"
+    job = {
+        "schema_version": 1,
+        "bvid": "BV1TXua68EYi",
+        "canonical_url": "https://www.bilibili.com/video/BV1TXua68EYi/",
+        "author": "UP",
+        "published": "2026-08-11",
+        "duration": "07:05",
+        "description": "原始简介",
+        "description_status": "present",
+        "canonical_title": "重复总结",
+        "note_filename": note.name,
+        "required_tags": ["视频生成"],
+        "note_path": str(note),
+        "analysis_path": str(analysis),
+    }
+    _write_passed_analysis(analysis)
+    base = _complete_ai_regions(render_note_skeleton(job))
+    note.write_text(base + "\n> [!summary] 第二个总结\n> 不应出现。\n", encoding="utf-8")
+    assert any("只允许一个最高优先级 Summary" in error for error in validate_note(note, job))
 
 
 def test_validator_rejects_a_card_without_grid_nesting(tmp_path: Path) -> None:
@@ -567,6 +678,9 @@ def test_validator_rejects_a_card_without_grid_nesting(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     assert validate_note(note, job) == []
+
+    note.write_text(base + "\n详见 fact-ledger.md。\n", encoding="utf-8")
+    assert any("fact-ledger.md" in error for error in validate_note(note, job))
 
 
 def test_validator_rejects_unfinished_quality_review(tmp_path: Path) -> None:
@@ -683,6 +797,15 @@ def test_create_job_writes_runtime_draft_without_publishing_note(tmp_path: Path,
     agent_work_dir = Path(payload["agent_work_dir"])
     assert agent_work_dir.parent == job_dir
     assert agent_work_dir.is_dir()
+    fact_ledger_path = Path(payload["fact_ledger_path"])
+    semantic_draft_path = Path(payload["semantic_draft_path"])
+    layout_plan_path = Path(payload["layout_plan_path"])
+    for runtime_path in (fact_ledger_path, semantic_draft_path, layout_plan_path):
+        assert runtime_path.parent == agent_work_dir
+        assert runtime_path.is_file()
+    assert "原子事实" in fact_ledger_path.read_text(encoding="utf-8")
+    assert "章节数量只决定事实如何分组" in semantic_draft_path.read_text(encoding="utf-8")
+    assert "排版只转换完整内容的表达形式" in layout_plan_path.read_text(encoding="utf-8")
     manifest_path = Path(payload["transcript_manifest_path"])
     assert manifest_path.parent == agent_work_dir
     assert payload["transcript_mode"] == "direct"
@@ -897,6 +1020,9 @@ def test_prepare_allows_a_new_note_for_an_existing_source(
     assert payload["transcript_mode"] == "direct"
     assert payload["transcript_chunk_count"] == 1
     assert Path(payload["transcript_manifest_path"]).is_file()
+    assert Path(payload["fact_ledger_path"]).is_file()
+    assert Path(payload["semantic_draft_path"]).is_file()
+    assert Path(payload["layout_plan_path"]).is_file()
 
 
 def _write_e2e_config(project_root: Path, taxonomy: dict) -> None:
@@ -938,6 +1064,7 @@ def test_e2e_draft_publish_navigation_and_repeated_video(
 
     draft.write_text(_complete_ai_regions(draft.read_text(encoding="utf-8")), encoding="utf-8")
     _write_passed_analysis(Path(first["analysis_path"]))
+    _complete_agent_workflow(first)
     completed, code = finalize_note(tmp_path, Path(first["job_dir"]), draft)
     assert code == 0 and completed["status"] == "note_ready"
     assert target.is_file()
@@ -960,6 +1087,7 @@ def test_finalize_reports_failure_when_cleanup_fails(tmp_path: Path, taxonomy: d
     draft = Path(prepared["draft_path"])
     draft.write_text(_complete_ai_regions(draft.read_text(encoding="utf-8")), encoding="utf-8")
     _write_passed_analysis(Path(prepared["analysis_path"]))
+    _complete_agent_workflow(prepared)
     monkeypatch.setattr(
         "bili_learning.lifecycle.cleanup_job",
         lambda *_args: (_ for _ in ()).throw(PermissionError("WinError 32")),
@@ -988,6 +1116,7 @@ def test_e2e_unfinished_draft_never_enters_navigation_and_invalid_draft_is_not_p
     finished_draft = Path(finished["draft_path"])
     finished_draft.write_text(_complete_ai_regions(finished_draft.read_text(encoding="utf-8")), encoding="utf-8")
     _write_passed_analysis(Path(finished["analysis_path"]))
+    _complete_agent_workflow(finished)
     completed, code = finalize_note(tmp_path, Path(finished["job_dir"]), finished_draft)
     assert code == 0 and completed["status"] == "note_ready"
     nav_text = (tmp_path / "notes" / "bilibili" / "99-导航" / "00-待整理.md").read_text(encoding="utf-8")

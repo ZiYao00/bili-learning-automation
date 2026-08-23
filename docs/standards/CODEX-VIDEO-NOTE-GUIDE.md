@@ -22,15 +22,18 @@
 - tags；
 - 文件路径和文件名；
 - runtime 草稿中的 AI marker；
-- runtime `analysis.json` 的基础结构。
+- runtime `analysis.json` 的基础结构；
+- runtime `fact-ledger.md`、`semantic-draft.md`、`layout-plan.md` 脚手架及其路径。
 
 ### 智能体负责
 
 1. 判断字幕与简介是否足以支撑可信学习笔记；
-2. 来源充分时形成 `knowledge_outline`；
-3. 填写短的“先看结论”；
-4. 根据视频实际信息结构组织知识正文；
-5. 成稿后做覆盖复核，并完成 `coverage_review`。
+2. 知识密集型内容完成 Fact Ledger，再形成 `knowledge_outline`；
+3. 在 Semantic Draft 中先完成知识内容；
+4. 内容完成后独立执行 Layout Pass；
+5. 填写短的“先看结论”和完整动态知识正文；
+6. 最终排版后回到 transcript 做 Source Recheck；
+7. 完成 `coverage_review`。
 
 不要重新生成整篇 Markdown，也不要改动程序确定性部分。
 
@@ -83,18 +86,28 @@
 
 也不要机械保留所有数字。广告价格、活动优惠、与学习目标无关的口播数据等是否进入正文，由智能体根据长期参考价值判断。
 
-## 知识清单
+## Fact Ledger 与知识索引
 
-来源充分后，先在 runtime `analysis.json` 的 `knowledge_outline` 中列出应保护的知识点，再写正文。
+来源充分后，知识密集型内容先完成 runtime 的 `fact-ledger.md`，再填写 `analysis.json` 的 `knowledge_outline`。
 
-它不是最终文章目录，也不是知识图谱。作用只是：
+Fact Ledger 是具体事实与关系的保全层；`knowledge_outline` 只是上层索引，不是事实清单、最终文章目录或知识图谱，条目与最终 H2 **不存在一一对应关系**。它们的作用是：
 
 - 防止长字幕前半部分的重要信息在写作阶段被遗忘；
 - 给成稿后的覆盖复核提供检查基线。
 
-短且简单的视频可以只有少量条目。长视频或百科型视频应更完整。
+短且简单的视频可以简化 Fact Ledger；长视频、百科型、参数密集或实测证据多的内容应完整使用。
 
-对于百科型、参数密集或全程干货视频，`knowledge_outline` 不应只写“模型选择 / 提示词 / 加速方案”这类主题名。先在 `agent_work_dir` 按 transcript chunk 或自然主题建立事实清单，再合并成 outline；事实条目尽量保持原子化，显式记录具体成员、数值/上下限、A/B 关系、来源/继承关系、适用条件、例外、冲突、兼容性和作者明确评价。若视频讲解了实际落地，还要记录运行路线、版本/插件安装条件、组件职责，以及“配置 → 耗时 / 质量结果”的实测关系。**可以压缩表达，不要在知识提取阶段压缩事实关系或证据链。**
+Fact Ledger 应按 transcript chunk 或自然主题记录原子事实，显式保留具体成员、数值/上下限、版本、A/B 关系、来源/继承、适用条件、例外、冲突、兼容性和作者评价。若视频讲解了实际落地，还要记录运行入口、版本/插件安装条件、组件职责，以及“配置 → 耗时 / 质量结果 / 失败表现”的证据链。“模型选择 / 提示词 / 加速方案”只是主题标签，不能代替事实。**可以压缩表达，不要在知识提取阶段压缩事实关系或证据链。**
+
+新任务的三份工作文件必须按 `KNOWLEDGE-DENSE-WORKFLOW.md` 更新 `workflow_status`：知识密集型 Fact Ledger、Semantic Draft、Layout Plan 均应为 `complete`；短且简单的视频仅 Fact Ledger 可标记为 `not_applicable`，并必须填写 `workflow_reason`。状态仍为 `pending`、文件为空模板或路径越界时，finalizer 拒绝发布。
+
+## Semantic Draft：先完成内容，再形成最终正文
+
+Fact Ledger 完成后，先在 runtime `semantic-draft.md` 写内容完成稿。观察原子事实之间的**共同对象、因果链、操作流程、比较关系、前置条件、例外与使用场景**，再做自然聚类。只有形成稳定语义组的内容才升级为 H2；一个 H2 可以吸收多个事实与 outline 条目，并通过 H3、表格和列表继续承载细节。
+
+没有“目标章节数量”。章节数量只决定事实如何分组，**不得改变事实保留预算**。不得因为同属 H3、模型百科、节点更新或知识密集型内容，就预设 3 / 4 / 5 个章节；也不得为了凑齐章节数量拆开一个自然主题，或因为减少 H2 就同步删掉参数、成员、关系与实测证据。章节标题、数量和长短应能从当前视频的信息关系本身解释出来，而不是从示例或上一份笔记推导出来。
+
+`STANDARD-VIDEO-NOTE-EXAMPLE.md` 只提供局部语法与关系表达，不提供可复制的章节集合或组件组合。知识密集型完整流程见 `KNOWLEDGE-DENSE-WORKFLOW.md`。
 
 ## 长字幕处理
 
@@ -130,6 +143,8 @@
 格式应服务信息，而不是让所有视频看起来像同一个模板。
 
 ## 视觉与版式决策
+
+只有 `semantic-draft.md` 内容完成后，才进入 runtime `layout-plan.md` 与 Layout Pass。Layout Pass 只能把已经完整的内容转换成更合适的表达形式，不能承担第二次摘要、重新选择事实或为了页面整齐删减信息。排版前后的高价值事实必须一一对应。
 
 视频学习笔记复用 ComfyUI Learning Lab Design System 的语义组件。Agent 只负责在 Markdown 中选择合适的表达，CSS 负责视觉表现；关闭 CSS 后正文仍必须可读。
 
@@ -174,7 +189,7 @@
 
 ## 覆盖复核
 
-成稿后必须重新按 manifest 顺序抽查或复读原 transcript；`knowledge_outline` 只能作为辅助清单，不能代替回看原字幕。知识密集型视频还应同时对照 `agent_work_dir` 中的事实清单。至少检查：
+最终排版后必须重新按 manifest 顺序抽查或复读原 transcript；`knowledge_outline` 只能作为辅助索引，不能代替回看原字幕。知识密集型视频还应同时对照 `fact-ledger.md`、`semantic-draft.md` 与最终正文。至少检查：
 
 - 重要参数、公式、限制、比较、方法是否进入正文；
 - 同类成员是否只剩一个类别名，或只留下名称却丢了来源、继承、步数、兼容性等关系；
@@ -182,6 +197,8 @@
 - 原则性结论是否把视频给出的可直接使用值一起压掉；
 - 默认值后面的例外条件是否丢失；
 - 多个方案是否被错误合并；
+- H2 数量减少时，参数、成员、关系和实测证据是否也被同步压掉；
+- Layout Pass 前后的高价值事实是否一一对应，是否为了卡片数量或页面简洁重新摘要；
 - 运行入口、版本/安装前提和关键组件职责是否因被误当作背景口播而删除；
 - 实测案例是否只剩“更快 / 更慢、质量更好 / 更差”的概括，而丢失可判断取舍的条件与结果；
 - 是否为了“简洁”删掉高价值具体知识；
@@ -228,7 +245,8 @@ UP 主原始简介是硬性核心数据。智能体不得用 AI 摘要替代、�
 - `job.json`；
 - `analysis.json`；
 - `agent_handoff.md`；
-- 内部证据编号；
+- `fact-ledger.md`、`semantic-draft.md`、`layout-plan.md` 等 runtime 工作文件名；
+- Fact ID、内部证据编号或工作状态；
 - Cookie；
 - 抓取日志和采集状态。
 

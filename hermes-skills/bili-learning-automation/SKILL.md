@@ -32,16 +32,18 @@ description: Turn a Bilibili copied link, supported Bilibili short link, or BV i
    - 其它 `failed`：回复短错误，不声称完成。
    - `materials_ready`，或满足上述“可续做中断任务”条件的 `in_progress`，才继续。
 
-3. 进入可处理状态后读取 `handoff_path`（新任务）或绑定 job 内的 `job.json`（续做任务），再读取 `analysis_path`、`agent_work_dir` 与 `transcript_manifest_path`，并遵循项目共享的 `docs\\AGENT-INTEGRATION.md` 与内容标准。程序已把原始 SRT 无语义删减地整理成适合 Agent 阅读的 transcript：manifest 为 `direct` 时读取唯一 chunk；为 `chunked` 时严格按 `chunks` 顺序逐块阅读。单个 chunk 在工具限制内时优先一次完整读取，只有工具明确返回截断/continuation 时才继续读取剩余部分；不要主动把一个 chunk 再拆成多次读取，也不要把原始 SRT 整份塞入上下文或自行重新按固定比例切分。处理长字幕、百科型或参数密集内容时，在 `agent_work_dir` 创建 `part-XX-notes.md`、事实清单或中间梳理文件，把每块的具体成员、数值、关系、适用条件、例外、冲突、兼容性和作者评价先原子化外化，再合并为 `knowledge_outline`；不要先压成几个主题概括。来源不足时在 `analysis.json` 记录原因，不得靠常识补全。所有临时文件都属于当前 job，由 finalizer 与 failsafe 统一清理；不得写到项目其他目录，也不得手工删除 job、reservation 或锁文件。
+3. 进入可处理状态后读取 `handoff_path`（新任务）或绑定 job 内的 `job.json`（续做任务），再读取 `analysis_path`、`agent_work_dir`、`fact_ledger_path`、`semantic_draft_path`、`layout_plan_path` 与 `transcript_manifest_path`，并遵循项目共享的 `docs\\AGENT-INTEGRATION.md` 与内容标准。知识密集型任务必须同时读取 `docs\\standards\\KNOWLEDGE-DENSE-WORKFLOW.md`。manifest 为 `direct` 时读取唯一 chunk；为 `chunked` 时严格按 `chunks` 顺序逐块阅读。单个 chunk 在工具限制内时优先一次完整读取，只有工具明确返回截断/continuation 时才继续；不要主动重新切分或把原始 SRT 整份塞入上下文。来源不足时在 `analysis.json` 记录原因，不得靠常识补全。所有 runtime 文件都由 finalizer / failsafe 清理，不得写到项目其他目录，也不得手工删除 job、reservation 或锁文件。
 
-4. 来源充分时，先填写 `knowledge_outline`，再只编辑 `draft_path` 的两个 marker：
+4. 来源充分时，按以下顺序完成内容：
 
-   - `BILI_AI_SUMMARY`：短的“先看结论”；
-   - `BILI_AI_BODY`：根据视频真实信息结构动态组织的知识正文。
+   - **Fact Ledger**：知识密集型内容先填写 `fact_ledger_path`，按 manifest 保留具体成员、数值、版本、关系、条件、例外、冲突、兼容性、作者评价，以及“配置 → 耗时 / 质量 / 失败表现”；再把 `knowledge_outline` 作为上层索引。知识密集型完成后标记 `workflow_status: complete`；短且简单的视频可标记 `not_applicable`，但必须填写 `workflow_reason`。
+   - **Semantic Draft**：在 `semantic_draft_path` 先完成普通 Markdown 内容稿。章节数量只决定事实如何分组，不改变事实保留预算；一个 H2 可以通过 H3、表格和列表承载很多事实；内容稿完成后标记 `workflow_status: complete`。
+   - **Layout Pass**：内容完成后才填写 `layout_plan_path`，只把现有关系转换成 Table / Grid / Card / Risk / Meta / Resource / Chip / Metric，不再次摘要或删事实；整页只保留一个 Summary；排版计划完成并确认事实无损后标记 `workflow_status: complete`。
+   - **Final Draft**：最后只编辑 `draft_path` 的 `BILI_AI_SUMMARY` 与 `BILI_AI_BODY`。Frontmatter、播放器与来源区、tags、cssclasses、路径和 marker 均由程序负责，Hermes 不修改。
 
-   不强制套用“怎么做 / 容易踩坑 / 我来实践”。参数、公式、限制、专名、A/B 差异、兼容性、作者明确推荐和重要资源等高价值信息，不能只为缩短篇幅而删除；表达可以压缩，但字幕明确给出的成员来源、继承、步数、适用条件、例外和冲突关系必须保留。正文只写字幕或原始简介支持的事实。版式按共享标准选择 Table / Grid / Card / Risk / Resource / Chip，不为了好看强行卡片化；Frontmatter 与 `learning-page + video-note` cssclasses 由程序负责，Hermes 不修改。
+   正文只写字幕或原始简介支持的事实；Grid 内 Card 必须使用嵌套 `> > [!card]`，不要为了好看强行卡片化。
 
-5. 成稿后必须重新按 manifest 顺序抽查或复读原 transcript；`knowledge_outline` 只能辅助检查，不能替代回看字幕。知识密集型内容还要对照事实清单，确认成员关系、可直接使用值、例外和比较没有被二次压缩；修正遗漏后再将 `coverage_review.status` 设为 `passed` 并填写 notes。不要把 runtime 路径、job 文件名、analysis 文件、证据编号或采集状态写进主笔记。
+5. 最终排版后必须重新按 manifest 顺序抽查或复读原 transcript，并同时对照 Fact Ledger、Semantic Draft 与最终正文。确认章节减少时事实没有同步减少，成员关系、可直接使用值、例外、实测条件与结果没有在自然聚类或 Layout Pass 中被二次压缩；修正遗漏后再将 `coverage_review.status` 设为 `passed` 并填写 notes。不要把 runtime 路径、工作文件名、Fact ID、analysis 文件或采集状态写进主笔记。
 
 6. 写完后立即 finalizer：
 

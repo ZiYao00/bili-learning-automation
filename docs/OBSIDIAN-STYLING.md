@@ -156,7 +156,24 @@ cssclasses:
 → 动态知识正文
 ```
 
-Agent 会根据知识关系选择 Table / Grid / Card / Chip / Risk / Resource 等语义组件；具体规则见 `docs/standards/CODEX-VIDEO-NOTE-GUIDE.md`。
+Agent 会根据知识关系选择 Table / Grid / Card / Chip / Risk / Meta / Resource / Metric 等语义组件；具体规则见 `docs/standards/CODEX-VIDEO-NOTE-GUIDE.md`。
+
+## Layout Pass：内容完成后再排版
+
+知识密集型笔记先完成 `fact-ledger.md` 与 `semantic-draft.md`，再使用 `layout-plan.md` 做独立 Layout Pass。排版的职责是改善扫描、比较和回查，不是第二次摘要。
+
+必须遵守：
+
+- Semantic Draft 内容未完整前，不要为了“好看”提前卡片化；
+- H2 数量减少不能连带删除参数、成员、关系、可直接使用值或实测证据；
+- 2 个核心对象可用 `grid-2 + card`，3 个平级入口可用 `grid-3 + card`；
+- 4 个以上对象或包含配置、耗时、质量结果等固定字段时优先 Table；
+- 一组名称需要保留检索但不逐项展开时使用 Chip；
+- 冲突、互斥、兼容性和失败模式使用 Risk；来源损坏或无法确认的边界使用 Meta；
+- 整页只保留一个最高优先级 Summary；
+- Layout Pass 前后的高价值事实必须一一对应，关闭 CSS 后仍应保持基本可读。
+
+完整流程见 `docs/standards/KNOWLEDGE-DENSE-WORKFLOW.md`。
 
 ## 更新项目后如何同步 CSS
 

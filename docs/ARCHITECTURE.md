@@ -7,9 +7,11 @@
 → input_resolver 规范化 BVID 与 canonical URL
 → yt-dlp 仅采集元数据、UP 主简介、ai-zh/zh 字幕
 → taxonomy 生成 tags 与后续整理建议；原视频标题的新笔记进入 00-待整理
-→ Python 在 runtime 写入确定性 Markdown 草稿与 analysis.json
-→ 接入智能体（Codex / Hermes / WorkBuddy）判断来源充分性并形成 knowledge_outline
-→ 智能体填写“先看结论 + 动态知识正文”并完成 coverage review
+→ Python 在 runtime 写入确定性 Markdown 草稿、analysis.json 与 Fact Ledger / Semantic Draft / Layout Plan 工作文件
+→ 接入智能体（Codex / Hermes / WorkBuddy）判断来源充分性
+→ 知识密集型内容完成 Fact Ledger 与 knowledge_outline
+→ 智能体完成 Semantic Draft，再独立执行 Layout Pass
+→ 智能体填写“先看结论 + 动态知识正文”，回到 transcript 完成 Source Recheck / coverage review
 → finalizer 校验质量流程状态、真实元数据与结构后原子发布
 → navigation 原子刷新
 → 清理临时 job
@@ -17,14 +19,14 @@
 
 ## 代码分层
 
-- `src/bili_learning/`：可测试的核心逻辑和 agent-neutral CLI（`prepare`、`finalize`、`organize`、`doctor`、`configure-obsidian`、`build-nav`）。
+- `src/bili_learning/`：可测试的核心逻辑和 agent-neutral CLI（`prepare`、`finalize`、`organize`、`doctor`、`configure-obsidian`、`build-nav`）；`workflow.py` 负责创建 Fact Ledger、Semantic Draft 与 Layout Plan 的 runtime 脚手架。
 - `docs/AGENT-INTEGRATION.md`：所有智能体共用的接入协议。
 - `hermes-skills/bili-learning-automation/SKILL.md`：Hermes/微信专属适配约束。
 - `hermes-skills/bili-learning-automation/scripts/`：只定位项目根目录并转发到核心 CLI 的兼容入口。
 - `config/bilibili-note-taxonomy.json`：模型别名、tags、后续整理建议和默认 `notes_root`。
 - `docs/standards/`：人类可读的笔记质量与版式语义标准。
 - `obsidian/snippets/`：随仓库提交、可直接安装到 Obsidian Vault 的 `learning-lab.css` Core 与 `video-note.css` Extension。
-- `docs/OBSIDIAN-STYLING.md`：CSS 安装、作用域、升级同步和无样式降级规则。当前副本与 `ComfyUI-Learning-Lab` Design System v0.3 / Video Note v0.1 对齐，但运行时不依赖另一个本地仓库。
+- `docs/OBSIDIAN-STYLING.md`：CSS 安装、作用域、升级同步和无样式降级规则。当前副本与 `ComfyUI-Learning-Lab` Design System v0.3 / Video Note v0.2 对齐，但运行时不依赖另一个本地仓库。
 
 ## 确定性边界
 
@@ -40,6 +42,7 @@
 - `learning-page + video-note` cssclasses；
 - 阅读顺序（Summary → Player / Source → AI Body）；
 - 输出路径；
+- runtime Fact Ledger / Semantic Draft / Layout Plan 脚手架及其路径；
 - 导航。
 
 taxonomy 的 route.path 不直接决定新文件的路径。新笔记统一先进入 fallback.path（默认 `00-待整理`）；route.path 仅随 job 保留为建议分类，并通过 tags 帮助 `organize` 在学习后归档。收集阶段 H1 直接使用原视频标题，不进行主题提炼。
@@ -47,17 +50,19 @@ taxonomy 的 route.path 不直接决定新文件的路径。新笔记统一先�
 接入智能体只负责字幕理解与语义内容：
 
 - 判断字幕与简介是否足以支撑可信学习笔记；
-- 形成 runtime `knowledge_outline`；知识密集型内容先在 `agent_work_dir` 建立原子事实清单，避免在知识提取阶段先丢具体成员、关系、可直接使用值、运行前提和实测证据；
+- 知识密集型内容先完成 runtime Fact Ledger，再把 `knowledge_outline` 作为上层索引，避免在知识提取阶段先丢具体成员、关系、可直接使用值、运行前提和实测证据；
+- 在 Semantic Draft 中先完成知识内容，再根据视频真实关系自然组织章节；章节数量不改变事实保留预算；
+- 内容完成后独立执行 Layout Pass，只转换表达形式，不再次摘要或删减事实；
 - 写短的“先看结论”；
 - 根据视频真实信息结构组织动态知识正文；
-- 成稿后重新回到原 transcript 完成覆盖复核，而不是只检查智能体自己生成的 outline。
+- 最终排版后重新回到原 transcript，并对照 Fact Ledger、Semantic Draft 与最终正文完成覆盖复核。
 
 章节、表格和步骤形式由内容决定；确定性骨架仍由程序控制，避免 LLM 重写元数据、简介或路径。
 
 ## 数据边界
 
 - 长期产物：私人 Markdown 笔记与导航页，默认不入 Git。
-- 临时产物：`.runtime/bilibili-learning`；成功、失败或 failsafe 后清理。
+- 临时产物：`.runtime/bilibili-learning`，包括 transcript、Fact Ledger、Semantic Draft、Layout Plan、analysis 与草稿；成功、失败或 failsafe 后清理。
 - 敏感数据：`key/` 中的 Cookie 文件；程序只把路径传给 yt-dlp，不读取内容。
 - 历史资料：`archive/`、`materials/` 及本机 legacy 依赖，不属于公开源码主链路。
 
@@ -69,7 +74,7 @@ taxonomy 的 route.path 不直接决定新文件的路径。新笔记统一先�
 
 - 文件名使用原视频标题，同名时在预约锁保护下使用递增序号，避免覆盖。已完成视频允许再次转换并生成新笔记。
 - 同一 BVID 仅在活动 collector、智能体写作与 finalizer 期间使用 reservation 防止并发；任务结束后释放 reservation，允许再次转换。残留 reservation 超过 2 小时且对应 job 不再活动时可自动恢复。
-- Finalizer 校验真实值，而非仅检查字段名；无效草稿不会进入笔记库，随 runtime job 一起清理。草稿的 `BILI_AI_*` marker 只用于校验，发布时会移除，因此正式 Obsidian 笔记不含机器标记。
+- Finalizer 校验真实值，而非仅检查字段名；新 job 还会校验 Fact Ledger、Semantic Draft、Layout Plan 的 `workflow_status`、受控路径与最小有效内容，拒绝跳过阶段直接发布。短且简单的视频仅允许将 Fact Ledger 标记为 `not_applicable`，并必须填写原因；旧 job 不含新字段时保持兼容。无效草稿不会进入笔记库，随 runtime job 一起清理。草稿的 `BILI_AI_*` marker 只用于校验，发布时会移除，因此正式 Obsidian 笔记不含机器标记。
 - 导航采用临时文件后原子替换。
 - 不同 BVID 可并行处理；导航重建使用独占锁串行执行，避免多个 finalizer 交叉覆盖同一组导航页。当前不会自动删除旧导航页，以免误删用户手写内容。
 - 外部 yt-dlp 调用有超时。

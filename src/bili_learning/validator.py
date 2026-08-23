@@ -7,6 +7,7 @@ from typing import Any
 from .frontmatter import DEFAULT_CSSCLASSES, parse_frontmatter, parse_frontmatter_list
 from .note_template import AI_MARKERS, PLACEHOLDER_TEXT, metadata_line, render_video_materials
 from .quality import load_analysis_report, validate_analysis_report
+from .workflow import validate_agent_workflow
 
 ALLOWED_FRONTMATTER_FIELDS = {"author", "published", "duration", "source", "tags", "cssclasses"}
 
@@ -85,8 +86,11 @@ def validate_note(note: Path, job: dict[str, Any]) -> list[str]:
         if PLACEHOLDER_TEXT in region or not region.strip():
             errors.append(f"AI 内容区域尚未完成：{key}")
 
-    if "[!summary] 先看结论" not in text:
+    summary_callouts = len(re.findall(r"^> \[!summary\]", text, re.MULTILINE))
+    if summary_callouts == 0:
         errors.append("缺少先看结论")
+    elif summary_callouts > 1:
+        errors.append("整页只允许一个最高优先级 Summary")
     if re.search(r"^> \[!card\]", text, re.MULTILINE):
         errors.append("Card 必须嵌套在 Grid 内：使用 > > [!card]，不能直接使用 > [!card]")
 
@@ -98,7 +102,18 @@ def validate_note(note: Path, job: dict[str, Any]) -> list[str]:
     except (KeyError, ValueError) as error:
         errors.append(str(error))
 
-    forbidden = (".runtime", "agent_handoff.md", "job.json", "analysis.json", "字幕证据索引")
+    errors.extend(validate_agent_workflow(job))
+
+    forbidden = (
+        ".runtime",
+        "agent_handoff.md",
+        "job.json",
+        "analysis.json",
+        "fact-ledger.md",
+        "semantic-draft.md",
+        "layout-plan.md",
+        "字幕证据索引",
+    )
     for token in forbidden:
         if token in text:
             errors.append(f"主笔记包含机器内部信息：{token}")

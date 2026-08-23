@@ -11,12 +11,14 @@
 ## 必须执行的流程
 
 1. 把原始收到的文本交给 collector。
-2. collector 先检查笔记位置。若返回 `configuration_required`，适配层必须停止采集并向用户索取 Obsidian Vault 根目录（包含 `.obsidian` 的目录），通过统一 `configure-obsidian` 入口写入本机配置后再重试原请求；不得静默使用仓库内 fallback。若返回 `failed` 且 `code = ytdlp_not_configured`，只向用户提供安装指引（Windows 推荐 `winget install yt-dlp`），不得自动安装、下载或把 `yt-dlp.exe` 放入 Skill / 仓库；安装完成后再重试。collector 返回 `materials_ready` 时再读取 `handoff_path`、`job.json`、`analysis_path`、`agent_work_dir`、`transcript_manifest_path` 和共享内容标准。`in_progress` 不得重新采集；若响应带绑定 `job_dir`，适配层只能在确认该 job 已明显陈旧且仍处于未写作状态、必需文件完整时续做同一 job，否则继续视为活动任务。程序会把原始 SRT 整理为 runtime-only transcript；短字幕为单块 `direct`，长字幕为按完整 cue 边界生成的 `chunked` 清单。
+2. collector 先检查笔记位置。若返回 `configuration_required`，适配层必须停止采集并向用户索取 Obsidian Vault 根目录（包含 `.obsidian` 的目录），通过统一 `configure-obsidian` 入口写入本机配置后再重试原请求；不得静默使用仓库内 fallback。若返回 `failed` 且 `code = ytdlp_not_configured`，只向用户提供安装指引（Windows 推荐 `winget install yt-dlp`），不得自动安装、下载或把 `yt-dlp.exe` 放入 Skill / 仓库；安装完成后再重试。collector 返回 `materials_ready` 时再读取 `handoff_path`、`job.json`、`analysis_path`、`agent_work_dir`、`fact_ledger_path`、`semantic_draft_path`、`layout_plan_path`、`transcript_manifest_path` 和共享内容标准。`in_progress` 不得重新采集；若响应带绑定 `job_dir`，适配层只能在确认该 job 已明显陈旧且仍处于未写作状态、必需文件完整时续做同一 job，否则继续视为活动任务。程序会把原始 SRT 整理为 runtime-only transcript；短字幕为单块 `direct`，长字幕为按完整 cue 边界生成的 `chunked` 清单。
 3. 先判断字幕与简介是否足以支撑可信学习笔记，并填写 runtime 的 `analysis.json`。
-4. 来源充分时先做知识提取，再编辑 `draft_path`。普通视频可直接形成 `knowledge_outline`；百科型、参数密集或全程干货内容应先在 `agent_work_dir` 按 transcript chunk / 自然主题建立原子事实清单，再合并成 `knowledge_outline`。事实清单优先保留具体成员、数值、关系、适用条件、例外、冲突、兼容性和作者评价；若来源给出运行入口、版本/安装前提、关键组件职责，或可复用的实测“配置 → 耗时/质量结果”，也必须作为独立事实记录，避免先压成主题概括。
-5. 成稿后必须重新按 manifest 顺序抽查或复读原 transcript；`knowledge_outline` 只能作为辅助，不能替代回看字幕。知识密集型内容同时对照事实清单，确认成员、关系、可直接使用值、例外、比较、运行前提和实测结果都没有被二次压缩，再将 `coverage_review.status` 设为 `passed` 并填写 notes。
-6. 无论写作成功、失败或中断，都必须运行 finalizer 清理 job。
-7. 只有 finalizer 返回 `note_ready` 且 `temporary_data_removed: true` 才能报告完成。
+4. 对长字幕、百科型、参数密集或实测证据多的内容，必须先完成 `fact_ledger_path`：按 manifest 顺序记录原子事实，再把 `knowledge_outline` 作为 Fact Ledger 的上层索引。Fact Ledger 优先保留具体成员、数值、版本、关系、适用条件、例外、冲突、兼容性、作者评价，以及“配置 → 耗时 / 质量 / 失败表现”；不得先压成几个主题名。普通短视频可把 Fact Ledger 标记为 `not_applicable`，但必须填写 `workflow_reason`；其余情况完成后把 `workflow_status` 标记为 `complete`。不能用模型常识补全。
+5. Fact Ledger 完成后，先在 `semantic_draft_path` 写内容完成稿。Semantic Draft 用普通 Markdown 自然聚类事实；章节数量只决定事实如何分组，不改变事实保留预算。一个 H2 可以通过 H3、表格、列表和必要 Callout 承载大量事实。内容稿完成后把 Semantic Draft 的 `workflow_status` 标记为 `complete`；本阶段不要编辑最终 `draft_path`。
+6. Semantic Draft 内容完成后才进入 `layout_plan_path` 与 Layout Pass。Layout Pass 只把现有关系转换成 Table / Grid / Card / Risk / Meta / Resource / Chip / Metric，不重新摘要、重新选择或删除事实；整页只保留一个最高优先级 Summary。排版计划完成并确认事实无损后，把 Layout Plan 的 `workflow_status` 标记为 `complete`，再把短的 `BILI_AI_SUMMARY` 与完整 `BILI_AI_BODY` 写入最终 `draft_path`。详细规则见 `docs\standards\KNOWLEDGE-DENSE-WORKFLOW.md` 与 `docs\OBSIDIAN-STYLING.md`。
+7. 最终排版后必须重新按 manifest 顺序抽查或复读原 transcript，并同时对照 Fact Ledger、Semantic Draft 与最终正文。确认成员、关系、可直接使用值、例外、运行前提、实测条件与结果没有在自然聚类或排版阶段被二次压缩，再将 `coverage_review.status` 设为 `passed` 并填写 notes。
+8. 无论写作成功、失败或中断，都必须运行 finalizer 清理 job。
+9. 只有 finalizer 返回 `note_ready` 且 `temporary_data_removed: true` 才能报告完成。
 
 `configuration_required`、`in_progress`、`subtitle_unavailable`、`source_insufficient`、`failed` 和 `note_invalid` 都不是完成状态。
 
@@ -26,6 +28,7 @@
 - collector 与 finalizer 的 JSON 响应包含 `schema_version: 1`、`status` 和可读 `message`（如适用）；智能体必须以 `status` 判断分支。`in_progress` 还可返回 reservation 当前绑定的 `job_dir`，供适配层在不重新采集的前提下验证是否可安全续做。
 - Frontmatter 的 `author`、`published`、`duration`、`source`、tags 与 `cssclasses`，以及标题下方“作者 · 日期 · 时长 · BVID”元信息行由程序生成，智能体不得自行改写；视频笔记固定使用 `learning-page + video-note` 以接入共享 Obsidian 视觉系统。
 - `analysis.json` 是 runtime-only 质量报告，不进入最终 Obsidian 笔记。它用于记录来源充分性、知识清单和覆盖复核状态，不是给用户阅读的机器报告。
+- collector 会在 `agent_work_dir` 创建 `fact-ledger.md`、`semantic-draft.md` 与 `layout-plan.md`，并通过 `fact_ledger_path`、`semantic_draft_path`、`layout_plan_path` 返回位置。它们用于分离事实保全、内容成稿和视觉排版，不进入正式笔记，也不改变当前 `analysis.json schema_version: 1`。
 
 ## 不可突破的数据边界
 
@@ -33,7 +36,7 @@
 - `confirmed_empty` 仅代表 info-json 明确给出空字符串且（如存在）简介 sidecar 与其一致；字段缺失、`null`、类型异常或两者不一致都必须失败。
 - Cookie 内容不得读取、打印、上传、编辑、提交或写入笔记；collector 仅可把配置的 Cookie 文件路径传给 yt-dlp。
 - 原始字幕、元数据、简介、`analysis.json`、日志和智能体临时工作文件只允许存在于 `.runtime/bilibili-learning` 的单个 job；finalizer 负责精确清理。
-- 智能体只可编辑既定的 `analysis.json`、草稿中的两个 AI 区域，以及 `agent_work_dir` 内的临时辅助文件。原始 SRT 由核心预处理器转换为 `transcript-manifest.json` 与一个或多个 transcript chunk；转换只移除 SRT 序号、毫秒精度与空行，保留字幕文字、顺序和 cue 边界，不做摘要、关键词过滤或语义去重。智能体应优先按 manifest 读取这些 chunk；长字幕可在 `agent_work_dir` 继续创建逐块知识摘录、索引或中间梳理文件，再合并与复核。`agent_work_dir` 不得存放最终笔记或持久资料；其内容随 job 一并由 finalizer / failsafe 清理。
+- 智能体只可编辑既定的 `analysis.json`、草稿中的两个 AI 区域，以及 `agent_work_dir` 内的 runtime 工作文件。原始 SRT 由核心预处理器转换为 `transcript-manifest.json` 与一个或多个 transcript chunk；转换只移除 SRT 序号、毫秒精度与空行，保留字幕文字、顺序和 cue 边界，不做摘要、关键词过滤或语义去重。智能体应优先按 manifest 读取这些 chunk；知识密集型内容依次使用 `fact-ledger.md`、`semantic-draft.md`、`layout-plan.md`，必要时还可创建 `part-XX-notes.md`。`agent_work_dir` 不得存放最终笔记或持久资料；其内容随 job 一并由 finalizer / failsafe 清理。
 - 智能体不得手工删除 job、reservation 或锁文件。finalizer 清理失败时必须如实报告失败状态，保留现场供后续诊断；只有用户明确授权后，才可对已核实的单个遗留文件执行回收站归档。
 - 不得覆盖已有笔记；同一 BVID 仅在**活动任务期间**由 reservation 防止并发处理，任务完成后允许再次转换。草稿只存在于 runtime，只有 finalizer 校验通过后才原子发布到 `note_path`。
 
@@ -63,11 +66,13 @@
 - 作者明确推荐、质量/速度/稳定性的取舍；
 - 会改变结果的前提、例外、冲突和警告；
 - 结构化方法、提示词公式、关键工作流；
+- 视频明确给出的运行入口、版本/安装前提与关键组件职责；
+- 具有长期参考价值的实测案例：使用条件、配置、耗时、质量变化或失败表现之间的关系；
 - 视频明确提供且具有学习价值的资源地址。
 
 这不是机械保留规则。广告价格、活动口播或与学习目标无关的数字是否保留，应由智能体根据长期参考价值判断。
 
-长字幕或知识密集内容允许先按语义章节/时间段分段提取，再合并、去重和组织。知识密集型内容应先建立原子事实清单，再写最终正文；表达可以压缩，但具体成员及其来源、继承、步数、适用条件、冲突和兼容关系不能被压成一个类别名或名称列表。来源明确讲解的运行路线、版本/插件安装条件、组件职责，以及“配置 → 耗时 / 质量变化”的实测案例，也不能只剩一句泛化结论。不要把固定 Map-Reduce 流程强加给所有短视频。
+长字幕或知识密集内容允许按 transcript chunk / 自然主题分段提取，但必须遵循 Fact Ledger → Semantic Draft → Layout Pass → Source Recheck。Fact Ledger 先保全原子事实；Semantic Draft 再自然聚类成文；Layout Pass 只转换表达形式。具体成员及其来源、继承、步数、适用条件、冲突和兼容关系不能被压成一个类别名或名称列表；来源明确讲解的运行路线、版本/插件安装条件、组件职责，以及“配置 → 耗时 / 质量变化 / 失败表现”的实测证据，也不能只剩一句泛化结论。不要把固定 Map-Reduce 流程强加给所有短视频。
 
 ## 最终笔记结构
 
@@ -82,7 +87,7 @@
 
 ## 覆盖复核
 
-程序可以检查结构和流程状态，但不能可靠判断“知识有没有漏”。因此成稿后必须由智能体完成语义复核，而且复核必须重新回到原 transcript；不能只拿自己生成的 `knowledge_outline` 检查自己。
+程序可以检查结构和流程状态，但不能可靠判断“知识有没有漏”。因此最终排版后必须由智能体完成语义复核，而且复核必须重新回到原 transcript，并同时对照 Fact Ledger、Semantic Draft 与最终正文；不能只拿自己生成的 `knowledge_outline` 检查自己。
 
 至少检查：
 
@@ -91,6 +96,8 @@
 - 比较关系是否只写了一边；
 - 默认值后面的例外或限制是否被误删；
 - 多个方案是否被错误合并；
+- H2 数量减少时，参数、成员、关系和实测证据是否也被同步压掉；
+- Layout Pass 前后的高价值事实是否一一对应，是否为了卡片数量或页面简洁重新摘要；
 - 是否为了简短而丢掉高价值具体信息；
 - 是否出现字幕/简介没有支持的新事实。
 
@@ -98,12 +105,7 @@
 
 ## 笔记内容边界
 
-必须阅读：
-
-```text
-docs\standards\CODEX-VIDEO-NOTE-GUIDE.md
-docs\standards\STANDARD-VIDEO-NOTE-EXAMPLE.md
-```
+必须阅读 `docs\standards\CODEX-VIDEO-NOTE-GUIDE.md`。长字幕、百科型、参数密集或实测证据多的内容还必须阅读 `docs\standards\KNOWLEDGE-DENSE-WORKFLOW.md`。`docs\standards\STANDARD-VIDEO-NOTE-EXAMPLE.md` 是语法与局部结构片段参考，不再作为每次任务的强制目录示例；只有需要确认 Table / Grid / Card / Callout 等具体写法时再读取相关片段，且不得复制其中的章节集合、顺序、数量或组件组合。
 
 所有新笔记先进入 `00-待整理`。H1 默认使用 B站原视频标题；程序在 H1 下方生成“作者 · 发布日期 · 时长 · BVID”的紧凑元信息行。允许重复链接再次生成笔记；同名文件由程序以 `（2）`、`（3）` 防覆盖。分类建议和 tags 由程序确定；智能体不得自行跳过 `00-待整理`。
 
