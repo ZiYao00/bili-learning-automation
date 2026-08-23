@@ -1,5 +1,6 @@
 {
   "vault_root": "D:\\YourObsidianVault",
   "notes_subdir": "bilibili",
-  "cookie_file": "C:\\PrivateConfig\\bilibili_cookies.txt"
+  "cookie_file": "C:\\PrivateConfig\\bilibili_cookies.txt",
+  "workflow_mode": "light"
 }

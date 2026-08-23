@@ -212,6 +212,20 @@ def test_agent_handoff_protects_dense_note_fact_relationships(tmp_path: Path) ->
     assert "配置、耗时与结果" in text
 
 
+def test_agent_handoff_light_mode_is_short_and_direct(tmp_path: Path) -> None:
+    job_dir = tmp_path / "light-job"
+    job_dir.mkdir()
+    handoff = write_handoff(job_dir, {"workflow_mode": "light"})
+    text = handoff.read_text(encoding="utf-8")
+
+    assert "LIGHT-WORKFLOW.md" in text
+    assert "直接在 `draft_path`" in text
+    assert "内容写完整后" in text
+    assert "Fact Ledger、Semantic Draft 或 Layout Plan" in text
+    assert "fact_ledger_path" not in text
+    assert "workflow_status" not in text
+
+
 def test_description_renders_compact_resources_and_preserves_raw_source() -> None:
     description = "节点升级说明\n工作流地址：\nhttps://example.com/workflow\n仓库：https://example.com/repo"
     rendered = quote_description(description, "present")
@@ -458,12 +472,49 @@ def test_notes_root_conflicts_with_vault_config(tmp_path: Path, taxonomy: dict) 
     assert error.value.code == "local_config_notes_conflict"
 
 
+def test_workflow_mode_defaults_to_light(tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "bilibili-note-taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
+    monkeypatch.delenv("BILI_LEARNING_WORKFLOW_MODE", raising=False)
+
+    settings = load_settings(tmp_path)
+
+    assert settings.workflow_mode == "light"
+
+
+def test_workflow_mode_local_and_environment_override(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "bilibili-note-taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
+    (config_dir / "local.json").write_text(json.dumps({"workflow_mode": "strict"}), encoding="utf-8")
+    monkeypatch.delenv("BILI_LEARNING_WORKFLOW_MODE", raising=False)
+
+    assert load_settings(tmp_path).workflow_mode == "strict"
+
+    monkeypatch.setenv("BILI_LEARNING_WORKFLOW_MODE", "light")
+    assert load_settings(tmp_path).workflow_mode == "light"
+
+
+def test_workflow_mode_rejects_invalid_value(tmp_path: Path, taxonomy: dict) -> None:
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "bilibili-note-taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
+    (config_dir / "local.json").write_text(json.dumps({"workflow_mode": "auto"}), encoding="utf-8")
+
+    with pytest.raises(ConfigurationError) as error:
+        load_settings(tmp_path)
+    assert error.value.code == "workflow_mode_invalid"
+
+
 def test_configure_obsidian_preserves_other_local_values(tmp_path: Path, taxonomy: dict) -> None:
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     (config_dir / "bilibili-note-taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
     (config_dir / "local.json").write_text(
-        json.dumps({"ytdlp": "tools/yt-dlp.exe", "notes_root": "old/notes"}),
+        json.dumps({"ytdlp": "tools/yt-dlp.exe", "notes_root": "old/notes", "workflow_mode": "strict"}),
         encoding="utf-8",
     )
     vault = tmp_path / "MyVault"
@@ -473,6 +524,7 @@ def test_configure_obsidian_preserves_other_local_values(tmp_path: Path, taxonom
     saved = json.loads(path.read_text(encoding="utf-8"))
 
     assert saved["ytdlp"] == "tools/yt-dlp.exe"
+    assert saved["workflow_mode"] == "strict"
     assert "notes_root" not in saved
     assert saved["vault_root"] == str(vault.resolve())
     assert saved["notes_subdir"] == str(Path("Resources/Bilibili"))
@@ -532,10 +584,14 @@ def _complete_agent_workflow(payload: dict[str, object]) -> None:
     layout_plan.write_text(layout_text, encoding="utf-8")
 
 
+def test_agent_workflow_light_mode_does_not_require_stage_files() -> None:
+    assert validate_agent_workflow({"workflow_mode": "light"}) == []
+
+
 def test_agent_workflow_stage_gate_requires_completed_runtime_files(tmp_path: Path) -> None:
     agent_work_dir = tmp_path / "agent-work"
     paths = write_agent_work_templates(agent_work_dir)
-    payload: dict[str, object] = {"agent_work_dir": str(agent_work_dir), **paths}
+    payload: dict[str, object] = {"workflow_mode": "strict", "agent_work_dir": str(agent_work_dir), **paths}
 
     pending_errors = validate_agent_workflow(payload)
     assert sum("尚未完成" in error for error in pending_errors) == 3
@@ -547,7 +603,7 @@ def test_agent_workflow_stage_gate_requires_completed_runtime_files(tmp_path: Pa
 def test_agent_workflow_allows_simple_video_to_skip_fact_ledger_with_reason(tmp_path: Path) -> None:
     agent_work_dir = tmp_path / "agent-work"
     paths = write_agent_work_templates(agent_work_dir)
-    payload: dict[str, object] = {"agent_work_dir": str(agent_work_dir), **paths}
+    payload: dict[str, object] = {"workflow_mode": "strict", "agent_work_dir": str(agent_work_dir), **paths}
     _complete_agent_workflow(payload)
 
     fact_ledger = Path(str(payload["fact_ledger_path"]))
@@ -583,7 +639,8 @@ def test_note_standard_prevents_fixed_section_templates() -> None:
     assert "不存在一一对应关系" in guide
     assert "没有“目标章节数量”" in guide
     assert "自然聚类" in guide
-    assert "章节数量只决定事实如何分组" in integration
+    assert "workflow_mode" in integration
+    assert "LIGHT-WORKFLOW.md" in integration
     assert "结构片段库（不是目录模板）" in example
     assert "## 01 · 核心规格" not in example
     assert "## 05 · 提示词结构" not in example
@@ -797,15 +854,13 @@ def test_create_job_writes_runtime_draft_without_publishing_note(tmp_path: Path,
     agent_work_dir = Path(payload["agent_work_dir"])
     assert agent_work_dir.parent == job_dir
     assert agent_work_dir.is_dir()
-    fact_ledger_path = Path(payload["fact_ledger_path"])
-    semantic_draft_path = Path(payload["semantic_draft_path"])
-    layout_plan_path = Path(payload["layout_plan_path"])
-    for runtime_path in (fact_ledger_path, semantic_draft_path, layout_plan_path):
-        assert runtime_path.parent == agent_work_dir
-        assert runtime_path.is_file()
-    assert "原子事实" in fact_ledger_path.read_text(encoding="utf-8")
-    assert "章节数量只决定事实如何分组" in semantic_draft_path.read_text(encoding="utf-8")
-    assert "排版只转换完整内容的表达形式" in layout_plan_path.read_text(encoding="utf-8")
+    assert payload["workflow_mode"] == "light"
+    assert "fact_ledger_path" not in payload
+    assert "semantic_draft_path" not in payload
+    assert "layout_plan_path" not in payload
+    assert not (agent_work_dir / "fact-ledger.md").exists()
+    assert not (agent_work_dir / "semantic-draft.md").exists()
+    assert not (agent_work_dir / "layout-plan.md").exists()
     manifest_path = Path(payload["transcript_manifest_path"])
     assert manifest_path.parent == agent_work_dir
     assert payload["transcript_mode"] == "direct"
@@ -821,6 +876,42 @@ def test_create_job_writes_runtime_draft_without_publishing_note(tmp_path: Path,
         < draft_text.find("https://player.bilibili.com/player.html")
         < draft_text.find("<!-- BILI_AI_BODY_START -->")
     )
+
+
+def test_create_job_strict_mode_writes_stage_files(tmp_path: Path, taxonomy: dict) -> None:
+    settings = replace(_settings(tmp_path, taxonomy), workflow_mode="strict")
+    job_dir = settings.runtime_root / "strict-job"
+    job_dir.mkdir(parents=True)
+    subtitle = job_dir / "video.ai-zh.srt"
+    subtitle.write_text("1\n00:00:00,000 --> 00:00:01,000\n字幕\n", encoding="utf-8")
+
+    payload = create_job(
+        settings,
+        "BV1TXua68EYi",
+        "https://www.bilibili.com/video/BV1TXua68EYi/",
+        {
+            "title": "H3 分段工作流",
+            "description": "原始简介",
+            "tags": [],
+            "uploader": "UP",
+            "upload_date": "20260811",
+            "duration": 425,
+        },
+        subtitle,
+        job_dir,
+    )
+
+    assert payload["workflow_mode"] == "strict"
+    agent_work_dir = Path(payload["agent_work_dir"])
+    fact_ledger_path = Path(payload["fact_ledger_path"])
+    semantic_draft_path = Path(payload["semantic_draft_path"])
+    layout_plan_path = Path(payload["layout_plan_path"])
+    for runtime_path in (fact_ledger_path, semantic_draft_path, layout_plan_path):
+        assert runtime_path.parent == agent_work_dir
+        assert runtime_path.is_file()
+    assert "原子事实" in fact_ledger_path.read_text(encoding="utf-8")
+    assert "章节数量只决定事实如何分组" in semantic_draft_path.read_text(encoding="utf-8")
+    assert "排版只转换完整内容的表达形式" in layout_plan_path.read_text(encoding="utf-8")
 
 
 def test_frontmatter_quotes_yaml_special_characters_round_trip() -> None:
@@ -1020,9 +1111,10 @@ def test_prepare_allows_a_new_note_for_an_existing_source(
     assert payload["transcript_mode"] == "direct"
     assert payload["transcript_chunk_count"] == 1
     assert Path(payload["transcript_manifest_path"]).is_file()
-    assert Path(payload["fact_ledger_path"]).is_file()
-    assert Path(payload["semantic_draft_path"]).is_file()
-    assert Path(payload["layout_plan_path"]).is_file()
+    assert payload["workflow_mode"] == "light"
+    assert "fact_ledger_path" not in payload
+    assert "semantic_draft_path" not in payload
+    assert "layout_plan_path" not in payload
 
 
 def _write_e2e_config(project_root: Path, taxonomy: dict) -> None:
@@ -1064,7 +1156,6 @@ def test_e2e_draft_publish_navigation_and_repeated_video(
 
     draft.write_text(_complete_ai_regions(draft.read_text(encoding="utf-8")), encoding="utf-8")
     _write_passed_analysis(Path(first["analysis_path"]))
-    _complete_agent_workflow(first)
     completed, code = finalize_note(tmp_path, Path(first["job_dir"]), draft)
     assert code == 0 and completed["status"] == "note_ready"
     assert target.is_file()
@@ -1078,6 +1169,34 @@ def test_e2e_draft_publish_navigation_and_repeated_video(
     assert Path(repeated["note_path"]).name == "H3 分段工作流（2）.md"
 
 
+def test_e2e_strict_mode_still_publishes_after_stage_completion(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_e2e_config(tmp_path, taxonomy)
+    (tmp_path / "config" / "local.json").write_text(
+        json.dumps({"notes_root": "notes/bilibili", "workflow_mode": "strict"}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", _fake_ytdlp)
+    monkeypatch.setattr("bili_learning.lifecycle._schedule_failsafe_cleanup", lambda *args: None)
+
+    prepared, code = prepare_note(tmp_path, "BV1TXua68EYi")
+    assert code == 0 and prepared["status"] == "materials_ready"
+    assert prepared["workflow_mode"] == "strict"
+    for key in ("fact_ledger_path", "semantic_draft_path", "layout_plan_path"):
+        assert Path(prepared[key]).is_file()
+
+    draft = Path(prepared["draft_path"])
+    draft.write_text(_complete_ai_regions(draft.read_text(encoding="utf-8")), encoding="utf-8")
+    _write_passed_analysis(Path(prepared["analysis_path"]))
+    _complete_agent_workflow(prepared)
+
+    completed, code = finalize_note(tmp_path, Path(prepared["job_dir"]), draft)
+
+    assert code == 0 and completed["status"] == "note_ready"
+    assert Path(prepared["note_path"]).is_file()
+
+
 def test_finalize_reports_failure_when_cleanup_fails(tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch) -> None:
     _write_e2e_config(tmp_path, taxonomy)
     monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", _fake_ytdlp)
@@ -1087,7 +1206,7 @@ def test_finalize_reports_failure_when_cleanup_fails(tmp_path: Path, taxonomy: d
     draft = Path(prepared["draft_path"])
     draft.write_text(_complete_ai_regions(draft.read_text(encoding="utf-8")), encoding="utf-8")
     _write_passed_analysis(Path(prepared["analysis_path"]))
-    _complete_agent_workflow(prepared)
+
     monkeypatch.setattr(
         "bili_learning.lifecycle.cleanup_job",
         lambda *_args: (_ for _ in ()).throw(PermissionError("WinError 32")),
@@ -1116,7 +1235,7 @@ def test_e2e_unfinished_draft_never_enters_navigation_and_invalid_draft_is_not_p
     finished_draft = Path(finished["draft_path"])
     finished_draft.write_text(_complete_ai_regions(finished_draft.read_text(encoding="utf-8")), encoding="utf-8")
     _write_passed_analysis(Path(finished["analysis_path"]))
-    _complete_agent_workflow(finished)
+
     completed, code = finalize_note(tmp_path, Path(finished["job_dir"]), finished_draft)
     assert code == 0 and completed["status"] == "note_ready"
     nav_text = (tmp_path / "notes" / "bilibili" / "99-导航" / "00-待整理.md").read_text(encoding="utf-8")

@@ -160,11 +160,17 @@ def _layout_plan_has_content(text: str) -> bool:
 
 
 def validate_agent_workflow(job: dict[str, Any]) -> list[str]:
-    """验证新任务是否完成三个 runtime 阶段；旧 job 无新字段时保持兼容。"""
+    """严格模式校验三个 runtime 阶段；轻量模式不强制中间工作文件。"""
+
+    mode = job.get("workflow_mode")
+    if mode == "light":
+        return []
+    if mode not in {None, "strict"}:
+        return ["workflow_mode 无效"]
 
     present = [key in job for key in _WORKFLOW_PATHS]
     if not any(present):
-        return []
+        return ["strict 模式缺少运行时工作文件"] if mode == "strict" else []
     if not all(present):
         return ["运行时工作流路径不完整"]
 

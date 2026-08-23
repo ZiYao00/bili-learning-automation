@@ -10,25 +10,24 @@
 
 ## 必须执行的流程
 
-1. 把原始收到的文本交给 collector。
-2. collector 先检查笔记位置。若返回 `configuration_required`，适配层必须停止采集并向用户索取 Obsidian Vault 根目录（包含 `.obsidian` 的目录），通过统一 `configure-obsidian` 入口写入本机配置后再重试原请求；不得静默使用仓库内 fallback。若返回 `failed` 且 `code = ytdlp_not_configured`，只向用户提供安装指引（Windows 推荐 `winget install yt-dlp`），不得自动安装、下载或把 `yt-dlp.exe` 放入 Skill / 仓库；安装完成后再重试。collector 返回 `materials_ready` 时再读取 `handoff_path`、`job.json`、`analysis_path`、`agent_work_dir`、`fact_ledger_path`、`semantic_draft_path`、`layout_plan_path`、`transcript_manifest_path` 和共享内容标准。`in_progress` 不得重新采集；若响应带绑定 `job_dir`，适配层只能在确认该 job 已明显陈旧且仍处于未写作状态、必需文件完整时续做同一 job，否则继续视为活动任务。程序会把原始 SRT 整理为 runtime-only transcript；短字幕为单块 `direct`，长字幕为按完整 cue 边界生成的 `chunked` 清单。
-3. 先判断字幕与简介是否足以支撑可信学习笔记，并填写 runtime 的 `analysis.json`。
-4. 对长字幕、百科型、参数密集或实测证据多的内容，必须先完成 `fact_ledger_path`：按 manifest 顺序记录原子事实，再把 `knowledge_outline` 作为 Fact Ledger 的上层索引。Fact Ledger 优先保留具体成员、数值、版本、关系、适用条件、例外、冲突、兼容性、作者评价，以及“配置 → 耗时 / 质量 / 失败表现”；不得先压成几个主题名。普通短视频可把 Fact Ledger 标记为 `not_applicable`，但必须填写 `workflow_reason`；其余情况完成后把 `workflow_status` 标记为 `complete`。不能用模型常识补全。
-5. Fact Ledger 完成后，先在 `semantic_draft_path` 写内容完成稿。Semantic Draft 用普通 Markdown 自然聚类事实；章节数量只决定事实如何分组，不改变事实保留预算。一个 H2 可以通过 H3、表格、列表和必要 Callout 承载大量事实。内容稿完成后把 Semantic Draft 的 `workflow_status` 标记为 `complete`；本阶段不要编辑最终 `draft_path`。
-6. Semantic Draft 内容完成后才进入 `layout_plan_path` 与 Layout Pass。Layout Pass 只把现有关系转换成 Table / Grid / Card / Risk / Meta / Resource / Chip / Metric，不重新摘要、重新选择或删除事实；整页只保留一个最高优先级 Summary。排版计划完成并确认事实无损后，把 Layout Plan 的 `workflow_status` 标记为 `complete`，再把短的 `BILI_AI_SUMMARY` 与完整 `BILI_AI_BODY` 写入最终 `draft_path`。详细规则见 `docs\standards\KNOWLEDGE-DENSE-WORKFLOW.md` 与 `docs\OBSIDIAN-STYLING.md`。
-7. 最终排版后必须重新按 manifest 顺序抽查或复读原 transcript，并同时对照 Fact Ledger、Semantic Draft 与最终正文。确认成员、关系、可直接使用值、例外、运行前提、实测条件与结果没有在自然聚类或排版阶段被二次压缩，再将 `coverage_review.status` 设为 `passed` 并填写 notes。
-8. 无论写作成功、失败或中断，都必须运行 finalizer 清理 job。
-9. 只有 finalizer 返回 `note_ready` 且 `temporary_data_removed: true` 才能报告完成。
+1. 把原始消息交给 collector，并按返回的 `status` 分支。`configuration_required` 时停止采集并询问 Vault；`ytdlp_not_configured` 时只提供安装指引；`in_progress` 不重复采集；只有 `materials_ready` 或确认可安全续做的旧 job 才继续。
+2. 读取 `handoff_path`、`job.json`、`analysis_path`、`workflow_mode` 与 `transcript_manifest_path`。按 manifest 顺序完整读取全部 transcript chunk，不自行重新切分或跳读。
+3. 先判断字幕与简介是否足以支撑可信笔记，并填写 `analysis.json`。来源不足时停止，不用模型常识补具体参数、资源或结论。
+4. 按 `workflow_mode` 执行：
+   - `light`：读取 `docs\standards\LIGHT-WORKFLOW.md`，直接完成正文；先写完整内容，再做一次独立排版优化，不创建 Fact Ledger、Semantic Draft 或 Layout Plan。
+   - `strict`：按 `fact_ledger_path → semantic_draft_path → layout_plan_path → draft_path` 执行，完整规则见 `CODEX-VIDEO-NOTE-GUIDE.md` 与 `KNOWLEDGE-DENSE-WORKFLOW.md`。
+5. 最终排版后回看 transcript，修正明显遗漏和无来源内容；严格模式还要对照 Fact Ledger 与 Semantic Draft。完成后更新 `coverage_review`。
+6. 无论成功、失败或中断，都必须由 finalizer 清理 job。只有返回 `note_ready` 且 `temporary_data_removed: true` 才能报告完成。
 
 `configuration_required`、`in_progress`、`subtitle_unavailable`、`source_insufficient`、`failed` 和 `note_invalid` 都不是完成状态。
 
 ## 数据契约
 
-- 新生成的 `job.json` 使用 `schema_version: 1`；finalizer 只接受该版本。
-- collector 与 finalizer 的 JSON 响应包含 `schema_version: 1`、`status` 和可读 `message`（如适用）；智能体必须以 `status` 判断分支。`in_progress` 还可返回 reservation 当前绑定的 `job_dir`，供适配层在不重新采集的前提下验证是否可安全续做。
+- 新生成的 `job.json` 使用 `schema_version: 1`，并包含 `workflow_mode: light | strict`；当前默认值为 `light`。
+- collector 与 finalizer 的 JSON 响应包含 `schema_version: 1`、`status` 和可读 `message`（如适用）；`materials_ready` 还会返回 `workflow_mode`。智能体必须以 `status` 与 `workflow_mode` 判断分支。
 - Frontmatter 的 `author`、`published`、`duration`、`source`、tags 与 `cssclasses`，以及标题下方“作者 · 日期 · 时长 · BVID”元信息行由程序生成，智能体不得自行改写；视频笔记固定使用 `learning-page + video-note` 以接入共享 Obsidian 视觉系统。
-- `analysis.json` 是 runtime-only 质量报告，不进入最终 Obsidian 笔记。它用于记录来源充分性、知识清单和覆盖复核状态，不是给用户阅读的机器报告。
-- collector 会在 `agent_work_dir` 创建 `fact-ledger.md`、`semantic-draft.md` 与 `layout-plan.md`，并通过 `fact_ledger_path`、`semantic_draft_path`、`layout_plan_path` 返回位置。它们用于分离事实保全、内容成稿和视觉排版，不进入正式笔记，也不改变当前 `analysis.json schema_version: 1`。
+- `analysis.json` 是 runtime-only 质量报告，不进入最终 Obsidian 笔记。它用于记录来源充分性、知识索引和覆盖复核状态。
+- 只有 `strict` 模式会在 `agent_work_dir` 创建 `fact-ledger.md`、`semantic-draft.md` 与 `layout-plan.md`，并返回对应路径；`light` 模式不创建这些文件。
 
 ## 不可突破的数据边界
 
@@ -36,7 +35,7 @@
 - `confirmed_empty` 仅代表 info-json 明确给出空字符串且（如存在）简介 sidecar 与其一致；字段缺失、`null`、类型异常或两者不一致都必须失败。
 - Cookie 内容不得读取、打印、上传、编辑、提交或写入笔记；collector 仅可把配置的 Cookie 文件路径传给 yt-dlp。
 - 原始字幕、元数据、简介、`analysis.json`、日志和智能体临时工作文件只允许存在于 `.runtime/bilibili-learning` 的单个 job；finalizer 负责精确清理。
-- 智能体只可编辑既定的 `analysis.json`、草稿中的两个 AI 区域，以及 `agent_work_dir` 内的 runtime 工作文件。原始 SRT 由核心预处理器转换为 `transcript-manifest.json` 与一个或多个 transcript chunk；转换只移除 SRT 序号、毫秒精度与空行，保留字幕文字、顺序和 cue 边界，不做摘要、关键词过滤或语义去重。智能体应优先按 manifest 读取这些 chunk；知识密集型内容依次使用 `fact-ledger.md`、`semantic-draft.md`、`layout-plan.md`，必要时还可创建 `part-XX-notes.md`。`agent_work_dir` 不得存放最终笔记或持久资料；其内容随 job 一并由 finalizer / failsafe 清理。
+- 智能体只可编辑既定的 `analysis.json`、草稿中的两个 AI 区域，以及当前模式明确提供的 runtime 工作文件。原始 SRT 会被转换为 `transcript-manifest.json` 与一个或多个 transcript chunk；转换只移除 SRT 序号、毫秒精度与空行，保留字幕文字、顺序和 cue 边界，不做摘要或语义过滤。`light` 模式直接读取 transcript 并写笔记；`strict` 模式才使用 `fact-ledger.md`、`semantic-draft.md`、`layout-plan.md`。`agent_work_dir` 不得存放最终笔记或持久资料；其内容随 job 一并清理。
 - 智能体不得手工删除 job、reservation 或锁文件。finalizer 清理失败时必须如实报告失败状态，保留现场供后续诊断；只有用户明确授权后，才可对已核实的单个遗留文件执行回收站归档。
 - 不得覆盖已有笔记；同一 BVID 仅在**活动任务期间**由 reservation 防止并发处理，任务完成后允许再次转换。草稿只存在于 runtime，只有 finalizer 校验通过后才原子发布到 `note_path`。
 

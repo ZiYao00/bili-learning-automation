@@ -48,6 +48,7 @@
 - 保留 UP 主原始简介和重要资源链接，并识别“三连 / 充电 / 评论关键词 / 私信 / 进群”等明确的附加资料获取条件；资料本体未出现在来源中时不会由智能体自行补写；
 - 字幕不足时宁可停止，也不靠模型常识补写事实；
 - 长字幕自动生成 transcript manifest 和分块，避免一次把超长 SRT 塞进上下文；
+- 默认使用轻量写作模式：完整读字幕后直接写笔记，内容完成再做一次排版优化；需要审计中间阶段时可切换到 `strict`；
 - 极小尾块自动合并，减少无意义的额外 Agent 读取；
 - 新笔记先进入 `00-待整理`，学完以后再归档；
 - 文件名默认保留原视频标题，同名自动加 `（2）`、`（3）`，不覆盖旧笔记；
@@ -143,7 +144,7 @@ Hermes / WorkBuddy / Codex 只负责读取已经准备好的 transcript，再完
 → 知识正文
 ```
 
-播放器与来源区不再显示额外标题：播放器直接位于“先看结论”之后，UP 主资源以逐条链接列表展示，视频简介保持紧凑，UP 主原文（完整说明与链接）继续折叠留档。知识密集型视频会先建立原子事实清单，再形成正文，并在完成前重新回看原 transcript，减少参数、成员关系和例外条件被二次压缩。
+播放器与来源区不再显示额外标题：播放器直接位于“先看结论”之后，UP 主资源以逐条链接列表展示，视频简介保持紧凑，UP 主原文（完整说明与链接）继续折叠留档。默认 `light` 模式完整读取 transcript 后直接生成正文，再独立做一次排版优化；需要 Fact Ledger、Semantic Draft 与 Layout Plan 时可切换为 `strict`。
 
 项目自带 Obsidian 样式：
 
@@ -179,7 +180,7 @@ obsidian/snippets/
 | --- | --- | --- |
 | Hermes | 想在微信里直接发链接的人 | `hermes-skills/bili-learning-automation/` |
 | WorkBuddy | 在 WorkBuddy 会话里使用 | `workbuddy-skills/bili-learning-automation/` |
-| Codex | 开发、测试、维护项目 | 读取 `AGENTS.md` 和 `docs/AGENT-INTEGRATION.md` |
+| Codex | 开发、测试、维护项目 | 先读 `AGENTS.md`，再按 `workflow_mode` 选择轻量或严格说明 |
 
 这些只是**薄适配层**。核心 collector、transcript、taxonomy、finalizer 和内容标准保持共用。
 
@@ -223,7 +224,8 @@ config/local.json
 {
   "vault_root": "D:\\Notes\\MyVault",
   "notes_subdir": "bilibili",
-  "cookie_file": "D:\\Private\\bilibili_cookies.txt"
+  "cookie_file": "D:\\Private\\bilibili_cookies.txt",
+  "workflow_mode": "light"
 }
 ```
 
@@ -239,6 +241,7 @@ config/local.json
 - `BILI_LEARNING_NOTES_ROOT`（旧版兼容）
 - `BILI_LEARNING_YTDLP`
 - `BILI_LEARNING_COOKIE_FILE`
+- `BILI_LEARNING_WORKFLOW_MODE`（`light` / `strict`）
 
 详见 [配置说明](docs/CONFIGURATION.md)。
 

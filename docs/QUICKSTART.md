@@ -63,7 +63,8 @@ Copy-Item .\config\local.json.example .\config\local.json
 {
   "vault_root": "D:\\Notes\\MyVault",
   "notes_subdir": "bilibili",
-  "cookie_file": "D:\\Private\\bilibili_cookies.txt"
+  "cookie_file": "D:\\Private\\bilibili_cookies.txt",
+  "workflow_mode": "light"
 }
 ```
 
@@ -71,7 +72,8 @@ Copy-Item .\config\local.json.example .\config\local.json
 
 - `vault_root`：Obsidian Vault 根目录，也就是直接包含 `.obsidian` 的目录；
 - `notes_subdir`：本项目在 Vault 内使用的相对子目录，默认推荐 `bilibili`；
-- `cookie_file`：Netscape 格式 Bilibili Cookie 文件的位置。
+- `cookie_file`：Netscape 格式 Bilibili Cookie 文件的位置；
+- `workflow_mode`：默认 `light`，让智能体完整读字幕后直接写笔记，再做一次排版优化；需要严格分阶段审计时改为 `strict`。
 
 最终笔记目录会自动计算为 `<vault_root>/<notes_subdir>`。例如上面的配置会写入 `D:\Notes\MyVault\bilibili\00-待整理\`。
 
@@ -190,14 +192,13 @@ workbuddy-skills/bili-learning-automation/
 
 ### Codex
 
-Codex 不需要额外复制一份 Skill。进入项目后遵循：
+Codex 不需要额外复制一份 Skill。进入项目后先读取：
 
 ```text
 AGENTS.md
-docs/AGENT-INTEGRATION.md
 ```
 
-即可使用核心流程。
+再按 collector 返回的 `workflow_mode` 选择 `LIGHT-WORKFLOW.md` 或严格流程文档。默认测试使用 `light`。
 
 ---
 
@@ -226,9 +227,9 @@ BVxxxxxxxxxx
 → yt-dlp 获取字幕 / 简介 / 元数据
 → 生成 transcript
 → 判断资料是否足够
-→ 提取知识
-→ 写“先看结论 + 知识正文”
-→ 覆盖复核
+→ 完整读字幕并写“先看结论 + 知识正文”
+→ 内容完成后做一次版式优化
+→ 回看字幕完成覆盖复核
 → finalizer 校验
 → 写入 Obsidian
 ```

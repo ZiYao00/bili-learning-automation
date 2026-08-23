@@ -41,6 +41,7 @@ def doctor_report(settings: Settings) -> dict[str, object]:
     )
     add("OK" if settings.project_root.is_dir() else "FAIL", "project_root_exists", "project root", str(settings.project_root))
     add("OK", "taxonomy_ready", "taxonomy", str(settings.taxonomy_path))
+    add("OK", "workflow_mode", "workflow mode", settings.workflow_mode)
 
     if settings.notes_is_fallback:
         add(

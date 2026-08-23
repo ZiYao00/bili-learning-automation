@@ -45,6 +45,7 @@ The project currently provides entry points for **Hermes, WorkBuddy, and Codex**
 - Conservatively recognizes explicit resource-access conditions such as likes/favorites/coins, charging, comment keywords, direct messages, or group access. It never invents a template or file that was not present in the source material.
 - Stops when the available source is insufficient instead of filling factual gaps from model knowledge.
 - Converts long subtitles into a transcript manifest and ordered chunks so agents do not need to load an entire long SRT at once.
+- Uses the lightweight writing flow by default: read the full transcript, write the note directly, then run a separate layout pass. A strict auditable flow remains available.
 - Merges tiny trailing transcript chunks to avoid wasteful extra reads.
 - Publishes new notes to `00-待整理` first; knowledge organization is a separate post-learning step.
 - Uses the original video title as the filename and adds `（2）`, `（3）`, etc. instead of overwriting an existing note.
@@ -118,7 +119,8 @@ Example:
 {
   "vault_root": "D:\\Notes\\MyVault",
   "notes_subdir": "bilibili",
-  "cookie_file": "D:\\Private\\bilibili_cookies.txt"
+  "cookie_file": "D:\\Private\\bilibili_cookies.txt",
+  "workflow_mode": "light"
 }
 ```
 
@@ -126,7 +128,8 @@ Where:
 
 - `vault_root` is the Obsidian Vault directory that directly contains `.obsidian`;
 - `notes_subdir` is the relative directory used by this project inside the Vault;
-- `cookie_file` points to a Netscape-format Bilibili Cookie file.
+- `cookie_file` points to a Netscape-format Bilibili Cookie file;
+- `workflow_mode` is `light` by default; use `strict` to restore the staged Fact Ledger / Semantic Draft / Layout Plan workflow.
 
 `config/local.json` is ignored by Git.
 
@@ -138,6 +141,7 @@ You may also use environment variables:
 - `BILI_LEARNING_NOTES_ROOT` (legacy compatibility)
 - `BILI_LEARNING_YTDLP`
 - `BILI_LEARNING_COOKIE_FILE`
+- `BILI_LEARNING_WORKFLOW_MODE` (`light` / `strict`)
 
 See [Configuration](docs/CONFIGURATION.md) for the full behavior and precedence rules.
 
@@ -197,7 +201,7 @@ See [Obsidian Styling](docs/OBSIDIAN-STYLING.md).
 | --- | --- | --- |
 | Hermes | Send a Bilibili link from a private chat / phone workflow | `hermes-skills/bili-learning-automation/` |
 | WorkBuddy | Convert links inside a WorkBuddy session | `workbuddy-skills/bili-learning-automation/` |
-| Codex | Development, testing, and direct project maintenance | `AGENTS.md` + `docs/AGENT-INTEGRATION.md` |
+| Codex | Development, testing, and direct project maintenance | Read `AGENTS.md`, then follow the selected `workflow_mode` |
 
 These are thin adapters. The project intentionally keeps the content and validation rules in a shared core rather than maintaining separate implementations for each agent.
 

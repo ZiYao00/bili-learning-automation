@@ -10,6 +10,8 @@ from typing import Any
 SUPPORTED_TAXONOMY_VERSION = 1
 LOCAL_CONFIG_RELATIVE_PATH = Path("config/local.json")
 DEFAULT_NOTES_SUBDIR = "bilibili"
+DEFAULT_WORKFLOW_MODE = "light"
+SUPPORTED_WORKFLOW_MODES = {"light", "strict"}
 OBSIDIAN_SNIPPET_NAMES = ("learning-lab.css", "video-note.css")
 YTDLP_INSTALL_URL = "https://github.com/yt-dlp/yt-dlp/wiki/Installation"
 YTDLP_WINDOWS_INSTALL_COMMAND = "winget install yt-dlp"
@@ -49,6 +51,7 @@ class Settings:
     cookie_file: Path
     ytdlp: ExecutableResolution
     local_config_path: Path
+    workflow_mode: str = DEFAULT_WORKFLOW_MODE
 
 
 def _resolve_path(project_root: Path, value: str) -> Path:
@@ -126,7 +129,7 @@ def _load_local_config(project_root: Path) -> tuple[Path, dict[str, str]]:
         raise ConfigurationError("local_config_invalid_json", f"本机配置不是有效 JSON：{path}") from exc
     if not isinstance(raw, dict):
         raise ConfigurationError("local_config_invalid_type", "本机配置必须是 JSON 对象")
-    allowed = {"taxonomy", "notes_root", "vault_root", "notes_subdir", "cookie_file", "ytdlp"}
+    allowed = {"taxonomy", "notes_root", "vault_root", "notes_subdir", "cookie_file", "ytdlp", "workflow_mode"}
     unknown = sorted(set(raw) - allowed)
     if unknown:
         raise ConfigurationError("local_config_unknown_key", "本机配置存在不支持字段：" + ", ".join(unknown))
@@ -142,6 +145,12 @@ def _load_local_config(project_root: Path) -> tuple[Path, dict[str, str]]:
         )
     if "notes_subdir" in values and "vault_root" not in values:
         raise ConfigurationError("local_config_notes_subdir_without_vault", "配置 notes_subdir 时必须同时配置 vault_root。")
+    workflow_mode = values.get("workflow_mode")
+    if workflow_mode and workflow_mode not in SUPPORTED_WORKFLOW_MODES:
+        raise ConfigurationError(
+            "workflow_mode_invalid",
+            "workflow_mode 只支持 light 或 strict。",
+        )
     return path, values
 
 
@@ -217,6 +226,17 @@ def find_ytdlp(project_root: Path, local_config: dict[str, str]) -> ExecutableRe
     return ExecutableResolution(None, "missing", tuple(checked))
 
 
+def _resolve_workflow_mode(local_config: dict[str, str]) -> str:
+    mode = (os.environ.get("BILI_LEARNING_WORKFLOW_MODE") or local_config.get("workflow_mode") or DEFAULT_WORKFLOW_MODE)
+    normalized = mode.strip().lower()
+    if normalized not in SUPPORTED_WORKFLOW_MODES:
+        raise ConfigurationError(
+            "workflow_mode_invalid",
+            "BILI_LEARNING_WORKFLOW_MODE / workflow_mode 只支持 light 或 strict。",
+        )
+    return normalized
+
+
 def load_settings(project_root: Path) -> Settings:
     project_root = project_root.resolve()
     local_config_path, local_config = _load_local_config(project_root)
@@ -252,4 +272,5 @@ def load_settings(project_root: Path) -> Settings:
         cookie_file=cookie_file,
         ytdlp=find_ytdlp(project_root, local_config),
         local_config_path=local_config_path,
+        workflow_mode=_resolve_workflow_mode(local_config),
     )

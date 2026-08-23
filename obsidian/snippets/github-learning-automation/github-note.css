@@ -1,0 +1,57 @@
+/*
+ * GitHub Note — Learning Lab Extension v0.1
+ * Requires: learning-lab.css Core v0.3+
+ * Scope: notes with cssclasses: [learning-page, github-note]
+ * Namespace: --gn-* / github-note-*
+ * Goal: keep repository notes compact, source-oriented, and easy to scan.
+ */
+
+.learning-page.github-note {
+  --gn-meta-gap: 0.55rem;
+}
+
+/* ---------- Compact repository header ---------- */
+
+.learning-page.github-note h1 {
+  max-width: 52ch;
+  margin-bottom: 0.18rem;
+  font-size: clamp(1.3rem, 1.8vw, 1.55rem);
+  font-weight: 680;
+  line-height: 1.22;
+  letter-spacing: -0.018em;
+}
+
+.learning-page.github-note .github-note-meta {
+  display: block;
+  margin: 0.1rem 0 var(--gn-meta-gap);
+  color: var(--ll-muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+/* ---------- Dense source-driven sections ---------- */
+
+.learning-page.github-note .callout[data-callout="summary"] {
+  margin-top: 0.7rem;
+}
+
+.learning-page.github-note .callout[data-callout="risk"],
+.learning-page.github-note .callout[data-callout="meta"],
+.learning-page.github-note .callout[data-callout="resource"] {
+  max-width: 100%;
+}
+
+.learning-page.github-note .callout[data-callout="meta"] {
+  margin-block: 0.65rem;
+}
+
+.learning-page.github-note h2 + h3 {
+  margin-top: 1.1em;
+}
+
+@media (max-width: 720px) {
+  .learning-page.github-note h1 {
+    max-width: none;
+    font-size: clamp(1.2rem, 5vw, 1.42rem);
+  }
+}

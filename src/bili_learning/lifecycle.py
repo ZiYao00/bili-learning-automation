@@ -181,9 +181,12 @@ def prepare_note(
                 "draft_path": job["draft_path"],
                 "analysis_path": job["analysis_path"],
                 "agent_work_dir": job["agent_work_dir"],
-                "fact_ledger_path": job["fact_ledger_path"],
-                "semantic_draft_path": job["semantic_draft_path"],
-                "layout_plan_path": job["layout_plan_path"],
+                "workflow_mode": job["workflow_mode"],
+                **{
+                    key: job[key]
+                    for key in ("fact_ledger_path", "semantic_draft_path", "layout_plan_path")
+                    if key in job
+                },
                 "transcript_manifest_path": job["transcript_manifest_path"],
                 "transcript_mode": job["transcript_mode"],
                 "transcript_chunk_count": job["transcript_chunk_count"],

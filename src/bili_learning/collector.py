@@ -170,7 +170,7 @@ def create_job(
         analysis_path = job_dir / "analysis.json"
         agent_work_dir = job_dir / "agent-work"
         agent_work_dir.mkdir(parents=True, exist_ok=True)
-        workflow_paths = write_agent_work_templates(agent_work_dir)
+        workflow_paths = write_agent_work_templates(agent_work_dir) if settings.workflow_mode == "strict" else {}
         transcript = prepare_agent_transcript(subtitle, agent_work_dir)
         resource_access_notices = detect_resource_access_notices(description, subtitle)
         payload: dict[str, Any] = {
@@ -193,6 +193,7 @@ def create_job(
             "draft_path": str(draft_path),
             "analysis_path": str(analysis_path),
             "agent_work_dir": str(agent_work_dir),
+            "workflow_mode": settings.workflow_mode,
             **workflow_paths,
             "transcript_manifest_path": transcript["manifest_path"],
             "transcript_mode": transcript["mode"],
@@ -209,7 +210,7 @@ def new_job_dir(settings: Settings, bvid: str) -> Path:
     return Path(tempfile.mkdtemp(prefix=f"{bvid}-", dir=settings.runtime_root))
 
 
-def write_handoff(job_dir: Path, payload: dict[str, Any]) -> Path:
+def _write_strict_handoff(job_dir: Path, payload: dict[str, Any]) -> Path:
     handoff = job_dir / "agent_handoff.md"
     handoff.write_text(
         "# B站视频转笔记任务\n\n"
@@ -222,4 +223,25 @@ def write_handoff(job_dir: Path, payload: dict[str, Any]) -> Path:
         "7. 写完立即运行 finalizer；无论成功或失败都必须 finalizer 清理 job。\n",
         encoding="utf-8",
     )
+    return handoff
+
+
+def _light_handoff_text() -> str:
+    return (
+        "# B站视频转笔记任务\n\n"
+        "工作模式：`light`。本任务优先让模型完整理解字幕并自然写作，不创建 Fact Ledger、Semantic Draft 或 Layout Plan。\n\n"
+        "1. 读取 `job.json`、`transcript_manifest_path` 和 `docs/standards/LIGHT-WORKFLOW.md`。按 manifest 顺序完整读完所有 transcript chunk；不要自行重新切分，也不要跳读。\n"
+        "2. 判断字幕与 UP 主简介是否足以支撑可信笔记，并填写 `analysis_path`。来源不足时停止，不要用模型常识补具体参数、资源或结论。\n"
+        "3. 直接在 `draft_path` 的两个 AI 区域写一篇完整、实用、适合长期查询的笔记。优先保留参数、数值、工具、模型、步骤、条件、比较、兼容性、作者建议和实测结果；章节数量由内容自然决定，不要为了简短主动压缩有价值信息。\n"
+        "4. 内容写完整后，再独立做一次版式优化。此时可按需读取 `docs/OBSIDIAN-STYLING.md`，或只查看 `STANDARD-VIDEO-NOTE-EXAMPLE.md` 中与当前关系匹配的局部写法。适度使用表格、列表、Grid / Card、Risk、Meta、Chip 或 Metric；不要求使用任何组件，也不要为了美化改写或删减知识。\n"
+        "5. 最后回看 transcript，修正明显遗漏和无来源事实；再将 `coverage_review.status` 设为 `passed` 并填写简短 notes。不要修改 Frontmatter、H1、播放器与来源区、资源、文件名、路径、tags、cssclasses 或 marker。\n"
+        "6. 写完立即运行 finalizer；无论成功或失败都必须由 finalizer 清理 job。\n"
+    )
+
+
+def write_handoff(job_dir: Path, payload: dict[str, Any]) -> Path:
+    if payload.get("workflow_mode") != "light":
+        return _write_strict_handoff(job_dir, payload)
+    handoff = job_dir / "agent_handoff.md"
+    handoff.write_text(_light_handoff_text(), encoding="utf-8")
     return handoff

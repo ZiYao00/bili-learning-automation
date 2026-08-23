@@ -28,7 +28,8 @@ config/local.json.example
 {
   "vault_root": "D:\\Notes\\MyVault",
   "notes_subdir": "bilibili",
-  "cookie_file": "D:\\Private\\bilibili_cookies.txt"
+  "cookie_file": "D:\\Private\\bilibili_cookies.txt",
+  "workflow_mode": "light"
 }
 ```
 
@@ -92,6 +93,21 @@ Vault 内用于保存本项目笔记的**相对子目录**。默认推荐：
 ### `cookie_file`
 
 Netscape 格式 Bilibili Cookie 文件路径。这里只写路径，不要把 Cookie 内容放进 JSON、日志、Issue 或聊天记录。
+
+### `workflow_mode`
+
+控制 Agent 的写作流程：
+
+- `light`：当前默认实验模式。完整读字幕后直接写笔记，内容完成再做一次排版优化；不创建 Fact Ledger、Semantic Draft 或 Layout Plan。
+- `strict`：保留此前的分阶段严格流程，用于需要可审计中间文件和阶段门禁的任务。
+
+推荐先使用：
+
+```json
+"workflow_mode": "light"
+```
+
+也可以临时通过环境变量 `BILI_LEARNING_WORKFLOW_MODE=strict` 切换，而不修改本机 JSON。
 
 ---
 
@@ -186,6 +202,7 @@ notes/bilibili
 | `BILI_LEARNING_NOTES_ROOT` | 旧版兼容：直接指定笔记根目录 |
 | `BILI_LEARNING_COOKIE_FILE` | Cookie 文件 |
 | `BILI_LEARNING_TAXONOMY` | 自定义 taxonomy 文件 |
+| `BILI_LEARNING_WORKFLOW_MODE` | `light` 或 `strict` 写作模式 |
 
 推荐的新方式：
 
