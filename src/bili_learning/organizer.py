@@ -119,11 +119,10 @@ def _rewrite_title_and_intro(text: str, title: str, intro: str) -> str:
     if details_at >= 0:
         return result[:details_at].rstrip() + f"\n\n{compact_intro}\n\n" + result[details_at:]
 
-    video_materials_at = result.find("## 视频资料")
-    if video_materials_at >= 0:
+    if 'player.bilibili.com/player.html?bvid=' in result:
         return result.rstrip() + f"\n\n{compact_intro}\n"
 
-    raise ValueError("笔记缺少标准视频资料区，无法整理")
+    raise ValueError("笔记缺少标准播放器与来源区，无法整理")
 
 
 def _publish_reorganized(source: Path, target: Path, content: str) -> None:

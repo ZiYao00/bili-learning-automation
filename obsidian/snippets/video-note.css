@@ -16,8 +16,8 @@
 .learning-page.video-note h1 {
   max-width: 46ch;
   margin-bottom: 0.2rem;
-  font-size: clamp(1.26rem, 1.55vw, 1.38rem);
-  font-weight: 700;
+  font-size: clamp(1.14rem, 1.35vw, 1.26rem);
+  font-weight: 650;
   line-height: 1.28;
   letter-spacing: -0.012em;
 }
@@ -37,12 +37,7 @@
   font-size: 0.82rem;
 }
 
-/* ---------- Compact video materials ---------- */
-
-.learning-page.video-note h2[data-heading="视频资料"] {
-  margin-top: 0.9rem;
-  margin-bottom: 0.4rem;
-}
+/* ---------- Compact player and source area ---------- */
 
 .learning-page.video-note iframe.video-note-player,
 .learning-page.video-note iframe[src*="player.bilibili.com"] {
@@ -56,24 +51,26 @@
   overflow: hidden;
 }
 
-.learning-page.video-note .video-note-resource-links,
 .learning-page.video-note .video-note-overview {
   margin: 0.42rem 0;
   font-size: 0.88rem;
   line-height: 1.5;
 }
 
-.learning-page.video-note .video-note-resource-links {
-  color: var(--ll-muted);
-}
-
-.learning-page.video-note .video-note-resource-links strong,
+.learning-page.video-note h3[data-heading="UP 主资源"],
 .learning-page.video-note .video-note-overview strong {
   color: var(--ll-text);
 }
 
-.learning-page.video-note .video-note-resource-links a {
-  white-space: normal;
+.learning-page.video-note h3[data-heading="UP 主资源"] {
+  margin: 0.65rem 0 0.2rem;
+  font-size: 0.94rem;
+}
+
+.learning-page.video-note h3[data-heading="UP 主资源"] + .list-bullet {
+  margin-block: 0.15rem 0.55rem;
+  font-size: 0.88rem;
+  line-height: 1.55;
 }
 
 /* ---------- Source appendix ---------- */
@@ -118,7 +115,7 @@
 @media (max-width: 720px) {
   .learning-page.video-note h1 {
     max-width: none;
-    font-size: clamp(1.22rem, 4.8vw, 1.32rem);
+    font-size: clamp(1.1rem, 4.5vw, 1.22rem);
   }
 
   .learning-page.video-note iframe.video-note-player,

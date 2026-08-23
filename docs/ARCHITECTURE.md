@@ -38,7 +38,7 @@
 - iframe；
 - tags；
 - `learning-page + video-note` cssclasses；
-- 阅读顺序（Summary → Video Materials / Player / Source → AI Body）；
+- 阅读顺序（Summary → Player / Source → AI Body）；
 - 输出路径；
 - 导航。
 
@@ -47,7 +47,7 @@ taxonomy 的 route.path 不直接决定新文件的路径。新笔记统一先�
 接入智能体只负责字幕理解与语义内容：
 
 - 判断字幕与简介是否足以支撑可信学习笔记；
-- 形成 runtime `knowledge_outline`；知识密集型内容先在 `agent_work_dir` 建立原子事实清单，避免在知识提取阶段先丢具体成员、关系和可直接使用值；
+- 形成 runtime `knowledge_outline`；知识密集型内容先在 `agent_work_dir` 建立原子事实清单，避免在知识提取阶段先丢具体成员、关系、可直接使用值、运行前提和实测证据；
 - 写短的“先看结论”；
 - 根据视频真实信息结构组织动态知识正文；
 - 成稿后重新回到原 transcript 完成覆盖复核，而不是只检查智能体自己生成的 outline。

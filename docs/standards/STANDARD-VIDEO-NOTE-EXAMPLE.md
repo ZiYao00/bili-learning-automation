@@ -26,8 +26,6 @@ cssclasses:
 > [!summary] 先看结论
 > 这段视频讲如何把受单段时长限制的视频拆成连续片段生成；关键是让上一段末帧参与下一段生成，并在扩大总时长前先验证两段之间的主体与动作衔接。
 
-## 视频资料
-
 <iframe class="video-note-player" src="https://player.bilibili.com/player.html?bvid=BV1EXAMPLE01&autoplay=0&danmaku=0" allowfullscreen></iframe>
 
 **资料获取**
@@ -36,12 +34,16 @@ cssclasses:
 > 来源：字幕；当前采集内容未包含该资料本体，本笔记不自行补写。
 > <small>原始说明：三连后可领取本期提示词模板。</small>
 
-<div class="video-note-resource-links"><strong>UP 主资源</strong>：<a href="https://github.com/example/example-node">GitHub 插件 · 示例节点</a> · <a href="https://pan.quark.cn/s/example">工作流（夸克网盘）</a> · <a href="https://example.feishu.cn/wiki/example">模型提示词指令（飞书）</a></div>
+### UP 主资源
+
+- [GitHub 插件 · 示例节点](https://github.com/example/example-node)
+- [工作流（夸克网盘）](https://pan.quark.cn/s/example)
+- [模型提示词指令（飞书）](https://example.feishu.cn/wiki/example)
 
 <p class="video-note-overview"><strong>视频简介</strong>：本示例用于展示程序保留并压缩展示 UP 主原始简介。</p>
 
 <details class="video-note-source-details">
-<summary>UP 主原始简介</summary>
+<summary>UP 主原文（完整说明与链接）</summary>
 
 原始简介内容……
 
@@ -60,7 +62,7 @@ cssclasses:
 - **主体在后续片段发生明显变化** → 检查上一段末帧是否正确作为下一段参考。
 ```
 
-这里使用“怎么做 / 容易踩坑”是因为视频本身是操作教程，不代表它们是固定章节。来源入口放在“先看结论”后、正文前；播放器直接位于“视频资料”下，不再额外增加“原视频”三级标题。资料获取提示、UP 主资源与视频简介都采用紧凑形式，完整原始简介继续折叠。
+这里使用“怎么做 / 容易踩坑”是因为视频本身是操作教程，不代表它们是固定章节。来源入口放在“先看结论”后、正文前；播放器不再使用额外“视频资料”标题。资料获取提示、UP 主资源与视频简介都采用紧凑形式，完整原始简介以“UP 主原文（完整说明与链接）”继续折叠。
 
 ## 示例 B：知识密集型模型百科
 
@@ -70,11 +72,11 @@ cssclasses:
 > [!summary] 先看结论
 > 这类视频的价值不在单一操作步骤，而在模型规格、输入方式、提示词、加速方案和兼容性之间的系统关系。正文应保留可复查的参数、限制、方案差异与作者明确建议。
 
-## 视频资料
-
 <iframe class="video-note-player" src="https://player.bilibili.com/player.html?bvid=BV1EXAMPLE02&autoplay=0&danmaku=0" allowfullscreen></iframe>
 
-<div class="video-note-resource-links"><strong>UP 主资源</strong>：……</div>
+### UP 主资源
+
+- ……
 
 <p class="video-note-overview"><strong>视频简介</strong>：……</p>
 

@@ -88,7 +88,13 @@ def _resource_platform(url: str) -> str:
 
 
 def _append_platform(label: str, platform: str) -> str:
-    if not platform or platform.lower() in label.lower():
+    aliases = {
+        "GitHub": ("github",),
+        "夸克网盘": ("夸克网盘", "夸克", "quark"),
+        "飞书": ("飞书", "feishu"),
+    }
+    normalized_label = label.lower()
+    if not platform or any(alias in normalized_label for alias in aliases.get(platform, (platform.lower(),))):
         return label
     return f"{label}（{platform}）"
 
@@ -139,6 +145,11 @@ def _description_resources(description: str) -> list[tuple[str, str]]:
         if len(label) > len(old_label):
             resources[existing] = (label, old_url)
     return resources
+
+
+def _markdown_resource_link(label: str, url: str) -> str:
+    escaped_label = label.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
+    return f"- [{escaped_label}](<{url}>)"
 
 
 def _is_section_like(line: str) -> bool:
@@ -225,21 +236,14 @@ def render_video_materials(job: dict[str, Any]) -> str:
     overview = _description_overview(description) if status == "present" else None
     notices = list(job.get("resource_access_notices") or [])
 
-    result = [
-        "## 视频资料",
-        "",
-        f'<iframe class="video-note-player" src="https://player.bilibili.com/player.html?bvid={bvid}&autoplay=0&danmaku=0" allowfullscreen></iframe>',
-    ]
+    result = [f'<iframe class="video-note-player" src="https://player.bilibili.com/player.html?bvid={bvid}&autoplay=0&danmaku=0" allowfullscreen></iframe>']
 
     notice_block = render_resource_access_notices(notices)
     if notice_block:
         result.extend(["", notice_block])
 
     if resources:
-        resource_links = " · ".join(
-            f'<a href="{html.escape(url, quote=True)}">{html.escape(label)}</a>' for label, url in resources
-        )
-        result.extend(["", f'<div class="video-note-resource-links"><strong>UP 主资源</strong>：{resource_links}</div>'])
+        result.extend(["", "### UP 主资源", "", *[_markdown_resource_link(label, url) for label, url in resources]])
 
     if overview:
         result.extend(["", f'<p class="video-note-overview"><strong>视频简介</strong>：{html.escape(overview)}</p>'])
@@ -250,7 +254,7 @@ def render_video_materials(job: dict[str, Any]) -> str:
             [
                 "",
                 '<details class="video-note-source-details">',
-                "<summary>UP 主原始简介</summary>",
+                "<summary>UP 主原文（完整说明与链接）</summary>",
                 "",
                 html.escape(normalized_description),
                 "",

@@ -67,13 +67,13 @@ def validate_note(note: Path, job: dict[str, Any]) -> list[str]:
     summary_at = text.find(AI_MARKERS["summary"][0])
     body_at = text.find(AI_MARKERS["body"][0])
     if description_at < 0:
-        errors.append("视频资料未按采集结果完整保留")
+        errors.append("播放器与来源区未按采集结果完整保留")
     if iframe_at < 0:
         errors.append("缺少正确的官方播放器 iframe")
     if min(summary_at, iframe_at, body_at, description_at) >= 0 and not (
         summary_at < description_at <= iframe_at < description_end < body_at
     ):
-        errors.append("阅读顺序必须为先看结论 → 视频资料 → 知识正文，播放器保留在视频资料内")
+        errors.append("阅读顺序必须为先看结论 → 播放器与来源区 → 知识正文")
 
     for key, (start, end) in AI_MARKERS.items():
         start_at = text.find(start)

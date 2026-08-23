@@ -210,12 +210,13 @@ def test_agent_handoff_protects_dense_note_fact_relationships(tmp_path: Path) ->
 def test_description_renders_compact_resources_and_preserves_raw_source() -> None:
     description = "节点升级说明\n工作流地址：\nhttps://example.com/workflow\n仓库：https://example.com/repo"
     rendered = quote_description(description, "present")
-    assert "## 视频资料" in rendered
+    assert "## 视频资料" not in rendered
     assert '<p class="video-note-overview"><strong>视频简介</strong>：节点升级说明</p>' in rendered
-    assert '<a href="https://example.com/workflow">工作流地址</a>' in rendered
-    assert '<a href="https://example.com/repo">仓库</a>' in rendered
+    assert "### UP 主资源" in rendered
+    assert "- [工作流地址](<https://example.com/workflow>)" in rendered
+    assert "- [仓库](<https://example.com/repo>)" in rendered
     assert '<details class="video-note-source-details">' in rendered
-    assert "<summary>UP 主原始简介</summary>" in rendered
+    assert "<summary>UP 主原文（完整说明与链接）</summary>" in rendered
     assert description in rendered
 
 
@@ -228,9 +229,9 @@ def test_description_resource_labels_include_section_type_and_platform() -> None
         "工作流：https://pan.quark.cn/s/workflow"
     )
     rendered = quote_description(description, "present")
-    assert '<a href="https://github.com/MieMieeeee/ComfyUI-MieNodes">GitHub 插件 · MieNodes</a>' in rendered
-    assert '<a href="https://example.feishu.cn/wiki/prompt">MiniMax H3 模型提示词指令（飞书）</a>' in rendered
-    assert '<a href="https://pan.quark.cn/s/workflow">工作流（夸克网盘）</a>' in rendered
+    assert "- [GitHub 插件 · MieNodes](<https://github.com/MieMieeeee/ComfyUI-MieNodes>)" in rendered
+    assert "- [MiniMax H3 模型提示词指令（飞书）](<https://example.feishu.cn/wiki/prompt>)" in rendered
+    assert "- [工作流（夸克网盘）](<https://pan.quark.cn/s/workflow>)" in rendered
     assert description in rendered
 
 
@@ -258,13 +259,19 @@ def test_video_materials_filter_separator_context_deduplicate_and_normalize_enti
     compact = rendered.split("<details", 1)[0]
     assert "video-note-overview" not in compact
     assert "在线工作流区域" not in compact
-    assert '<a href="https://example.com/demo">国际站 · 体验地址</a>' in rendered
-    assert '<a href="https://example.cn/demo">国内站 · 体验地址</a>' in rendered
+    assert "- [国际站 · 体验地址](<https://example.com/demo>)" in rendered
+    assert "- [国内站 · 体验地址](<https://example.cn/demo>)" in rendered
     assert "夸克网盘（夸克网盘）" not in rendered
     compact_resources = rendered.split('<details class="video-note-source-details">', 1)[0]
     assert compact_resources.count("https://pan.quark.cn/s/demo") == 1
     assert "&amp;amp;" not in rendered
     assert "本地工作流&amp;模型&amp;提示词模板" in rendered
+
+
+def test_resource_label_does_not_append_quark_platform_twice() -> None:
+    rendered = quote_description("模型库（夸克）：https://pan.quark.cn/s/models", "present")
+    assert "- [模型库（夸克）](<https://pan.quark.cn/s/models>)" in rendered
+    assert "模型库（夸克）（夸克网盘）" not in rendered
 
 
 def test_video_materials_keep_real_overview_before_resource_section() -> None:
@@ -290,7 +297,7 @@ def test_video_materials_omit_empty_overview_but_keep_player_and_resources() -> 
     )
     assert "### 原视频" not in rendered
     assert "player.bilibili.com/player.html?bvid=BV1EXAMPLE" in rendered
-    assert "video-note-resource-links" in rendered
+    assert "### UP 主资源" in rendered
     assert "video-note-overview" not in rendered
 
 
@@ -350,9 +357,8 @@ def test_note_skeleton_places_materials_before_knowledge_body() -> None:
     assert metadata_line(job) in rendered
     summary_at = rendered.index("[!summary] 先看结论")
     body_at = rendered.index("BILI_AI_BODY_START")
-    materials_at = rendered.index("## 视频资料")
     player_at = rendered.index("player.bilibili.com")
-    assert summary_at < materials_at < player_at < body_at
+    assert summary_at < player_at < body_at
 
 
 def test_taxonomy_rejects_duplicate_route_ids(taxonomy: dict) -> None:
@@ -491,6 +497,20 @@ def _write_passed_analysis(path: Path) -> None:
         ),
         encoding="utf-8",
     )
+
+
+def test_dense_note_standard_keeps_execution_and_empirical_evidence() -> None:
+    guide = (Path(__file__).parents[1] / "docs" / "standards" / "CODEX-VIDEO-NOTE-GUIDE.md").read_text(
+        encoding="utf-8"
+    )
+    integration = (Path(__file__).parents[1] / "docs" / "AGENT-INTEGRATION.md").read_text(encoding="utf-8")
+
+    for text in (guide, integration):
+        assert "运行入口" in text
+        assert "实测" in text
+        assert "配置 → 耗时" in text
+    assert "960×544" in guide
+    assert "84 秒" in guide
 
 
 def test_validator_checks_real_metadata_and_markers(tmp_path: Path) -> None:
@@ -675,7 +695,6 @@ def test_create_job_writes_runtime_draft_without_publishing_note(tmp_path: Path,
     assert parse_frontmatter_list(draft_text, "cssclasses") == ["learning-page", "video-note"]
     assert (
         draft_text.find("<!-- BILI_AI_SUMMARY_START -->")
-        < draft_text.find("## 视频资料")
         < draft_text.find("https://player.bilibili.com/player.html")
         < draft_text.find("<!-- BILI_AI_BODY_START -->")
     )
@@ -1087,11 +1106,11 @@ def test_organize_note_migrates_a_legacy_description_and_bvid_filename(tmp_path:
     text = target.read_text(encoding="utf-8")
     assert target.name == "整理后标题.md"
     assert bvid_line("BV1TXua68EYi") in text
-    assert "## 视频资料" in text
-    assert '<div class="video-note-resource-links"><strong>UP 主资源</strong>：' in text
-    assert '<a href="https://example.com/workflow">工作流</a>' in text
+    assert "## 视频资料" not in text
+    assert "### UP 主资源" in text
+    assert "- [工作流](<https://example.com/workflow>)" in text
     assert '<details class="video-note-source-details">' in text
-    assert "<summary>UP 主原始简介</summary>" in text
+    assert "<summary>UP 主原文（完整说明与链接）</summary>" in text
 
 
 def test_navigation_rebuilds_are_serialized(tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch) -> None:
