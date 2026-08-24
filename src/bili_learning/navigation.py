@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import os
 import re
 from collections import defaultdict
@@ -14,10 +15,18 @@ NAVIGATION_LOCK_TIMEOUT_SECONDS = 30.0
 
 
 def load_note_metadata(path: Path) -> dict[str, object]:
-    text = path.read_text(encoding="utf-8")
+    text = path.read_text(encoding="utf-8-sig")
     title_match = re.search(r"^#\s+(.+)$", text, re.MULTILINE)
+    meta_match = re.search(r'^<small class="video-note-meta">(.*?)</small>$', text, re.MULTILINE)
+    marker = ""
+    if meta_match:
+        marker_match = re.match(r"\s*(\([^()]{1,40}\))\s+", html.unescape(meta_match.group(1)))
+        if marker_match:
+            marker = marker_match.group(1).strip()
     _, tags = parse_frontmatter(text)
-    return {"title": title_match.group(1).strip() if title_match else path.stem, "tags": tags}
+    title = title_match.group(1).strip() if title_match else path.stem
+    display_title = f"{title} {marker}" if marker else title
+    return {"title": title, "display_title": display_title, "tags": tags}
 
 
 def atomic_write(path: Path, content: str) -> None:
@@ -48,6 +57,7 @@ def _build_navigation(settings: Settings) -> None:
                 {
                     "path": relative.with_suffix(""),
                     "title": data["title"],
+                    "display_title": data["display_title"],
                     "tags": data["tags"],
                     "category": relative.parent,
                 }
@@ -72,7 +82,7 @@ def _build_navigation(settings: Settings) -> None:
         lines = [f"# {category}", ""]
         if by_top[category]:
             for entry in by_top[category]:
-                lines.append(f"- [[{entry['path']}|{entry['title']}]]")
+                lines.append(f"- [[{entry['path']}|{entry['display_title']}]]")
         else:
             lines.append("暂无待整理笔记。")
         atomic_write(nav_dir / f"{category}.md", "\n".join(lines) + "\n")
@@ -88,6 +98,6 @@ def _build_navigation(settings: Settings) -> None:
     for model in sorted(by_model):
         model_lines.append(f"## {model}\n")
         for entry in by_model[model]:
-            model_lines.append(f"- [[{entry['path']}|{entry['title']}]]")
+            model_lines.append(f"- [[{entry['path']}|{entry['display_title']}]]")
         model_lines.append("")
     atomic_write(nav_dir / "模型索引.md", "\n".join(model_lines))

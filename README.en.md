@@ -285,7 +285,7 @@ Detailed documentation is currently maintained in Chinese.
 - [Hermes Skill Installation](docs/HERMES-SKILL-INSTALL.md)
 - [WorkBuddy Skill Installation](docs/WORKBUDDY-SKILL-INSTALL.md)
 - [Obsidian Styling](docs/OBSIDIAN-STYLING.md)
-- [Note Organization and Filing](docs/NOTE-ORGANIZATION.md)
+- [Post-learning Filing (rename/move only)](docs/NOTE-ORGANIZATION.md)
 
 ### Reference
 

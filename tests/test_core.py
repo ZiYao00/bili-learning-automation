@@ -34,14 +34,13 @@ from bili_learning.frontmatter import parse_frontmatter, parse_frontmatter_list
 from bili_learning.input_resolver import resolve_input
 from bili_learning.lifecycle import finalize_note, prepare_note
 from bili_learning.note_template import (
-    bvid_line,
     metadata_line,
     note_filename,
     quote_description,
     render_note_skeleton,
     render_video_materials,
 )
-from bili_learning.organizer import organize_note
+from bili_learning.organizer import find_duplicate_bvid_notes, organize_note
 from bili_learning.publisher import publish_validated_draft
 from bili_learning.resource_access import detect_resource_access_notices
 from bili_learning.runtime import (
@@ -69,7 +68,7 @@ def taxonomy() -> dict:
         "routes": [
             {
                 "id": "h3_segment",
-                "path": ["01-视频生成", "01-MiniMax-H3"],
+                "path": ["01-视频", "MiniMax-H3"],
                 "all_patterns": ["H3", "分段"],
                 "task": "分段生成",
                 "tags": ["视频生成", "工作流"],
@@ -98,7 +97,7 @@ def test_taxonomy_classification(taxonomy: dict) -> None:
     filing = classify({"title": "H3 分段工作流", "description": "", "tags": []}, taxonomy)
     assert filing["suggested_title"] == "分段生成"
     assert filing["category_path"] == ["00-待整理"]
-    assert filing["suggested_category_path"] == ["01-视频生成", "01-MiniMax-H3"]
+    assert filing["suggested_category_path"] == ["01-视频", "MiniMax-H3"]
     assert filing["suggested_route_id"] == "h3_segment"
 
 
@@ -112,7 +111,7 @@ def test_taxonomy_uses_a_specific_topic_title_in_the_inbox(taxonomy: dict) -> No
         0,
         {
             "id": "h3_grid",
-            "path": ["01-视频生成", "01-MiniMax-H3"],
+            "path": ["01-视频", "MiniMax-H3"],
             "all_patterns": ["H3"],
             "any_patterns": ["9宫格"],
             "task": "9宫格",
@@ -130,7 +129,7 @@ def test_taxonomy_uses_node_prompt_topic_title_in_the_inbox(taxonomy: dict) -> N
         0,
         {
             "id": "h3_node_prompt",
-            "path": ["01-视频生成", "01-MiniMax-H3"],
+            "path": ["01-视频", "MiniMax-H3"],
             "all_patterns": ["H3", "节点", "提示词优化"],
             "task": "节点升级",
             "title": "节点升级与提示词优化",
@@ -491,6 +490,18 @@ def test_notes_root_conflicts_with_vault_config(tmp_path: Path, taxonomy: dict) 
     with pytest.raises(ConfigurationError) as error:
         load_settings(tmp_path)
     assert error.value.code == "local_config_notes_conflict"
+
+
+def test_load_settings_accepts_utf8_bom_in_local_config(tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "bilibili-note-taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
+    (config_dir / "local.json").write_text(json.dumps({"notes_root": "notes/bilibili"}), encoding="utf-8-sig")
+    monkeypatch.delenv("BILI_LEARNING_NOTES_ROOT", raising=False)
+
+    settings = load_settings(tmp_path)
+
+    assert settings.notes_root == tmp_path / "notes" / "bilibili"
 
 
 def test_workflow_mode_defaults_to_light(tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1315,11 +1326,49 @@ def test_organize_note_requires_explicit_scope_confirmation(tmp_path: Path, taxo
             settings,
             settings.notes_root / "00-待整理" / "不会执行.md",
             "不会执行",
-            "不会执行。",
-            category="01-视频生成/01-MiniMax-H3",
-            tags=["视频生成", "MiniMax-H3"],
+            destination="01-视频/MiniMax-H3",
             confirmed_scope="",
         )
+
+
+def test_organize_latest_rejects_a_non_latest_inbox_note(tmp_path: Path, taxonomy: dict) -> None:
+    settings = _settings(tmp_path, taxonomy)
+    inbox = settings.notes_root / "00-待整理"
+    inbox.mkdir(parents=True)
+    older = inbox / "older.md"
+    newer = inbox / "newer.md"
+    older.write_text("# older\n", encoding="utf-8")
+    newer.write_text("# newer\n", encoding="utf-8")
+    os.utime(older, (1, 1))
+    os.utime(newer, (2, 2))
+
+    with pytest.raises(ValueError, match="不是最近一篇"):
+        organize_note(
+            settings,
+            older,
+            "older",
+            destination="01-视频/MiniMax-H3",
+            confirmed_scope="latest",
+        )
+
+
+def test_duplicate_bvid_detection_reports_other_notes_without_blocking(tmp_path: Path, taxonomy: dict) -> None:
+    settings = _settings(tmp_path, taxonomy)
+    inbox = settings.notes_root / "00-待整理"
+    archive = settings.notes_root / "01-视频生成" / "01-MiniMax-H3"
+    inbox.mkdir(parents=True)
+    archive.mkdir(parents=True)
+    source = inbox / "source.md"
+    duplicate = archive / "duplicate.md"
+    other = archive / "other.md"
+    source.write_text("https://www.bilibili.com/video/BV1TXua68EYi/", encoding="utf-8")
+    duplicate.write_text('<iframe src="https://player.bilibili.com/player.html?bvid=BV1TXua68EYi"></iframe>', encoding="utf-8")
+    other.write_text("https://www.bilibili.com/video/BV1DIFFERENT/", encoding="utf-8")
+
+    bvid, duplicates = find_duplicate_bvid_notes(settings, source)
+
+    assert bvid == "BV1TXua68EYi"
+    assert duplicates == [duplicate.resolve()]
 
 
 def test_agent_skills_require_organize_scope_confirmation() -> None:
@@ -1330,12 +1379,17 @@ def test_agent_skills_require_organize_scope_confirmation() -> None:
     ):
         text = (root / relative).read_text(encoding="utf-8")
         assert "默认关闭" in text
+        assert "指定" in text
         assert "最近一篇" in text
         assert "全部待整理笔记" in text
+        assert "single" in text
+        assert "--filename" in text
+        assert "--destination" in text
+        assert "不得修改笔记内容" in text
         assert "--confirmed-scope" in text
 
 
-def test_organize_note_updates_title_intro_moves_and_rebuilds_navigation(tmp_path: Path, taxonomy: dict) -> None:
+def test_organize_note_only_renames_moves_and_rebuilds_navigation(tmp_path: Path, taxonomy: dict) -> None:
     settings = _settings(tmp_path, taxonomy)
     source = settings.notes_root / "00-待整理" / "H3 分段工作流.md"
     source.parent.mkdir(parents=True)
@@ -1354,31 +1408,31 @@ def test_organize_note_updates_title_intro_moves_and_rebuilds_navigation(tmp_pat
         _complete_ai_regions(render_note_skeleton(job)).replace("<!-- BILI_AI_SUMMARY_START -->", "").replace("<!-- BILI_AI_SUMMARY_END -->", "").replace("<!-- BILI_AI_BODY_START -->", "").replace("<!-- BILI_AI_BODY_END -->", ""),
         encoding="utf-8",
     )
+    before = source.read_bytes()
     target = organize_note(
         settings,
         source,
-        "H3 分段生成",
-        "将长视频拆成连续片段生成。",
-        category="01-视频生成/01-MiniMax-H3",
-        tags=["视频生成", "MiniMax-H3", "分段生成", "首尾帧"],
-        confirmed_scope="latest",
+        "工作流：MiniMax H3 分段生成",
+        destination="01-视频/MiniMax-H3",
+        confirmed_scope="single",
     )
-    assert target == settings.notes_root / "01-视频生成" / "01-MiniMax-H3" / "H3 分段生成.md"
+    assert target == settings.notes_root / "01-视频" / "MiniMax-H3" / "工作流：MiniMax H3 分段生成.md"
     assert not source.exists()
+    assert target.read_bytes() == before
     organized = target.read_text(encoding="utf-8")
     assert organized.startswith("---")
-    assert "# H3 分段生成" in organized
-    assert "将长视频拆成连续片段生成。" in organized
+    assert "# H3 分段工作流" in organized
+    assert "原始说明" in organized
     assert metadata_line(job) in organized
-    assert '<small class="video-note-original-title"><strong>原视频标题</strong>：H3 分段工作流</small>' in organized
+    assert 'class="video-note-original-title"' not in organized
     _, organized_tags = parse_frontmatter(organized)
-    assert organized_tags == ["视频生成", "MiniMax-H3", "分段生成", "首尾帧"]
+    assert organized_tags == ["视频生成", "工作流", "MiniMax-H3"]
     assert "待整理" not in organized_tags
-    assert (settings.notes_root / "99-导航" / "01-视频生成.md").is_file()
+    assert (settings.notes_root / "99-导航" / "01-视频.md").is_file()
     assert "00-待整理]]（0）" in (settings.notes_root / "99-导航" / "首页.md").read_text(encoding="utf-8")
 
 
-def test_organize_note_adds_learning_intro_when_source_has_only_resources(tmp_path: Path, taxonomy: dict) -> None:
+def test_organize_note_does_not_add_learning_intro_when_source_has_only_resources(tmp_path: Path, taxonomy: dict) -> None:
     settings = _settings(tmp_path, taxonomy)
     source = settings.notes_root / "00-待整理" / "资源型简介.md"
     source.parent.mkdir(parents=True)
@@ -1401,22 +1455,22 @@ def test_organize_note_adds_learning_intro_when_source_has_only_resources(tmp_pa
         .replace("<!-- BILI_AI_BODY_END -->", ""),
         encoding="utf-8",
     )
+    before = source.read_bytes()
     target = organize_note(
         settings,
         source,
-        "整理后标题",
-        "学习后补充的一句简介。",
-        category="01-视频生成/01-MiniMax-H3",
-        tags=["视频生成", "MiniMax-H3", "资源"],
+        "教程：资源型简介",
+        destination="01-视频/MiniMax-H3",
         confirmed_scope="latest",
     )
     text = target.read_text(encoding="utf-8")
+    assert target.read_bytes() == before
     assert metadata_line(job) in text
-    assert '<p class="video-note-overview"><strong>视频简介</strong>：学习后补充的一句简介。</p>' in text
-    assert text.index("video-note-overview") < text.index('<details class="video-note-source-details">')
+    assert "学习后补充的一句简介。" not in text
+    assert target.name == "教程：资源型简介.md"
 
 
-def test_organize_note_migrates_a_legacy_description_and_bvid_filename(tmp_path: Path, taxonomy: dict) -> None:
+def test_organize_note_does_not_migrate_legacy_content(tmp_path: Path, taxonomy: dict) -> None:
     settings = _settings(tmp_path, taxonomy)
     source = settings.notes_root / "00-待整理" / "旧标题__BV1TXua68EYi.md"
     source.parent.mkdir(parents=True)
@@ -1426,23 +1480,84 @@ def test_organize_note_migrates_a_legacy_description_and_bvid_filename(tmp_path:
         "<iframe src=\"https://player.bilibili.com/player.html?bvid=BV1TXua68EYi\"></iframe>\n",
         encoding="utf-8",
     )
+    before = source.read_bytes()
     target = organize_note(
         settings,
         source,
-        "整理后标题",
-        "整理后的简介摘要。",
-        category="01-视频生成/01-MiniMax-H3",
-        tags=["视频生成", "MiniMax-H3", "旧笔记迁移"],
+        "教程：旧笔记示例",
+        destination="01-视频/MiniMax-H3",
         confirmed_scope="latest",
     )
     text = target.read_text(encoding="utf-8")
-    assert target.name == "整理后标题.md"
-    assert bvid_line("BV1TXua68EYi") in text
+    assert target.name == "教程：旧笔记示例.md"
+    assert target.read_bytes() == before
     assert "## 视频资料" not in text
-    assert "### UP 主资源" in text
-    assert "- [工作流](<https://example.com/workflow>)" in text
-    assert '<details class="video-note-source-details">' in text
-    assert "<summary>UP 主原文（完整说明与链接）</summary>" in text
+    assert "> **视频简介**" in text
+    assert "https://example.com/workflow" in text
+    assert '<details class="video-note-source-details">' not in text
+    assert "<summary>UP 主原文（完整说明与链接）</summary>" not in text
+    assert "# 旧标题" in text
+
+
+def test_organize_note_keeps_same_name_versions_without_overwriting(tmp_path: Path, taxonomy: dict) -> None:
+    settings = _settings(tmp_path, taxonomy)
+    inbox = settings.notes_root / "00-待整理"
+    destination = settings.notes_root / "02-图像" / "Krea2"
+    inbox.mkdir(parents=True)
+    destination.mkdir(parents=True)
+    existing = destination / "百科：Krea-2 生图模型全解.md"
+    existing.write_text("existing\n", encoding="utf-8")
+    source = inbox / "source.md"
+    source.write_text("new version\n", encoding="utf-8")
+
+    target = organize_note(
+        settings,
+        source,
+        "百科：Krea-2 生图模型全解.md",
+        destination="02-图像/Krea2",
+        confirmed_scope="single",
+    )
+
+    assert target.name == "百科：Krea-2 生图模型全解（2）.md"
+    assert existing.read_text(encoding="utf-8") == "existing\n"
+    assert target.read_text(encoding="utf-8") == "new version\n"
+
+
+def test_organize_note_rejects_more_than_two_destination_levels(tmp_path: Path, taxonomy: dict) -> None:
+    settings = _settings(tmp_path, taxonomy)
+    source = settings.notes_root / "00-待整理" / "source.md"
+    source.parent.mkdir(parents=True)
+    source.write_text("content\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="最多允许 2 层"):
+        organize_note(
+            settings,
+            source,
+            "简单文件名",
+            destination="02-图像/Krea2/模型与LoRA",
+            confirmed_scope="single",
+        )
+
+    assert source.exists()
+
+
+def test_navigation_uses_meta_marker_to_distinguish_same_title_notes(tmp_path: Path, taxonomy: dict) -> None:
+    settings = _settings(tmp_path, taxonomy)
+    category = settings.notes_root / "01-视频" / "MiniMax-H3"
+    category.mkdir(parents=True)
+    first = category / "同名笔记.md"
+    second = category / "同名笔记（2）.md"
+    base = '---\ntags:\n  - "MiniMax-H3"\n---\n\n# 同名笔记\n\n'
+    first.write_text(base + '<small class="video-note-meta">UP · 2026-08-24 · 01:00 · BV1FIRST</small>\n', encoding="utf-8")
+    second.write_text(base + '<small class="video-note-meta">(workbuddy) UP · 2026-08-24 · 01:00 · BV1SECOND</small>\n', encoding="utf-8")
+
+    navigation.build_navigation(settings)
+
+    category_nav = (settings.notes_root / "99-导航" / "01-视频.md").read_text(encoding="utf-8")
+    model_nav = (settings.notes_root / "99-导航" / "模型索引.md").read_text(encoding="utf-8")
+    assert "|同名笔记]]" in category_nav
+    assert "|同名笔记 (workbuddy)]]" in category_nav
+    assert "|同名笔记 (workbuddy)]]" in model_nav
 
 
 def test_navigation_rebuilds_are_serialized(tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch) -> None:

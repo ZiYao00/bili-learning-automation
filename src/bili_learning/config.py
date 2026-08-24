@@ -89,16 +89,9 @@ def validate_taxonomy(config: dict[str, Any]) -> None:
         for key in ("enabled_by_default", "scope_confirmation_required"):
             if key in organization and not isinstance(organization[key], bool):
                 raise ValueError(f"taxonomy.organization.{key} 必须是布尔值")
-        categories = organization.get("categories")
-        if not isinstance(categories, list) or not categories:
-            raise ValueError("taxonomy.organization.categories 必须是非空数组")
-        for category in categories:
-            if (
-                not isinstance(category, list)
-                or not category
-                or not all(isinstance(part, str) and part.strip() for part in category)
-            ):
-                raise ValueError("taxonomy.organization.categories 中每个目录都必须是非空字符串数组")
+        max_depth = organization.get("max_depth", 2)
+        if not isinstance(max_depth, int) or isinstance(max_depth, bool) or max_depth < 1 or max_depth > 2:
+            raise ValueError("taxonomy.organization.max_depth 必须是 1 或 2")
 
     route_ids: set[str] = set()
     for route in [config["fallback"], *config["routes"]]:
@@ -142,7 +135,7 @@ def _load_local_config(project_root: Path) -> tuple[Path, dict[str, Any]]:
     if not path.is_file():
         return path, {}
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw = json.loads(path.read_text(encoding="utf-8-sig"))
     except json.JSONDecodeError as exc:
         raise ConfigurationError("local_config_invalid_json", f"本机配置不是有效 JSON：{path}") from exc
     if not isinstance(raw, dict):
@@ -272,7 +265,7 @@ def load_settings(project_root: Path) -> Settings:
     )
     if not taxonomy_path.is_file():
         raise FileNotFoundError(f"未找到 B站笔记分类配置：{taxonomy_path}")
-    taxonomy = json.loads(taxonomy_path.read_text(encoding="utf-8"))
+    taxonomy = json.loads(taxonomy_path.read_text(encoding="utf-8-sig"))
     validate_taxonomy(taxonomy)
 
     notes_root, vault_root, notes_subdir, notes_source, notes_is_fallback = _resolve_notes_location(

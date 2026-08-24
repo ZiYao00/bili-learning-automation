@@ -5,6 +5,14 @@
 ### Added
 
 - 新增 `scripts/bili_asr_fallback.py` 作为 `subtitle_unavailable` 的人工应急旁路：仅在确认视频完全无字幕后，临时下载低码率音轨并调用 SiliconFlow `FunAudioLLM/SenseVoiceSmall` 输出纯文本 transcript；默认从被 Git 忽略的 `config/local.json` 读取 `siliconflow.api_key`，公开仓库只保留示例占位符；不接入 collector / finalizer，也不改变默认“不下载媒体”的 Skill 行为。
+- Organizer 新增 `single` 范围，区分“用户明确指定单篇”与真正的 `latest`；`latest` 会验证文件确实是待整理目录中的最近一篇。
+- Organizer 会检测相同 BVID 的其它笔记并作为 `duplicate_bvid_notes` 提示，不自动覆盖或删除测试稿；输出同时区分逻辑 Vault 路径与 Junction 解析后的真实路径。
+- Organizer 简化为纯归档器：只改文件名和目标路径，不再改写 H1、简介、Tags、Frontmatter 或旧笔记结构；归档前后 Markdown 内容保持不变。
+- 归档目录改为浅层“领域 / 对象”结构，最多两层；例如 `02-图像/Krea2`、`01-视频/MiniMax-H3`，不再维护多层 `organization.categories` / legacy 迁移表。
+
+### Fixed
+
+- 本机 `config/local.json` 与 taxonomy 配置现在使用 `utf-8-sig` 读取，兼容 Windows 编辑器写入的 UTF-8 BOM，避免 `local_config_invalid_json`。
 
 ## [1.0.0] - 2026-08-23
 

@@ -314,7 +314,7 @@ archive/ materials/  # 本地资料
 - [Hermes Skill 安装教程](docs/HERMES-SKILL-INSTALL.md)：安装、更新和验证 Hermes 入口；
 - [WorkBuddy Skill 安装教程](docs/WORKBUDDY-SKILL-INSTALL.md)：安装、更新和验证 WorkBuddy 入口；
 - [Obsidian 样式教程](docs/OBSIDIAN-STYLING.md)：安装 CSS、启用样式和排查显示问题；
-- [笔记整理与归档教程](docs/NOTE-ORGANIZATION.md)：短标题、分类、Tags 与“最近一篇 / 全部”的整理门禁。
+- [学习后归档](docs/NOTE-ORGANIZATION.md)：只改文件名和路径，采用最多两层的“领域 / 对象”目录，并保留原笔记内容不变。
 
 ### 使用说明与参考
 

@@ -9,7 +9,7 @@ from .config import DEFAULT_NOTES_SUBDIR, ConfigurationError, configure_obsidian
 from .doctor import doctor_report, run_doctor
 from .lifecycle import FAILSAFE_SECONDS, finalize_note, prepare_note
 from .navigation import build_navigation
-from .organizer import organize_note
+from .organizer import find_duplicate_bvid_notes, organize_note
 
 
 def find_project_root() -> Path:
@@ -51,17 +51,15 @@ def main() -> None:
     finalize_parser = subparsers.add_parser("finalize", help="校验 runtime 草稿并发布笔记")
     finalize_parser.add_argument("--job", type=Path, required=True)
     finalize_parser.add_argument("--note", type=Path, required=True)
-    organize_parser = subparsers.add_parser("organize", help="学习后整理已有笔记；默认不执行")
-    organize_parser.add_argument("--note", type=Path, required=True, help="待整理笔记路径")
-    organize_parser.add_argument("--title", required=True, help="学习后确定的短标题")
-    organize_parser.add_argument("--intro", required=True, help="学习后的一句简介摘要")
-    organize_parser.add_argument("--category", required=True, help="taxonomy.organization.categories 中的目标相对目录")
-    organize_parser.add_argument("--tag", action="append", dest="tags", required=True, help="整理后的标签；可重复传入")
+    organize_parser = subparsers.add_parser("organize", help="学习后归档已有笔记；只改文件名和路径，不改正文")
+    organize_parser.add_argument("--note", type=Path, required=True, help="待归档笔记路径")
+    organize_parser.add_argument("--filename", required=True, help="新的简短文件名；可省略 .md")
+    organize_parser.add_argument("--destination", required=True, help="notes_root 下的目标相对目录，推荐“领域/对象”")
     organize_parser.add_argument(
         "--confirmed-scope",
-        choices=("latest", "all"),
+        choices=("single", "latest", "all"),
         required=True,
-        help="用户已明确选择整理最近一篇（latest）或全部待整理笔记（all）",
+        help="用户已明确选择指定单篇（single）、最近一篇（latest）或全部待整理笔记（all）",
     )
     args = parser.parse_args()
 
@@ -130,16 +128,30 @@ def main() -> None:
         raise SystemExit(code)
     if args.command == "organize":
         try:
+            bvid, duplicates = find_duplicate_bvid_notes(settings, args.note)
             note_path = organize_note(
                 settings,
                 args.note,
-                args.title,
-                args.intro,
-                category=args.category,
-                tags=args.tags,
+                args.filename,
+                destination=args.destination,
                 confirmed_scope=args.confirmed_scope,
             )
-            print(json.dumps({"schema_version": 1, "status": "organized", "note_path": str(note_path)}, ensure_ascii=False, indent=2))
+            resolved_root = settings.notes_root.resolve()
+            relative_note = note_path.resolve().relative_to(resolved_root)
+            logical_note = settings.notes_root / relative_note
+            logical_duplicates = [
+                str(settings.notes_root / path.resolve().relative_to(resolved_root)) for path in duplicates
+            ]
+            payload = {
+                "schema_version": 1,
+                "status": "organized",
+                "scope": args.confirmed_scope,
+                "bvid": bvid,
+                "note_path": str(logical_note),
+                "resolved_note_path": str(note_path.resolve()),
+                "duplicate_bvid_notes": logical_duplicates,
+            }
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
         except Exception as error:
             print(json.dumps({"schema_version": 1, "status": "failed", "message": str(error)}, ensure_ascii=False, indent=2))
             raise SystemExit(1)
