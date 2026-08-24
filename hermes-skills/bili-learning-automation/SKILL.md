@@ -54,18 +54,14 @@ description: Turn a Bilibili copied link, supported Bilibili short link, or BV i
 
 ## 学习后整理
 
-学习后整理**默认关闭**。生成新笔记、finalizer 完成或检测到 `00-待整理` 有文件时，都不得自动整理。
+学习后整理**默认关闭**，只有 owner 明确要求整理 / 归档时才执行。先确认范围：指定一篇用 `single`，最近一篇用 `latest`，全部待整理笔记用 `all`；范围不明确时再询问。
 
-只有 owner 明确提出“整理 / 归档笔记”时才进入整理流程。执行前必须先确定范围：owner 已明确指定某一篇笔记时使用 `single`，明确说“最近一篇”时使用 `latest`，明确说“全部”时使用 `all`。只有在用户提出整理但没有给出任何可判定范围时，才询问 **“要整理指定的一篇、最近一篇，还是全部待整理笔记？”**；不要把用户明确指定的文件伪装成 `latest`。
+整理时逐篇完整阅读，只决定**短文件名**和**目标目录**。目标是让以后在 Obsidian 中一眼看懂、容易找到，而不是套固定分类模板。通常使用“领域 / 对象”，最多两层；具体判断参考项目 `docs/NOTE-ORGANIZATION.md` 中的真实案例，并保留模型自行判断空间。
 
-范围确认后，逐篇完整阅读笔记，但**只决定文件名和目标目录**。文件名应短、直接，可按需要使用 `百科：`、`教程：`、`工作流：`、`实测：`、`对比：` 等前缀；目录优先采用“领域 / 对象”，最多两层，例如 `02-图像/Krea2`、`01-视频/MiniMax-H3`。
-
-归档阶段不得修改笔记内容。H1、Summary、正文、Frontmatter、Tags、视频简介、UP 主资源以及 `(workbuddy)` / `(GPT)` 等测试标记全部保持原样。
-
-调用统一 `organize_bilibili_learning.py` 时必须显式传入：
+归档阶段不得修改笔记内容，包括 H1、Summary、正文、Frontmatter、Tags、视频简介、UP 主资源和测试标记。
 
 ```powershell
 python "$project\hermes-skills\bili-learning-automation\scripts\organize_bilibili_learning.py" --note '<现有笔记路径>' --filename '<新的简短文件名>' --destination '<领域/对象>' --confirmed-scope '<single|latest|all>'
 ```
 
-不得自行改写笔记内容，也不要借归档顺手升级旧格式。统一 Organizer 只负责改文件名、移动文件和重建导航。
+统一 Organizer 只负责改文件名、移动文件和重建导航；内容修改或旧格式升级应作为独立任务处理。
