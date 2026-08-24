@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- 新增 `scripts/bili_asr_fallback.py` 作为 `subtitle_unavailable` 的人工应急旁路：仅在确认视频完全无字幕后，临时下载低码率音轨并调用 SiliconFlow `FunAudioLLM/SenseVoiceSmall` 输出纯文本 transcript；默认从被 Git 忽略的 `config/local.json` 读取 `siliconflow.api_key`，公开仓库只保留示例占位符；不接入 collector / finalizer，也不改变默认“不下载媒体”的 Skill 行为。
+
 ## [1.0.0] - 2026-08-23
 
 ### Documentation

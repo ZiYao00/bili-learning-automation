@@ -535,7 +535,14 @@ def test_configure_obsidian_preserves_other_local_values(tmp_path: Path, taxonom
     config_dir.mkdir()
     (config_dir / "bilibili-note-taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
     (config_dir / "local.json").write_text(
-        json.dumps({"ytdlp": "tools/yt-dlp.exe", "notes_root": "old/notes", "workflow_mode": "strict"}),
+        json.dumps(
+            {
+                "ytdlp": "tools/yt-dlp.exe",
+                "notes_root": "old/notes",
+                "workflow_mode": "strict",
+                "siliconflow": {"api_key": "local-only-test-key"},
+            }
+        ),
         encoding="utf-8",
     )
     vault = tmp_path / "MyVault"
@@ -546,6 +553,7 @@ def test_configure_obsidian_preserves_other_local_values(tmp_path: Path, taxonom
 
     assert saved["ytdlp"] == "tools/yt-dlp.exe"
     assert saved["workflow_mode"] == "strict"
+    assert saved["siliconflow"] == {"api_key": "local-only-test-key"}
     assert "notes_root" not in saved
     assert saved["vault_root"] == str(vault.resolve())
     assert saved["notes_subdir"] == str(Path("Resources/Bilibili"))

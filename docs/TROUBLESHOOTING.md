@@ -41,7 +41,7 @@ doctor 不访问 Bilibili，也不读取 Cookie 内容。
 | `configuration_required` | 尚未显式绑定 Obsidian Vault | 提供包含 `.obsidian` 的 Vault 根目录；本次不会启动采集 |
 | `materials_ready` | 采集完成，等待智能体写笔记 | 正常继续 |
 | `in_progress` | 同 BV 已有活动任务 | 不重复采集；等待或由适配层安全续做陈旧 job |
-| `subtitle_unavailable` | 没有取得可用中文字幕 | 本次停止，不自动下载视频做 ASR |
+| `subtitle_unavailable` | 没有取得可用中文字幕 | 本次停止；若人工确认视频完全无字幕，可按第 5 节使用手动 ASR 旁路 |
 | `source_insufficient` | 字幕 / 简介不足以写可靠笔记 | 换资料更完整的视频 |
 | `note_ready` | Finalizer 校验通过 | 完成 |
 | `note_invalid` | 草稿未通过最终校验 | 看错误原因，不绕过 finalizer |
@@ -146,14 +146,35 @@ zh.*
 
 可用字幕。
 
-项目默认策略是**字幕优先、宁缺毋滥**，因此不会自动：
+项目默认策略是**字幕优先、宁缺毋滥**，因此正常 Skill 流程不会自动：
 
 - 下载视频；
 - 下载音频；
 - 调 ASR 补字幕；
 - 用模型常识代替原视频内容。
 
-如果这个视频本身没有可用字幕，本次不生成笔记是正常行为。
+如果视频本身没有可用字幕，本次不生成笔记是正常行为。
+
+### 已确认视频完全无字幕：手动 ASR 旁路
+
+只有在人工确认视频确实没有可提取字幕时，才考虑项目级辅助脚本：
+
+```powershell
+python .\scripts\bili_asr_fallback.py "https://www.bilibili.com/video/BV..." `
+  --output "$env:TEMP\BV-transcript.txt"
+```
+
+该脚本不属于 collector / finalizer 的正常执行链，也不会改变 `subtitle_unavailable` 的含义。它只做：
+
+```text
+B站链接 → yt-dlp 临时下载低码率音轨 → SiliconFlow STT → transcript.txt
+```
+
+默认使用 `FunAudioLLM/SenseVoiceSmall`，优先读取 `config/local.json` 中现有的 yt-dlp 路径，并可复用项目 `key/` 下已有 Cookie。API Key 默认读取本机 `config/local.json` 的 `siliconflow.api_key`；也可由 `SILICONFLOW_API_KEY` 或显式 `--api-key-file` 覆盖。`config/local.json` 已被 Git 忽略，公开仓库只能提交 `config/local.json.example` 中的占位符，真实 Key 不得进入 README、日志或 Git。
+
+音频默认存放在系统临时目录并在脚本结束后自动清理；只有显式传入 `--keep-audio` 才会保留。输出文本和可选保留音频如果目标文件已存在都会停止，不会覆盖。当前 SiliconFlow STT 单文件限制为不超过 50MB、时长不超过 1 小时，脚本会在上传前检查这两个条件。
+
+输出是无伪造时间戳的纯文本 transcript。它适合作为人工异常处理的事实来源；不要把整段文本伪装成单条 SRT，也不要把这条旁路描述成正常 Skill 已自动完成。
 
 ---
 

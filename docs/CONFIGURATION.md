@@ -1,6 +1,6 @@
 # 配置说明
 
-普通用户优先使用 `config/local.json`。它只保存当前电脑的路径配置，并已被 Git 忽略。
+普通用户优先使用 `config/local.json`。它保存当前电脑的本地路径与私密配置，并已被 Git 忽略；公开仓库只提交 `config/local.json.example`。
 
 新版本把 Obsidian 配置拆成两个概念：
 
@@ -203,6 +203,7 @@ notes/bilibili
 | `BILI_LEARNING_COOKIE_FILE` | Cookie 文件 |
 | `BILI_LEARNING_TAXONOMY` | 自定义 taxonomy 文件 |
 | `BILI_LEARNING_WORKFLOW_MODE` | `light` 或 `strict` 写作模式 |
+| `SILICONFLOW_API_KEY` | 手动 ASR 旁路的 SiliconFlow Key；优先级高于 `config/local.json` |
 
 推荐的新方式：
 

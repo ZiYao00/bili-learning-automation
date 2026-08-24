@@ -22,7 +22,7 @@ description: Turn a Bilibili copied link, supported Bilibili short link, or BV i
 
    - `configuration_required`：停止采集，向 owner 询问包含 `.obsidian` 的 Vault 根目录，再调用统一 `configure_bilibili_learning.py`；返回 `configured` 后重试原链接。不得自动扫描磁盘或自行选择 Vault。
    - `in_progress`：不重复采集。只有绑定 job 已明显陈旧、必需文件完整、草稿和 analysis 仍未写作时才续做；否则按活动任务处理，不抢占、不手工删锁。
-   - `subtitle_unavailable`：说明没有可用中文字幕，且没有下载媒体，不生成笔记。
+   - `subtitle_unavailable`：说明没有可用中文字幕，且没有下载媒体，不生成笔记。若 owner 已人工确认视频确实无字幕并明确要求应急转录，只说明可使用项目级 `scripts/bili_asr_fallback.py`；不得在当前 prepare job 内自动调用旁路或把旁路结果伪装成正常 Skill 流程。
    - `failed` 且 `code = ytdlp_not_configured`：只提供 `winget install yt-dlp`，不自动安装或复制可执行文件。
    - 其它 `failed` / `note_invalid`：报告短错误，不声称完成。
    - 只有 `materials_ready`，或确认可安全续做的旧 job，才继续。

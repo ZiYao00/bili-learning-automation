@@ -37,7 +37,7 @@ runner="$HOME/.workbuddy/skills/bili-learning-automation/scripts/bridge.ps1"
 
    - `configuration_required`：停止采集，询问包含 `.obsidian` 的 Vault 根目录，再调用 `configure-obsidian`。返回 `configured` 后重试原链接；不得自动扫描磁盘或自行选择 Vault。
    - `in_progress`：已有活动任务，不重复采集或抢占。
-   - `subtitle_unavailable`：没有可用中文字幕，且没有下载媒体，不生成笔记。
+   - `subtitle_unavailable`：没有可用中文字幕，且没有下载媒体，不生成笔记。若用户已人工确认视频确实无字幕并明确要求应急转录，只说明可使用项目级 `scripts/bili_asr_fallback.py`；不得在当前 prepare job 内自动调用旁路或把旁路结果伪装成正常 Skill 流程。
    - `failed` 且 `code = ytdlp_not_configured`：只提供 `winget install yt-dlp`，不自动安装或复制可执行文件。
    - 其它 `failed` / `note_invalid`：报告短错误，不声称完成。
    - 只有 `materials_ready` 才继续。

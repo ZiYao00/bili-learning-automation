@@ -119,7 +119,7 @@ def validate_taxonomy(config: dict[str, Any]) -> None:
             raise ValueError(f"taxonomy model aliases 无效：{model.get('canonical')}")
 
 
-def _load_local_config(project_root: Path) -> tuple[Path, dict[str, str]]:
+def _load_local_config(project_root: Path) -> tuple[Path, dict[str, Any]]:
     path = project_root / LOCAL_CONFIG_RELATIVE_PATH
     if not path.is_file():
         return path, {}
@@ -129,12 +129,20 @@ def _load_local_config(project_root: Path) -> tuple[Path, dict[str, str]]:
         raise ConfigurationError("local_config_invalid_json", f"本机配置不是有效 JSON：{path}") from exc
     if not isinstance(raw, dict):
         raise ConfigurationError("local_config_invalid_type", "本机配置必须是 JSON 对象")
-    allowed = {"taxonomy", "notes_root", "vault_root", "notes_subdir", "cookie_file", "ytdlp", "workflow_mode"}
+    allowed = {"taxonomy", "notes_root", "vault_root", "notes_subdir", "cookie_file", "ytdlp", "workflow_mode", "siliconflow"}
     unknown = sorted(set(raw) - allowed)
     if unknown:
         raise ConfigurationError("local_config_unknown_key", "本机配置存在不支持字段：" + ", ".join(unknown))
-    values: dict[str, str] = {}
+    values: dict[str, Any] = {}
     for key, value in raw.items():
+        if key == "siliconflow":
+            if not isinstance(value, dict) or set(value) != {"api_key"}:
+                raise ConfigurationError("local_config_invalid_value", "siliconflow 必须只包含非空 api_key 字段")
+            api_key = value.get("api_key")
+            if not isinstance(api_key, str) or not api_key.strip():
+                raise ConfigurationError("local_config_invalid_value", "siliconflow.api_key 必须是非空字符串")
+            values[key] = {"api_key": api_key.strip()}
+            continue
         if not isinstance(value, str) or not value.strip():
             raise ConfigurationError("local_config_invalid_value", f"本机配置 {key} 必须是非空字符串")
         values[key] = value.strip()
