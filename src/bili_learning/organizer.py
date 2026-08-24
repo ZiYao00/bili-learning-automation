@@ -7,9 +7,11 @@ import uuid
 from pathlib import Path, PurePosixPath
 
 from .config import Settings
-from .frontmatter import parse_frontmatter
+from .frontmatter import yaml_scalar
 from .navigation import build_navigation
 from .note_template import bvid_line, note_filename, render_video_materials, safe_title
+
+ORGANIZE_SCOPES = {"latest", "all"}
 
 
 def _safe_category(value: str) -> tuple[str, ...]:
@@ -20,17 +22,80 @@ def _safe_category(value: str) -> tuple[str, ...]:
     return tuple(parts)
 
 
-def _suggest_category(settings: Settings, tags: list[str]) -> tuple[str, ...]:
-    tag_set = set(tags)
-    candidates = [
-        route
-        for route in settings.taxonomy["routes"]
-        if set(route["tags"]).issubset(tag_set)
-    ]
-    if not candidates:
-        return tuple(settings.taxonomy["fallback"]["path"])
-    best = max(candidates, key=lambda route: len(route["tags"]))
-    return tuple(best["path"])
+def _allowed_categories(settings: Settings) -> set[tuple[str, ...]]:
+    organization = settings.taxonomy.get("organization") or {}
+    configured = organization.get("categories")
+    if configured:
+        return {tuple(category) for category in configured}
+    return {tuple(route["path"]) for route in settings.taxonomy["routes"]}
+
+
+def _validated_category(settings: Settings, value: str) -> tuple[str, ...]:
+    category = _safe_category(value)
+    if category not in _allowed_categories(settings):
+        raise ValueError("整理目录不在 taxonomy.organization.categories 允许范围内")
+    return category
+
+
+def _normalize_tags(values: list[str]) -> list[str]:
+    tags: list[str] = []
+    for raw in values:
+        tag = " ".join(str(raw).split())
+        if not tag or tag == "待整理" or tag in tags:
+            continue
+        tags.append(tag)
+    if not tags:
+        raise ValueError("整理后的 tags 不能为空")
+    return tags
+
+
+def _rewrite_frontmatter_tags(text: str, tags: list[str]) -> str:
+    match = re.match(r"^---\r?\n(?P<body>.*?)\r?\n---\r?\n", text, flags=re.DOTALL)
+    if not match:
+        raise ValueError("笔记缺少 Frontmatter，无法整理 tags")
+
+    lines = match.group("body").splitlines()
+    start = next((index for index, line in enumerate(lines) if line.strip() == "tags:"), None)
+    replacement = ["tags:", *[f"  - {yaml_scalar(tag)}" for tag in tags]]
+
+    if start is None:
+        insert_at = next((index for index, line in enumerate(lines) if line.strip() == "cssclasses:"), len(lines))
+        lines[insert_at:insert_at] = replacement
+    else:
+        end = start + 1
+        while end < len(lines):
+            line = lines[end]
+            if not line.startswith((" ", "\t")) and re.match(r"^[A-Za-z_][A-Za-z0-9_-]*:\s*", line):
+                break
+            end += 1
+        lines[start:end] = replacement
+
+    return text[: match.start("body")] + "\n".join(lines) + text[match.end("body") :]
+
+
+def _preserve_original_video_title(text: str) -> str:
+    if 'class="video-note-original-title"' in text:
+        return text
+
+    h1_match = re.search(r"^#\s+(.+)$", text, flags=re.MULTILINE)
+    if not h1_match:
+        raise ValueError("笔记缺少 H1，无法保留原视频标题")
+    original_title = h1_match.group(1).strip()
+    original_line = (
+        '<small class="video-note-original-title"><strong>原视频标题</strong>：'
+        + html.escape(original_title)
+        + "</small>"
+    )
+
+    meta_match = re.search(r'^<small class="video-note-meta">.*?</small>$', text, flags=re.MULTILINE)
+    if meta_match:
+        return text[: meta_match.end()] + f"\n\n{original_line}" + text[meta_match.end() :]
+
+    bvid_match = re.search(r"^<small>BV号：[^<]+</small>$", text, flags=re.MULTILINE)
+    if bvid_match:
+        return text[: bvid_match.end()] + f"\n\n{original_line}" + text[bvid_match.end() :]
+
+    return text[: h1_match.end()] + f"\n\n{original_line}" + text[h1_match.end() :]
 
 
 def _available_path(directory: Path, title: str, source: Path) -> Path:
@@ -71,6 +136,7 @@ def _upgrade_legacy_description(text: str) -> str:
 
 def _rewrite_title_and_intro(text: str, title: str, intro: str) -> str:
     text = _upgrade_legacy_description(text)
+    text = _preserve_original_video_title(text)
     bvid_match = re.search(r"player\.html\?bvid=(BV[0-9A-Za-z]+)", text)
     if not bvid_match:
         raise ValueError("笔记缺少播放器 BVID，无法整理")
@@ -144,22 +210,37 @@ def _publish_reorganized(source: Path, target: Path, content: str) -> None:
     source.unlink()
 
 
-def organize_note(settings: Settings, source: Path, title: str, intro: str, category: str | None = None) -> Path:
+def organize_note(
+    settings: Settings,
+    source: Path,
+    title: str,
+    intro: str,
+    *,
+    category: str,
+    tags: list[str],
+    confirmed_scope: str,
+) -> Path:
+    if confirmed_scope not in ORGANIZE_SCOPES:
+        raise ValueError("整理功能默认不执行；执行前必须由用户明确选择最近一篇（latest）或全部（all）")
+
     source = source.resolve()
     notes_root = settings.notes_root.resolve()
     if source == notes_root or notes_root not in source.parents or not source.is_file():
         raise ValueError("待整理笔记必须是 notes_root 内的现有 Markdown 文件")
     if source.parent == (notes_root / settings.navigation_dir).resolve() or (notes_root / settings.navigation_dir).resolve() in source.parents:
         raise ValueError("导航文件不能作为整理对象")
+
     title = safe_title(" ".join(title.split()))
     intro = " ".join(intro.split())
     if not intro:
         raise ValueError("简介摘要不能为空")
+    target_category = _validated_category(settings, category)
+    normalized_tags = _normalize_tags(tags)
+
     text = source.read_text(encoding="utf-8")
-    _, tags = parse_frontmatter(text)
-    target_category = _safe_category(category) if category else _suggest_category(settings, tags)
     target = _available_path(notes_root.joinpath(*target_category), title, source)
     updated = _rewrite_title_and_intro(text, title, intro)
+    updated = _rewrite_frontmatter_tags(updated, normalized_tags)
     _publish_reorganized(source, target, updated)
     build_navigation(settings)
     return target

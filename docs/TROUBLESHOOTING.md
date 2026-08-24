@@ -328,17 +328,26 @@ video-note
 
 ## 13. `organize` 失败
 
-检查：
+整理功能默认关闭。先确认用户已经明确选择：
+
+```text
+latest = 最近一篇
+all    = 全部待整理笔记
+```
+
+然后检查：
 
 - `--note` 是否位于 notes root 内；
 - 笔记是否已经正式发布；
-- `--title` 是否非空；
-- `--intro` 是否非空；
-- `--category`（如果提供）是否是项目内允许的相对目录。
+- `--title` 与 `--intro` 是否非空；
+- `--confirmed-scope` 是否是 `latest` 或 `all`；
+- `--category` 是否存在于 `taxonomy.organization.categories`；
+- 是否至少提供一个 `--tag`；
+- 整理后的 tags 是否仍只剩 `待整理`（Organizer 会移除该标签）。
 
-不要手工移动文件后再让导航脚本猜当前状态。
+如果返回“整理功能默认不执行”，说明 Agent 在没有用户范围确认的情况下调用了 Organizer。不要绕过这道门禁。
 
-正确流程是由 `organize` 完成安全移动和导航重建。
+不要手工移动文件后再让导航脚本猜当前状态。正确流程是由 `organize` 统一完成原视频标题保留、短标题更新、tags 更新、安全移动和导航重建。完整规则见 [笔记整理与归档教程](NOTE-ORGANIZATION.md)。
 
 ---
 

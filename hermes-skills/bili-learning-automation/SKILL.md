@@ -1,6 +1,6 @@
 ---
 name: bili-learning-automation
-description: Turn a Bilibili copied link, supported Bilibili short link, or BV id received in the owner's private conversation into a subtitle-first Obsidian learning note without downloading media. No command prefix is required.
+description: Turn a Bilibili copied link, supported Bilibili short link, or BV id received in the owner's private conversation into a subtitle-first Obsidian learning note without downloading media; also organize existing notes only when the owner explicitly requests it. No command prefix is required.
 ---
 
 # B站视频转笔记
@@ -54,4 +54,16 @@ description: Turn a Bilibili copied link, supported Bilibili short link, or BV i
 
 ## 学习后整理
 
-只有 owner 明确要求整理已学习笔记时，才调用统一 `organize_bilibili_learning.py`。不得自行改名、移动文件或改写 UP 主资源链接。
+学习后整理**默认关闭**。生成新笔记、finalizer 完成或检测到 `00-待整理` 有文件时，都不得自动整理。
+
+只有 owner 明确提出“整理 / 归档笔记”时才进入整理流程。执行前必须先确定范围：如果 owner 尚未明确范围，先询问 **“要只整理最近一篇笔记，还是整理全部待整理笔记？”**；只有明确得到 `latest` 或 `all` 后才可以继续。owner 已经明确说“最近一篇”或“全部”时不要重复询问。
+
+范围确认后，逐篇完整阅读笔记，生成简洁知识标题、一句简介、唯一主分类和技术 tags。主分类必须来自 `config/bilibili-note-taxonomy.json` 的 `organization.categories`。视频生成按模型生态优先分类：MiniMax H3、Wan 系列、Seedance 等各自集中管理；真正跨模型、原理性、选型或对比内容才进入 `01-视频生成/90-进阶专题`。显存优化、首尾帧、数字人等技术维度优先放到 tags，不继续增加多层目录。
+
+调用统一 `organize_bilibili_learning.py` 时必须显式传入：
+
+```powershell
+python "$project\hermes-skills\bili-learning-automation\scripts\organize_bilibili_learning.py" --note '<现有笔记路径>' --title '<短标题>' --intro '<一句简介摘要>' --category '<taxonomy 目标目录>' --tag '<标签1>' --tag '<标签2>' --confirmed-scope '<latest|all>'
+```
+
+不得自行改名、移动文件、改写 UP 主资源链接或删除 Organizer 保留的原视频标题。

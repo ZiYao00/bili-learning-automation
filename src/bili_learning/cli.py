@@ -51,11 +51,18 @@ def main() -> None:
     finalize_parser = subparsers.add_parser("finalize", help="校验 runtime 草稿并发布笔记")
     finalize_parser.add_argument("--job", type=Path, required=True)
     finalize_parser.add_argument("--note", type=Path, required=True)
-    organize_parser = subparsers.add_parser("organize", help="学习后整理已有笔记")
+    organize_parser = subparsers.add_parser("organize", help="学习后整理已有笔记；默认不执行")
     organize_parser.add_argument("--note", type=Path, required=True, help="待整理笔记路径")
     organize_parser.add_argument("--title", required=True, help="学习后确定的短标题")
-    organize_parser.add_argument("--intro", required=True, help="保留在视频简介区的一句摘要")
-    organize_parser.add_argument("--category", help="可选的目标相对目录；默认按 tags 推断 taxonomy 建议目录")
+    organize_parser.add_argument("--intro", required=True, help="学习后的一句简介摘要")
+    organize_parser.add_argument("--category", required=True, help="taxonomy.organization.categories 中的目标相对目录")
+    organize_parser.add_argument("--tag", action="append", dest="tags", required=True, help="整理后的标签；可重复传入")
+    organize_parser.add_argument(
+        "--confirmed-scope",
+        choices=("latest", "all"),
+        required=True,
+        help="用户已明确选择整理最近一篇（latest）或全部待整理笔记（all）",
+    )
     args = parser.parse_args()
 
     project_root = args.project_root.resolve() if args.project_root else find_project_root()
@@ -123,7 +130,15 @@ def main() -> None:
         raise SystemExit(code)
     if args.command == "organize":
         try:
-            note_path = organize_note(settings, args.note, args.title, args.intro, args.category)
+            note_path = organize_note(
+                settings,
+                args.note,
+                args.title,
+                args.intro,
+                category=args.category,
+                tags=args.tags,
+                confirmed_scope=args.confirmed_scope,
+            )
             print(json.dumps({"schema_version": 1, "status": "organized", "note_path": str(note_path)}, ensure_ascii=False, indent=2))
         except Exception as error:
             print(json.dumps({"schema_version": 1, "status": "failed", "message": str(error)}, ensure_ascii=False, indent=2))

@@ -1308,6 +1308,33 @@ def test_source_insufficient_is_cleaned_without_publishing(
     assert not Path(prepared["job_dir"]).exists()
 
 
+def test_organize_note_requires_explicit_scope_confirmation(tmp_path: Path, taxonomy: dict) -> None:
+    settings = _settings(tmp_path, taxonomy)
+    with pytest.raises(ValueError, match="整理功能默认不执行"):
+        organize_note(
+            settings,
+            settings.notes_root / "00-待整理" / "不会执行.md",
+            "不会执行",
+            "不会执行。",
+            category="01-视频生成/01-MiniMax-H3",
+            tags=["视频生成", "MiniMax-H3"],
+            confirmed_scope="",
+        )
+
+
+def test_agent_skills_require_organize_scope_confirmation() -> None:
+    root = Path(__file__).parents[1]
+    for relative in (
+        "workbuddy-skills/bili-learning-automation/SKILL.md",
+        "hermes-skills/bili-learning-automation/SKILL.md",
+    ):
+        text = (root / relative).read_text(encoding="utf-8")
+        assert "默认关闭" in text
+        assert "最近一篇" in text
+        assert "全部待整理笔记" in text
+        assert "--confirmed-scope" in text
+
+
 def test_organize_note_updates_title_intro_moves_and_rebuilds_navigation(tmp_path: Path, taxonomy: dict) -> None:
     settings = _settings(tmp_path, taxonomy)
     source = settings.notes_root / "00-待整理" / "H3 分段工作流.md"
@@ -1327,7 +1354,15 @@ def test_organize_note_updates_title_intro_moves_and_rebuilds_navigation(tmp_pat
         _complete_ai_regions(render_note_skeleton(job)).replace("<!-- BILI_AI_SUMMARY_START -->", "").replace("<!-- BILI_AI_SUMMARY_END -->", "").replace("<!-- BILI_AI_BODY_START -->", "").replace("<!-- BILI_AI_BODY_END -->", ""),
         encoding="utf-8",
     )
-    target = organize_note(settings, source, "H3 分段生成", "将长视频拆成连续片段生成。")
+    target = organize_note(
+        settings,
+        source,
+        "H3 分段生成",
+        "将长视频拆成连续片段生成。",
+        category="01-视频生成/01-MiniMax-H3",
+        tags=["视频生成", "MiniMax-H3", "分段生成", "首尾帧"],
+        confirmed_scope="latest",
+    )
     assert target == settings.notes_root / "01-视频生成" / "01-MiniMax-H3" / "H3 分段生成.md"
     assert not source.exists()
     organized = target.read_text(encoding="utf-8")
@@ -1335,6 +1370,10 @@ def test_organize_note_updates_title_intro_moves_and_rebuilds_navigation(tmp_pat
     assert "# H3 分段生成" in organized
     assert "将长视频拆成连续片段生成。" in organized
     assert metadata_line(job) in organized
+    assert '<small class="video-note-original-title"><strong>原视频标题</strong>：H3 分段工作流</small>' in organized
+    _, organized_tags = parse_frontmatter(organized)
+    assert organized_tags == ["视频生成", "MiniMax-H3", "分段生成", "首尾帧"]
+    assert "待整理" not in organized_tags
     assert (settings.notes_root / "99-导航" / "01-视频生成.md").is_file()
     assert "00-待整理]]（0）" in (settings.notes_root / "99-导航" / "首页.md").read_text(encoding="utf-8")
 
@@ -1362,7 +1401,15 @@ def test_organize_note_adds_learning_intro_when_source_has_only_resources(tmp_pa
         .replace("<!-- BILI_AI_BODY_END -->", ""),
         encoding="utf-8",
     )
-    target = organize_note(settings, source, "整理后标题", "学习后补充的一句简介。")
+    target = organize_note(
+        settings,
+        source,
+        "整理后标题",
+        "学习后补充的一句简介。",
+        category="01-视频生成/01-MiniMax-H3",
+        tags=["视频生成", "MiniMax-H3", "资源"],
+        confirmed_scope="latest",
+    )
     text = target.read_text(encoding="utf-8")
     assert metadata_line(job) in text
     assert '<p class="video-note-overview"><strong>视频简介</strong>：学习后补充的一句简介。</p>' in text
@@ -1379,7 +1426,15 @@ def test_organize_note_migrates_a_legacy_description_and_bvid_filename(tmp_path:
         "<iframe src=\"https://player.bilibili.com/player.html?bvid=BV1TXua68EYi\"></iframe>\n",
         encoding="utf-8",
     )
-    target = organize_note(settings, source, "整理后标题", "整理后的简介摘要。")
+    target = organize_note(
+        settings,
+        source,
+        "整理后标题",
+        "整理后的简介摘要。",
+        category="01-视频生成/01-MiniMax-H3",
+        tags=["视频生成", "MiniMax-H3", "旧笔记迁移"],
+        confirmed_scope="latest",
+    )
     text = target.read_text(encoding="utf-8")
     assert target.name == "整理后标题.md"
     assert bvid_line("BV1TXua68EYi") in text

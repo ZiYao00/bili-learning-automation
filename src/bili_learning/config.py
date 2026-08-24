@@ -82,6 +82,24 @@ def validate_taxonomy(config: dict[str, Any]) -> None:
     if not isinstance(config["models"], list) or not isinstance(config["routes"], list):
         raise ValueError("taxonomy.models/routes 必须是数组")
 
+    organization = config.get("organization")
+    if organization is not None:
+        if not isinstance(organization, dict):
+            raise ValueError("taxonomy.organization 必须是对象")
+        for key in ("enabled_by_default", "scope_confirmation_required"):
+            if key in organization and not isinstance(organization[key], bool):
+                raise ValueError(f"taxonomy.organization.{key} 必须是布尔值")
+        categories = organization.get("categories")
+        if not isinstance(categories, list) or not categories:
+            raise ValueError("taxonomy.organization.categories 必须是非空数组")
+        for category in categories:
+            if (
+                not isinstance(category, list)
+                or not category
+                or not all(isinstance(part, str) and part.strip() for part in category)
+            ):
+                raise ValueError("taxonomy.organization.categories 中每个目录都必须是非空字符串数组")
+
     route_ids: set[str] = set()
     for route in [config["fallback"], *config["routes"]]:
         if not isinstance(route, dict):

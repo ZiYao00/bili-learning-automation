@@ -21,6 +21,18 @@
 
 `configuration_required`、`in_progress`、`subtitle_unavailable`、`source_insufficient`、`failed` 和 `note_invalid` 都不是完成状态。
 
+## 学习后整理授权
+
+学习后整理与“转成笔记”是两套独立流程，**默认不执行**。任何适配层都不得在 finalizer 完成后自动改名、移动或归档笔记。
+
+只有用户明确要求整理时才进入整理流程。如果用户尚未说明范围，适配层必须先询问“只整理最近一篇，还是全部待整理笔记？”，并等待明确的 `latest` / `all` 选择；用户已经明确给出范围时不重复询问。
+
+范围确认后，适配层必须完整阅读目标笔记并显式给出短标题、唯一主分类、Tags 与一句简介，然后调用核心 `organize`。`--category` 必须来自 `taxonomy.organization.categories`，`--tag` 至少一个，`--confirmed-scope` 必须与用户选择一致。不得根据旧文件名或旧 Tags 直接批量猜分类，也不得绕过 organizer 手工移动文件。
+
+视频生成分类优先按模型生态：MiniMax H3、Wan 系列、Seedance 等各自集中管理；`01-视频生成/90-进阶专题` 只用于真正跨模型、原理性、选型或对比内容。显存优化、首尾帧、数字人等技术维度优先使用 Tags，不继续增加模型目录下的多层分类。
+
+Organizer 在改写短标题时会保留原视频标题，并统一更新 Tags、移动文件和重建导航。
+
 ## 数据契约
 
 - 新生成的 `job.json` 使用 `schema_version: 1`，并包含 `workflow_mode: light | strict`；当前默认值为 `light`。

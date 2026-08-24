@@ -313,7 +313,8 @@ archive/ materials/  # 本地资料
 - [新手快速上手](docs/QUICKSTART.md)：从下载项目到生成第一篇笔记；
 - [Hermes Skill 安装教程](docs/HERMES-SKILL-INSTALL.md)：安装、更新和验证 Hermes 入口；
 - [WorkBuddy Skill 安装教程](docs/WORKBUDDY-SKILL-INSTALL.md)：安装、更新和验证 WorkBuddy 入口；
-- [Obsidian 样式教程](docs/OBSIDIAN-STYLING.md)：安装 CSS、启用样式和排查显示问题。
+- [Obsidian 样式教程](docs/OBSIDIAN-STYLING.md)：安装 CSS、启用样式和排查显示问题；
+- [笔记整理与归档教程](docs/NOTE-ORGANIZATION.md)：短标题、分类、Tags 与“最近一篇 / 全部”的整理门禁。
 
 ### 使用说明与参考
 
