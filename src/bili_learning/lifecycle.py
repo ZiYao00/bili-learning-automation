@@ -18,7 +18,7 @@ from .collector import (
 )
 from .config import DependencyError, load_settings
 from .doctor import onboarding_report
-from .input_resolver import resolve_input
+from .input_resolver import extract_user_supplied_source, resolve_input
 from .navigation import build_navigation
 from .publisher import publish_validated_draft
 from .quality import load_analysis_report, validate_analysis_report
@@ -180,6 +180,7 @@ def prepare_note(
             subtitle,
             job_dir,
             description_sidecar=description_sidecar,
+            user_supplied_source=extract_user_supplied_source(message),
         )
         handoff = write_handoff(job_dir, job)
         ready = True
@@ -252,9 +253,17 @@ def finalize_note(project_root: Path, job_path: Path, note_path: Path) -> tuple[
             if errors:
                 payload, code = {"status": "note_invalid", "message": "；".join(errors)}, 2
             else:
-                publish_validated_draft(note_path, Path(job["note_path"]))
+                published_now = publish_validated_draft(
+                    note_path,
+                    Path(job["note_path"]),
+                    allow_existing_identical=True,
+                )
                 build_navigation(settings)
-                payload = {"status": "note_ready", "note_path": job["note_path"]}
+                payload = {
+                    "status": "note_ready",
+                    "note_path": job["note_path"],
+                    "publish_state": "published" if published_now else "already_published",
+                }
     except Exception as error:
         payload, code = {"status": "failed", "message": str(error)}, 1
     try:

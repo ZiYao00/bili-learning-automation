@@ -1,117 +1,78 @@
 ---
 name: bili-learning-automation
-description: "Turn a Bilibili copied link, supported short link, or BV id provided by the user in the current WorkBuddy conversation into a subtitle-first Obsidian learning note without downloading media. Also use when the user asks to install, inspect, verify, initialize, or confirm readiness of this skill, or to organize an already-learned note."
-description_zh: "B站视频转笔记：把用户在会话中提供的 B站链接 / 短链 / BV 号转成字幕优先的 Obsidian 学习笔记（不下载音视频）；也用于安装、检查、验证、初始化或确认本 Skill 是否可用，以及学习后整理归档"
-description_en: "Convert Bilibili videos into subtitle-first Obsidian learning notes; also organize learned notes"
-version: 1.0.0
-display_name: "B站视频转笔记"
-display_name_en: "Bili Video to Note"
-visibility: "private"
+description: Turn a Bilibili copied link, supported short link, or BV id into a subtitle-first Obsidian learning note without downloading media. Also use when the user asks to install, inspect, verify, initialize, or confirm readiness of this skill, or explicitly asks to organize already-learned notes.
 ---
 
-# B站视频转笔记（WorkBuddy 适配层）
+# B站视频转笔记（WorkBuddy）
 
-当用户在当前会话中主动提供 B站链接 / BV 号并明确要转笔记、明确要求整理已学习笔记，或要求安装 / 检查 / 验证 / 初始化 / 确认本 Skill 是否可用时执行。链接用途不明确时先确认；除非用户明确要求，不批量转换链接列表。仅要求解释或编辑仓库源码、且明确不涉及当前本机安装状态时，不强制执行环境验收。
+把本文件当作控制层；确定性状态、配置、发布、导航和清理由共享 Python 核心负责，写作细节以 runtime `handoff_path` 和对应 workflow 文档为准。不要为了处理正常状态去阅读核心源码。
 
-## 环境与路径
+## 入口
 
-- 安装目录按 WorkBuddy 约定使用 `~/.workbuddy/skills/bili-learning-automation`，推荐通过 Junction 指向仓库中的适配层。
-- 不硬编码仓库绝对路径；使用 `scripts/bridge.ps1` 与 `bridge.py` 定位并调用共享核心。
-- yt-dlp、Cookie、Obsidian Vault 和工作模式来自项目配置或受支持环境变量。不得读取、展示或复述 Cookie 内容。
+安装目录使用 `~/.workbuddy/skills/bili-learning-automation`，通常通过链接指向仓库适配层。不要硬编码用户仓库绝对路径。
 
 ```bash
 runner="$HOME/.workbuddy/skills/bili-learning-automation/scripts/bridge.ps1"
 ```
 
-`$runner` 不存在时停止并说明安装无效，不猜测仓库路径。
+`$runner` 不存在时停止并说明 Skill 安装无效。正常优先通过 `bridge.ps1` 调用；若 WorkBuddy 沙箱明确阻止 `powershell.exe`，解析已安装 Skill 链接目标得到仓库根，再用该仓库 `.venv/Scripts/python.exe` 调同目录 `bridge.py`，不要写死 `G:\...` 路径。
 
-## 安装验收、首次使用与环境门禁
+不得读取、展示或复述 Cookie 内容。
 
-以下两类请求都必须运行统一 onboarding：
+## 正常流程
 
-1. 用户要生成 B站学习笔记，在正式采集前检查；
-2. 用户要求安装、检查、验证、初始化或确认本 Skill 是否可用。此时先确认安装目录 / `$runner` 有效，再运行 onboarding；**不能只报告“链接存在 / Skill 内容一致”就结束**。
+1. **onboarding**
 
-```bash
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$runner" onboarding
-```
+   生成笔记前，以及安装 / 检查 / 验证 / 初始化 / 可用性确认时，都先运行：
 
-安装 / 可用性检查的反馈要区分两层状态：
+   ```bash
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$runner" onboarding
+   ```
 
-- **安装状态**：Skill 是否已正确安装、链接目标是否有效；
-- **运行环境状态**：onboarding 是否 `ready`。只有两层都通过，才能告诉用户“当前可以直接使用”。
+   - `ready`：向用户简要展示返回的 `summary`（Python、yt-dlp、Cookie 是否就绪、Obsidian、CSS、workflow mode）。Cookie 只报告状态。生成笔记任务继续；仅验收任务到此结束。
+   - `action_required`：停止采集，只按 `actions / warnings` 处理真正缺失项；只询问机器无法自动确定的输入。配置完成后重跑 onboarding。
+   - CSS 警告不阻塞生成，也不得静默复制或覆盖用户 CSS。
 
-不要机械重复完整安装教程，只报告实际检查结果和真正缺失的项目。
+2. **prepare**
 
-- `status = ready`：明确告诉用户环境已经就绪；可简要概括 Python、yt-dlp、Bilibili Cookie、Obsidian Vault 与 CSS 状态，但不得展示 Cookie 内容。生成笔记请求可继续正式采集；安装 / 验证请求则在报告“Skill 已安装 + 环境已就绪”后结束。
-- `status = action_required`：安装本身可以是成功的，但必须明确说明“运行环境尚未就绪”；停止采集，只处理 `actions` 中真正缺失的项目。可以一次汇总多个缺失项，但只向用户询问机器无法自动确定的输入。
-  - `obsidian_vault_required` / `obsidian_vault_invalid`：询问直接包含 `.obsidian` 的 Vault 根目录，笔记子目录默认 `bilibili`；取得路径后执行 `configure-obsidian --vault '<path>'`。
-  - `cookie_file_required`：只询问 Netscape 格式 Cookie **文件路径**，不得要求、展示或复述 Cookie 内容；取得路径后执行 `configure-cookie --file '<path>'`。若用户不知道如何获取，指向项目 `docs/BILIBILI-COOKIE.md`，不要要求用户把 Cookie 内容发到会话中。
-  - `ytdlp_required`：说明项目不会自动安装或复制 yt-dlp。Windows 默认推荐 `winget install yt-dlp`；若用户已经装在自定义目录，只询问可执行文件路径并执行 `configure-ytdlp --path '<path>'`，不要要求普通用户先决定安装目录。
-  - Python 或其它硬性 `FAIL`：按 action 信息说明后停止。
-- `warnings` 中的 CSS 缺失不阻塞笔记生成，但首次出现时简短告知：CSS 只影响视觉效果，程序不会静默复制或覆盖，需要从 `obsidian-learning-snippets` 安装 `learning-lab.css` 与 `video-note.css` 到当前 Vault 的 `.obsidian/snippets/`，并在 Obsidian 中启用。
-- 配置后重新运行 onboarding；只有 `ready` 才能把环境描述为“可直接使用”。
-- `prepare` 自身也执行同一门禁；若返回 `onboarding_required`，按其 `actions / warnings` 完成配置后重试原链接。
-
-## 必须执行的流程
-
-1. 原样把用户消息交给 collector：
+   把用户当前消息原样交给 collector：
 
    ```bash
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$runner" prepare '<用户消息原文>'
    ```
 
-2. 按 JSON `status` 分支：
+   - `materials_ready`：继续写作。
+   - `onboarding_required`：按返回动作完成配置后重试原消息。
+   - `in_progress`：不重复采集、不抢占、不手工删 job / reservation / lock；核心会回收已确认死亡的中间态。
+   - `subtitle_unavailable`：说明正常流程没有可用中文字幕且没有下载媒体；只有用户明确要求时才讨论项目级 ASR fallback。
+   - 其它失败：报告短错误，不声称完成。
 
-   - `onboarding_required`：停止采集，按返回的 `actions / warnings` 完成首次环境配置，重新运行 onboarding，确认 `ready` 后再重试原链接；不要退回旧的单项配置分支。
-   - `in_progress`：已有活动任务，不重复采集或抢占。
-   - `subtitle_unavailable`：没有可用中文字幕，且没有下载媒体，不生成笔记。若用户已人工确认视频确实无字幕并明确要求应急转录，只说明可使用项目级 `scripts/bili_asr_fallback.py`；不得在当前 prepare job 内自动调用旁路或把旁路结果伪装成正常 Skill 流程。
-   - 其它 `failed` / `note_invalid`：报告短错误，不声称完成。
-   - 只有 `materials_ready` 才继续。
+3. **写作**
 
-3. 读取 `handoff_path`、`job.json`、`analysis_path` 与 `transcript_manifest_path`，确认 `workflow_mode`。按 manifest 顺序完整读取全部 transcript chunk，不自行重新切分或跳读。来源不足时在 `analysis.json` 记录原因，不得靠常识补具体事实。
+   读取 `handoff_path`、`job.json`、`analysis_path` 与 `transcript_manifest_path`，按 manifest 顺序完整读取全部 transcript。以 handoff 指定的 `workflow_mode` 和文档为唯一流程说明，不在本 Skill 重复 light / strict 的内部步骤。
 
-4. 按模式写作：
+   只使用当前任务允许的来源支撑具体事实；来源不足时如实记录，不用模型常识补参数、资源或结论。程序负责 Frontmatter、H1、播放器、来源/资源区、tags、cssclasses、路径和 marker；WorkBuddy 只完成 handoff 指定的 AI 内容与质量复核。
 
-   - **`light`（默认）**：读取 `docs\standards\LIGHT-WORKFLOW.md`。不要创建或执行 Fact Ledger、Semantic Draft、Layout Plan。直接完成 `draft_path` 的两个 AI 区域；先写完整内容，再独立做一次排版优化，最后回看 transcript 修正明显遗漏和无来源事实。
-   - **`strict`**：读取 `docs\AGENT-INTEGRATION.md`、`docs\standards\CODEX-VIDEO-NOTE-GUIDE.md` 与 `docs\standards\KNOWLEDGE-DENSE-WORKFLOW.md`，按 `fact_ledger_path → semantic_draft_path → layout_plan_path → draft_path` 执行并完成阶段状态。
+4. **finalize**
 
-   两种模式都只能使用字幕或 UP 主简介支持的事实。Frontmatter、H1、播放器与来源区、资源、tags、cssclasses、路径和 marker 由程序负责，WorkBuddy 不修改。Grid 内 Card 必须使用嵌套 `> > [!card]`。
-
-5. 最终排版后回看 transcript，修正明显遗漏和无来源内容，再将 `coverage_review.status` 设为 `passed` 并填写简短 notes。严格模式还要对照 Fact Ledger 与 Semantic Draft。不要把 runtime 路径、工作文件名、Fact ID、analysis 文件或采集状态写进主笔记。
-
-6. 立即运行 finalizer：
+   写完立即运行：
 
    ```bash
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$runner" finalize --job '<job_dir>' --note '<draft_path>'
    ```
 
-   即使写作失败，也必须由 finalizer 清理 job；不得手工删除 job、reservation 或锁文件。
-
-7. 只在 finalizer 返回后回复：
-
-   - `note_ready` 且 `temporary_data_removed: true`：报告标题、文件名与已写入 Obsidian。
-   - `source_insufficient`：说明现有字幕/简介不足，本次未发布正式笔记。
-   - `note_invalid` / `failed` 或清理失败：只报告短错误，不能说已完成。
+   无论写作成功或失败，都由 finalizer 清理 runtime；不要手工删除中间文件或锁。只有 `note_ready` 且 `temporary_data_removed: true` 才报告完成；`publish_state = already_published` 表示此前发布已成功，本次是安全重试。
 
 ## 学习后整理
 
-学习后整理**默认关闭**，只有用户明确要求整理 / 归档时才执行。先确认范围：指定一篇用 `single`，最近一篇用 `latest`，全部待整理笔记用 `all`；范围不明确时再询问。
-
-整理时逐篇完整阅读，只决定**短文件名**和**目标目录**。目标是让以后在 Obsidian 中一眼看懂、容易找到，而不是套固定分类模板。通常使用“领域 / 对象”，最多两层；具体判断参考项目 `docs/NOTE-ORGANIZATION.md` 中的真实案例，并保留模型自行判断空间。
-
-归档阶段不得修改笔记内容，包括 H1、Summary、正文、Frontmatter、Tags、视频简介、UP 主资源和测试标记。
+整理功能**默认关闭**，仅在用户明确要求时执行。指定一篇用 `single`，最近一篇用 `latest`，全部待整理笔记用 `all`；范围不明确再询问。先完整阅读目标笔记，并按 `docs/NOTE-ORGANIZATION.md` 判断短文件名与最多两层的目标目录。
 
 ```bash
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$runner" organize --note '<现有笔记路径>' --filename '<新的简短文件名>' --destination '<领域/对象>' --confirmed-scope '<single|latest|all>'
 ```
 
-统一 Organizer 只负责改文件名、移动文件和重建导航；内容修改或旧格式升级应作为独立任务处理。
+Organizer 只负责重命名、移动和重建导航，**不得修改笔记内容**。
 
 ## 诊断
 
-```bash
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$runner" doctor --json
-```
-
-CSS 缺失属于可诊断警告，不得静默覆盖用户已有 CSS。
+只有排查环境问题时才运行 `doctor --json`；正常生成流程不要额外加载安装教程或核心源码。

@@ -53,22 +53,76 @@ def _reservation_age_seconds(path: Path, payload: dict[str, object]) -> int:
         return 0
 
 
+def _process_is_alive(pid: object) -> bool | None:
+    """Return True/False when process liveness can be determined, else None."""
+    if not isinstance(pid, int) or pid <= 0:
+        return None
+    if pid == os.getpid():
+        return True
+    if os.name == "nt":
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            process_query_limited_information = 0x1000
+            still_active = 259
+            kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+            kernel32.OpenProcess.restype = wintypes.HANDLE
+            kernel32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+            kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+            kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+            kernel32.CloseHandle.restype = wintypes.BOOL
+            handle = kernel32.OpenProcess(process_query_limited_information, False, pid)
+            if not handle:
+                return False if ctypes.get_last_error() == 87 else None
+            exit_code = wintypes.DWORD()
+            try:
+                if not kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+                    return None
+                return exit_code.value == still_active
+            finally:
+                kernel32.CloseHandle(handle)
+        except (AttributeError, OSError):
+            return None
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return None
+    return True
+
+
 def _remove_stale_reservation(path: Path, stale_seconds: int) -> None:
     payload = _read_reservation(path)
+    age = _reservation_age_seconds(path, payload)
+    owner_alive = _process_is_alive(payload.get("pid"))
     job_dir = payload.get("job_dir")
     if isinstance(job_dir, str) and job_dir:
         candidate = Path(job_dir)
         try:
-            if candidate.is_dir() and time.time() - candidate.stat().st_mtime <= stale_seconds:
-                return
+            if candidate.is_dir():
+                if (candidate / "job.json").is_file() and age <= stale_seconds:
+                    return
+                if not (candidate / "job.json").is_file():
+                    if owner_alive is True:
+                        return
+                    if owner_alive is None and age <= stale_seconds:
+                        return
+                    if owner_alive is False:
+                        try:
+                            remove_job(path.parent.parent, candidate)
+                        except (OSError, ValueError):
+                            pass
         except OSError:
-            pass
-        # A reservation that has already been bound to a missing job cannot
-        # belong to an active task. Reclaim it immediately rather than
-        # blocking a retry until the generic stale timeout expires.
-    elif _reservation_age_seconds(path, payload) <= stale_seconds:
-        # Between claiming a reservation and binding its newly-created job,
-        # job_dir is intentionally empty. Keep that short-lived reservation.
+            if owner_alive is not False and age <= stale_seconds:
+                return
+    elif age <= stale_seconds and owner_alive is not False:
+        # Between claim and bind, job_dir is intentionally empty. Keep it while
+        # the owner lives. Older payloads without a PID keep the stale timeout.
         return
     try:
         path.unlink()
@@ -80,7 +134,13 @@ def claim_reservation(runtime_root: Path, bvid: str, stale_seconds: int = LOCK_S
     path = _reservation_path(runtime_root, bvid)
     path.parent.mkdir(parents=True, exist_ok=True)
     _remove_stale_reservation(path, stale_seconds)
-    payload = {"bvid": bvid, "created_at": time.time(), "updated_at": time.time(), "job_dir": None}
+    payload = {
+        "bvid": bvid,
+        "pid": os.getpid(),
+        "created_at": time.time(),
+        "updated_at": time.time(),
+        "job_dir": None,
+    }
     try:
         fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     except FileExistsError as exc:
@@ -144,14 +204,38 @@ def cleanup_job(runtime_root: Path, path: Path) -> None:
     remove_job(runtime_root, candidate)
     if bvid:
         release_reservation(runtime_root, bvid, candidate)
+        return
+
+    # Incomplete jobs may be killed before job.json is written. Release the
+    # reservation already bound to this job path instead of leaving a dead job.
+    locks_dir = runtime_root / "locks"
+    if not locks_dir.is_dir():
+        return
+    for reservation_path in locks_dir.glob(f"*{RESERVATION_SUFFIX}"):
+        payload = _read_reservation(reservation_path)
+        owner = payload.get("job_dir")
+        if isinstance(owner, str) and owner and Path(owner).resolve() == candidate:
+            try:
+                reservation_path.unlink()
+            except FileNotFoundError:
+                pass
+            break
 
 
 def _remove_stale_lock(lock_path: Path, stale_seconds: int) -> None:
     try:
         age = time.time() - lock_path.stat().st_mtime
+        raw_pid = lock_path.read_text(encoding="ascii", errors="ignore").strip()
     except FileNotFoundError:
         return
-    if age <= stale_seconds:
+    try:
+        pid: object = int(raw_pid)
+    except ValueError:
+        pid = None
+    owner_alive = _process_is_alive(pid)
+    if owner_alive is True:
+        return
+    if owner_alive is None and age <= stale_seconds:
         return
     try:
         lock_path.unlink()

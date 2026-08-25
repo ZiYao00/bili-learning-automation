@@ -16,12 +16,27 @@ ALLOWED_HOSTS = {
 }
 MAX_REDIRECTS = 5
 DEFAULT_TIMEOUT = 10
+USER_SOURCE_MARKER_RE = re.compile(
+    r"(?im)^[ \t]*(?P<label>(?:(?:下面|以下)(?:内容)?(?:是|为)?[ \t]*)?"
+    r"(?:(?:up|UP)[ \t]*主(?:的)?[ \t]*)?(?:视频)?(?:简介|附加内容|附加信息|补充内容|资源))[ \t]*[:：][ \t]*"
+)
 
 
 @dataclass(frozen=True)
 class ResolvedInput:
     bvid: str
     canonical_url: str
+
+
+def extract_user_supplied_source(value: str) -> dict[str, str] | None:
+    """Extract only material the user explicitly labels as source content."""
+    match = USER_SOURCE_MARKER_RE.search(value)
+    if not match:
+        return None
+    text = value[match.end() :].strip().strip("-—_= \t\r\n")
+    if not text:
+        return None
+    return {"label": " ".join(match.group("label").split()), "text": text}
 
 
 class _SafeRedirectHandler(urllib.request.HTTPRedirectHandler):

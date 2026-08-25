@@ -235,6 +235,11 @@ def render_video_materials(job: dict[str, Any]) -> str:
     resources = _description_resources(description) if status == "present" else []
     overview = _description_overview(description) if status == "present" else None
     notices = list(job.get("resource_access_notices") or [])
+    user_source = job.get("user_supplied_source")
+    user_source = user_source if isinstance(user_source, dict) else {}
+    user_source_label = str(user_source.get("label") or "用户补充材料").strip()
+    user_source_text = str(user_source.get("text") or "").strip()
+    user_resources = _description_resources(user_source_text) if user_source_text else []
 
     result = [f'<iframe class="video-note-player" src="https://player.bilibili.com/player.html?bvid={bvid}&autoplay=0&danmaku=0" allowfullscreen></iframe>']
 
@@ -244,6 +249,28 @@ def render_video_materials(job: dict[str, Any]) -> str:
 
     if resources:
         result.extend(["", "### UP 主资源", "", *[_markdown_resource_link(label, url) for label, url in resources]])
+
+    if user_source_text:
+        if user_resources:
+            result.extend(
+                [
+                    "",
+                    "### 用户补充资源",
+                    "",
+                    *[_markdown_resource_link(label, url) for label, url in user_resources],
+                ]
+            )
+        result.extend(
+            [
+                "",
+                '<details class="video-note-source-details">',
+                f"<summary>用户补充来源（{html.escape(user_source_label)}，未与 B站简介合并）</summary>",
+                "",
+                html.escape(user_source_text),
+                "",
+                "</details>",
+            ]
+        )
 
     if overview:
         result.extend(["", f'<p class="video-note-overview"><strong>视频简介</strong>：{html.escape(overview)}</p>'])

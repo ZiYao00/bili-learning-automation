@@ -148,6 +148,7 @@ def create_job(
     subtitle: Path,
     job_dir: Path,
     description_sidecar: str | None = None,
+    user_supplied_source: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     status, description = description_state(info, description_sidecar)
     if status == "failed":
@@ -184,6 +185,7 @@ def create_job(
             "source_tags": [str(item) for item in (info.get("tags") or []) if str(item).strip()],
             "description": description,
             "description_status": status,
+            "user_supplied_source": user_supplied_source,
             "resource_access_notices": resource_access_notices,
             "subtitle_path": str(subtitle),
             "canonical_title": canonical_title,
@@ -215,10 +217,10 @@ def _write_strict_handoff(job_dir: Path, payload: dict[str, Any]) -> Path:
     handoff.write_text(
         "# B站视频转笔记任务\n\n"
         "1. 先读取 `job.json`、`transcript_manifest_path`、`agent_work_dir`、`fact_ledger_path`、`semantic_draft_path`、`layout_plan_path` 与共享内容标准；知识密集型任务还必须读取 `docs/standards/KNOWLEDGE-DENSE-WORKFLOW.md`。manifest 的 `chunks` 已按 cue 完整边界生成；`direct` 读取唯一 transcript，`chunked` 按 manifest 顺序逐块阅读，不要再把原始 SRT 整份塞入上下文。\n"
-        "2. 先判断字幕与简介是否足以支撑可信学习笔记，并填写 runtime 的 `analysis_path`。来源不足时不要编造正文。\n"
+        "2. 先判断字幕、B站采集简介以及 job 中明确存在的 `user_supplied_source` 是否足以支撑可信学习笔记，并填写 runtime 的 `analysis_path`。用户补充来源必须与 B站简介分开保留 provenance；两者冲突时标记冲突，不静默覆盖或猜测。来源不足时不要编造正文。\n"
         "3. 长视频、百科型、参数密集或实测证据多的内容，必须先完成 `fact_ledger_path`：按 manifest 顺序记录原子事实，显式保留具体成员、数值/上下限、版本、A/B 关系、来源/继承、适用条件、例外、冲突、兼容性、作者评价，以及“配置 → 耗时 / 质量 / 失败表现”的证据链。`knowledge_outline` 只是 Fact Ledger 的上层索引，不是事实清单或最终目录；不得先压成几个主题名。普通短视频可将 Fact Ledger 的 `workflow_status` 标记为 `not_applicable`，但必须填写 `workflow_reason`；其余情况完成后标记为 `complete`。仍不得用模型常识补全。\n"
         "4. Fact Ledger 完成后，先在 `semantic_draft_path` 写内容完成稿；本阶段不要编辑最终 `draft_path`。Semantic Draft 先用普通 Markdown 自然聚类事实，不为卡片数量或页面简洁删知识；章节数量只改变事实如何分组，不改变事实保留预算。一个 H2 可以通过 H3、表格和列表承载很多事实。内容稿完成后把 Semantic Draft 的 `workflow_status` 标记为 `complete`。不要改 Frontmatter、H1、播放器与来源区、资源获取提示、iframe、文件名、路径、tags、cssclasses 或 marker。\n"
-        "5. Semantic Draft 内容完成后才进入 `layout_plan_path` 与 Layout Pass：只把现有关系转换成 Table / Grid / Card / Risk / Meta / Resource / Chip / Metric，不重新摘要或选择事实。整页只保留一个最高优先级 Summary；Grid 内 Card 必须使用嵌套 `> > [!card]`。排版计划完成并确认事实无损后，把 Layout Plan 的 `workflow_status` 标记为 `complete`，再把短结论与完整正文写入 `draft_path` 的两个 AI 区域。正文仍只能使用字幕或原始简介支持的事实；外部知识除非用户明确要求，否则不得并入。\n"
+        "5. Semantic Draft 内容完成后才进入 `layout_plan_path` 与 Layout Pass：只把现有关系转换成 Table / Grid / Card / Risk / Meta / Resource / Chip / Metric，不重新摘要或选择事实。整页只保留一个最高优先级 Summary；Grid 内 Card 必须使用嵌套 `> > [!card]`。排版计划完成并确认事实无损后，把 Layout Plan 的 `workflow_status` 标记为 `complete`，再把短结论与完整正文写入 `draft_path` 的两个 AI 区域。正文只能使用字幕、B站采集简介或明确标注的 `user_supplied_source` 支持的事实，并保留来源差异；外部知识除非用户明确要求，否则不得并入。\n"
         "6. 最终排版后重新按 manifest 顺序抽查/复读原 transcript，并同时对照 Fact Ledger、Semantic Draft 与最终正文。重点检查：章节减少时事实是否也被误删；成员是否只剩类别；关系是否只剩名称；原则是否丢了可直接使用值；推荐区间是否丢了例外；实测是否还保留配置、耗时与结果；Layout Pass 前后的事实是否一致。发现遗漏先修正文，再将 `coverage_review.status` 设为 `passed` 并填写 notes。\n"
         "7. 写完立即运行 finalizer；无论成功或失败都必须 finalizer 清理 job。\n",
         encoding="utf-8",
@@ -231,7 +233,7 @@ def _light_handoff_text() -> str:
         "# B站视频转笔记任务\n\n"
         "工作模式：`light`。本任务优先让模型完整理解字幕并自然写作，不创建 Fact Ledger、Semantic Draft 或 Layout Plan。\n\n"
         "1. 读取 `job.json`、`transcript_manifest_path` 和 `docs/standards/LIGHT-WORKFLOW.md`。按 manifest 顺序完整读完所有 transcript chunk；不要自行重新切分，也不要跳读。\n"
-        "2. 判断字幕与 UP 主简介是否足以支撑可信笔记，并填写 `analysis_path`。来源不足时停止，不要用模型常识补具体参数、资源或结论。\n"
+        "2. 判断字幕、B站采集简介以及 job 中明确存在的 `user_supplied_source` 是否足以支撑可信笔记，并填写 `analysis_path`。用户补充来源必须与 B站简介分开保留 provenance；两者冲突时标记冲突，不静默覆盖或猜测。来源不足时停止，不要用模型常识补具体参数、资源或结论。\n"
         "3. 直接在 `draft_path` 的两个 AI 区域写一篇完整、实用、适合长期查询的笔记。优先保留参数、数值、工具、模型、步骤、条件、比较、兼容性、作者建议和实测结果；章节数量由内容自然决定，不要为了简短主动压缩有价值信息。\n"
         "4. 内容写完整后，再独立做一次版式优化。此时可按需读取 `docs/OBSIDIAN-STYLING.md`，或只查看 `STANDARD-VIDEO-NOTE-EXAMPLE.md` 中与当前关系匹配的局部写法。适度使用表格、列表、Grid / Card、Risk、Meta、Chip 或 Metric；不要求使用任何组件，也不要为了美化改写或删减知识。\n"
         "5. 最后回看 transcript，修正明显遗漏和无来源事实；再将 `coverage_review.status` 设为 `passed` 并填写简短 notes。不要修改 Frontmatter、H1、播放器与来源区、资源、文件名、路径、tags、cssclasses 或 marker。\n"

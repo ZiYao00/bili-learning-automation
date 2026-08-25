@@ -113,7 +113,18 @@ def doctor_report(settings: Settings) -> dict[str, object]:
             completed = subprocess.run(
                 [str(ytdlp.path), "--version"], text=True, encoding="utf-8", errors="replace", capture_output=True, timeout=10
             )
-        except (OSError, subprocess.TimeoutExpired) as exc:
+        except subprocess.TimeoutExpired as exc:
+            add(
+                "WARN",
+                "ytdlp_version_check_timeout",
+                "yt-dlp",
+                str(exc),
+                source=ytdlp.source,
+                path=str(ytdlp.path),
+                message="yt-dlp --version 检查超时；保留为警告，正式采集仍会做真实可用性验证。",
+                checked_sources=list(ytdlp.checked_sources),
+            )
+        except OSError as exc:
             add("FAIL", "ytdlp_not_executable", "yt-dlp", str(exc), source=ytdlp.source, checked_sources=list(ytdlp.checked_sources))
         else:
             version = completed.stdout.strip().splitlines()[0] if completed.stdout.strip() else ""
@@ -183,6 +194,24 @@ def onboarding_report(settings: Settings) -> dict[str, object]:
             prompt="如已在自定义目录安装 yt-dlp，请提供可执行文件路径；否则可先按推荐命令安装。",
         )
 
+    ytdlp_unusable = checks.get("ytdlp_not_executable")
+    if ytdlp_unusable and ytdlp_unusable["status"] == "FAIL":
+        add_action(
+            "ytdlp_unusable",
+            "已找到 yt-dlp，但当前环境无法执行它；请检查文件权限、损坏或兼容性后重试。",
+            current_value=str(settings.ytdlp.path) if settings.ytdlp.path is not None else "",
+        )
+
+    ytdlp_timeout = checks.get("ytdlp_version_check_timeout")
+    if ytdlp_timeout and ytdlp_timeout["status"] == "WARN":
+        warnings.append(
+            {
+                "code": "ytdlp_version_check_timeout",
+                "message": "yt-dlp 版本探测超时，但文件已检测到；这不会阻塞首次配置，正式采集会再次验证。",
+                "path": str(settings.ytdlp.path) if settings.ytdlp.path is not None else "",
+            }
+        )
+
     if not settings.cookie_file.is_file():
         add_action(
             "cookie_file_required",
@@ -222,11 +251,32 @@ def onboarding_report(settings: Settings) -> dict[str, object]:
             }
         )
 
+    ytdlp_status = "missing"
+    if settings.ytdlp.path is not None and settings.ytdlp.path.is_file():
+        ytdlp_status = "unusable" if ytdlp_unusable else ("warning" if ytdlp_timeout else "ready")
+    summary = {
+        "python": {"status": "ready" if sys.version_info >= MINIMUM_PYTHON else "required", "version": sys.version.split()[0]},
+        "yt_dlp": {
+            "status": ytdlp_status,
+            "path": str(settings.ytdlp.path) if settings.ytdlp.path is not None else None,
+            "source": settings.ytdlp.source,
+        },
+        "bilibili_cookie": {"status": "ready" if settings.cookie_file.is_file() else "required"},
+        "obsidian": {
+            "status": "required" if settings.notes_is_fallback else "ready",
+            "vault_root": str(settings.vault_root) if settings.vault_root is not None else None,
+            "notes_root": str(settings.notes_root),
+        },
+        "css": {"status": "missing_optional" if missing_css else "ready", "missing": missing_css},
+        "workflow_mode": settings.workflow_mode,
+    }
+
     return {
         "schema_version": 1,
         "status": "action_required" if actions else "ready",
         "actions": actions,
         "warnings": warnings,
+        "summary": summary,
         "checks": report["checks"],
     }
 

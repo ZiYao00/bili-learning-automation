@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
+import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -33,7 +35,7 @@ from bili_learning.config import (
 )
 from bili_learning.doctor import doctor_report, onboarding_report
 from bili_learning.frontmatter import parse_frontmatter, parse_frontmatter_list
-from bili_learning.input_resolver import resolve_input
+from bili_learning.input_resolver import extract_user_supplied_source, resolve_input
 from bili_learning.lifecycle import finalize_note, prepare_note
 from bili_learning.note_template import (
     metadata_line,
@@ -88,6 +90,18 @@ def test_resolve_bvid() -> None:
 def test_resolve_bvid_inside_text() -> None:
     result = resolve_input("复制链接 https://www.bilibili.com/video/BV1TXua68EYi/?spm_id_from=333")
     assert result.bvid == "BV1TXua68EYi"
+
+
+def test_extract_user_supplied_source_requires_an_explicit_label() -> None:
+    message = (
+        "转换该视频：\nhttps://www.bilibili.com/video/BV1TXua68EYi/\n\n"
+        "下面内容是up主的附加内容：\n工作流：https://pan.quark.cn/s/example"
+    )
+    source = extract_user_supplied_source(message)
+    assert source is not None
+    assert "up主" in source["label"].lower()
+    assert source["text"] == "工作流：https://pan.quark.cn/s/example"
+    assert extract_user_supplied_source("转换该视频：https://www.bilibili.com/video/BV1TXua68EYi/") is None
 
 
 def test_reject_non_bilibili_url_without_bvid() -> None:
@@ -340,6 +354,26 @@ def test_video_materials_omit_empty_overview_but_keep_player_and_resources() -> 
     assert "player.bilibili.com/player.html?bvid=BV1EXAMPLE" in rendered
     assert "### UP 主资源" in rendered
     assert "video-note-overview" not in rendered
+
+
+def test_video_materials_keep_user_supplied_source_separate_from_bilibili_description() -> None:
+    rendered = render_video_materials(
+        {
+            "bvid": "BV1EXAMPLE",
+            "description": "平台采集到的简介",
+            "description_status": "present",
+            "resource_access_notices": [],
+            "user_supplied_source": {
+                "label": "下面内容是up主的附加内容",
+                "text": "工作流：https://pan.quark.cn/s/example",
+            },
+        }
+    )
+    assert "平台采集到的简介" in rendered
+    assert "### 用户补充资源" in rendered
+    assert "https://pan.quark.cn/s/example" in rendered
+    assert "未与 B站简介合并" in rendered
+    assert "下面内容是up主的附加内容" in rendered
 
 
 def test_resource_access_detects_explicit_conditions_without_inventing_materials(tmp_path: Path) -> None:
@@ -612,6 +646,25 @@ def test_onboarding_css_warning_does_not_block_ready_state(tmp_path: Path, taxon
     assert report["status"] == "ready"
     assert report["actions"] == []
     assert any(warning["code"] == "obsidian_css_missing" for warning in report["warnings"])
+    assert report["summary"]["obsidian"]["status"] == "ready"
+    assert report["summary"]["bilibili_cookie"]["status"] == "ready"
+    assert report["summary"]["css"]["status"] == "missing_optional"
+
+
+def test_onboarding_ytdlp_version_timeout_is_non_blocking_warning(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    settings = _settings(tmp_path, taxonomy)
+    monkeypatch.setattr(
+        "bili_learning.doctor.subprocess.run",
+        lambda *args, **kwargs: (_ for _ in ()).throw(subprocess.TimeoutExpired(cmd="yt-dlp", timeout=10)),
+    )
+
+    report = onboarding_report(settings)
+
+    assert report["status"] == "ready"
+    assert any(warning["code"] == "ytdlp_version_check_timeout" for warning in report["warnings"])
+    assert report["summary"]["yt_dlp"]["status"] == "warning"
 
 
 def test_configure_cookie_and_ytdlp_preserve_existing_local_values(tmp_path: Path, taxonomy: dict) -> None:
@@ -1131,6 +1184,37 @@ def test_claim_reservation_reclaims_missing_bound_job_without_waiting(tmp_path: 
     assert replacement.path.is_file()
 
 
+def test_cleanup_incomplete_job_releases_bound_reservation(tmp_path: Path) -> None:
+    runtime = tmp_path / ".runtime" / "bilibili-learning"
+    reservation = claim_reservation(runtime, "BV1TXua68EYi")
+    job = runtime / "BV1TXua68EYi-incomplete"
+    job.mkdir()
+    (job / "partial.info.json").write_text("{}", encoding="utf-8")
+    bind_reservation(reservation, job)
+
+    cleanup_job(runtime, job)
+
+    assert not job.exists()
+    replacement = claim_reservation(runtime, "BV1TXua68EYi")
+    assert replacement.path.is_file()
+
+
+def test_dead_incomplete_reservation_is_reclaimed_immediately(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runtime = tmp_path / ".runtime" / "bilibili-learning"
+    reservation = claim_reservation(runtime, "BV1TXua68EYi")
+    job = runtime / "BV1TXua68EYi-incomplete"
+    job.mkdir()
+    bind_reservation(reservation, job)
+    monkeypatch.setattr("bili_learning.runtime._process_is_alive", lambda _pid: False)
+
+    replacement = claim_reservation(runtime, "BV1TXua68EYi")
+
+    assert replacement.path.is_file()
+    assert not job.exists()
+
+
 def test_core_prepare_dry_run_returns_versioned_status_and_releases_reservation(
     tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1236,8 +1320,7 @@ def _write_e2e_config(project_root: Path, taxonomy: dict) -> None:
 
     cookie = project_root / "cookies.txt"
     cookie.write_text("# Netscape HTTP Cookie File\n", encoding="utf-8")
-    ytdlp = project_root / "yt-dlp.exe"
-    ytdlp.write_text("stub", encoding="utf-8")
+    ytdlp = Path(sys.executable)
     (config_dir / "local.json").write_text(
         json.dumps({"notes_root": "notes/bilibili", "cookie_file": str(cookie), "ytdlp": str(ytdlp)}),
         encoding="utf-8",
@@ -1325,10 +1408,16 @@ def test_finalize_reports_failure_when_cleanup_fails(tmp_path: Path, taxonomy: d
     draft.write_text(_complete_ai_regions(draft.read_text(encoding="utf-8")), encoding="utf-8")
     _write_passed_analysis(Path(prepared["analysis_path"]))
 
-    monkeypatch.setattr(
-        "bili_learning.lifecycle.cleanup_job",
-        lambda *_args: (_ for _ in ()).throw(PermissionError("WinError 32")),
-    )
+    cleanup_attempts = 0
+
+    def flaky_cleanup(runtime_root: Path, job_dir: Path) -> None:
+        nonlocal cleanup_attempts
+        cleanup_attempts += 1
+        if cleanup_attempts == 1:
+            raise PermissionError("WinError 32")
+        cleanup_job(runtime_root, job_dir)
+
+    monkeypatch.setattr("bili_learning.lifecycle.cleanup_job", flaky_cleanup)
 
     result, code = finalize_note(tmp_path, Path(prepared["job_dir"]), draft)
 
@@ -1337,6 +1426,13 @@ def test_finalize_reports_failure_when_cleanup_fails(tmp_path: Path, taxonomy: d
     assert result["temporary_data_removed"] is False
     assert result["note_path"] == prepared["note_path"]
     assert "WinError 32" in result["cleanup_error"]
+
+    retried, retry_code = finalize_note(tmp_path, Path(prepared["job_dir"]), draft)
+    assert retry_code == 0
+    assert retried["status"] == "note_ready"
+    assert retried["publish_state"] == "already_published"
+    assert retried["temporary_data_removed"] is True
+    assert not Path(prepared["job_dir"]).exists()
 
 
 def test_e2e_unfinished_draft_never_enters_navigation_and_invalid_draft_is_not_published(
@@ -1748,6 +1844,18 @@ def test_file_lock_blocks_concurrent_owner(tmp_path: Path) -> None:
         with pytest.raises(RuntimeError, match="已有任务正在处理"):
             with file_lock(lock):
                 pass
+    assert not lock.exists()
+
+
+def test_file_lock_recovers_fresh_dead_owner(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    lock = tmp_path / "locks" / "BV1TXua68EYi.lock"
+    lock.parent.mkdir(parents=True)
+    lock.write_text("12345", encoding="ascii")
+    monkeypatch.setattr("bili_learning.runtime._process_is_alive", lambda _pid: False)
+
+    with file_lock(lock):
+        assert lock.is_file()
+
     assert not lock.exists()
 
 

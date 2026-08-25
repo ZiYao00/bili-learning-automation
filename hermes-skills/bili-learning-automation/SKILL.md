@@ -1,94 +1,62 @@
 ---
 name: bili-learning-automation
-description: Turn a Bilibili copied link, supported Bilibili short link, or BV id received in the owner's private conversation into a subtitle-first Obsidian learning note without downloading media; also install, inspect, verify, initialize, or confirm readiness of this skill, and organize existing notes only when the owner explicitly requests it. No command prefix is required.
+description: Turn a Bilibili copied link, supported short link, or BV id received in the owner's private conversation into a subtitle-first Obsidian learning note without downloading media. Also use to install, inspect, verify, initialize, or confirm readiness of this skill, and organize existing notes only when the owner explicitly requests it.
 ---
 
-# B站视频转笔记
+# B站视频转笔记（Hermes）
 
-把 owner 私聊中的 B站复制链接、受支持的 Bilibili 短链接或 BV 号视为生成一篇学习笔记的请求。owner 要求安装 / 检查 / 验证 / 初始化 / 确认本 Skill 是否可用时，也执行本 Skill 的安装验收流程。只在 owner 私聊中运行；群聊或发送者范围不确定时先确认。仅要求解释或编辑仓库源码、且明确不涉及当前本机安装状态时，不强制执行环境验收。过程消息与最终回复使用简体中文，代码、路径、模型名和原始专有名词除外。
+只在 owner 私聊中执行；群聊或发送者范围不确定时先确认。把本文件当作控制层：确定性状态、配置、发布、导航和清理由共享 Python 核心负责，写作细节以 runtime `handoff_path` 和对应 workflow 文档为准。过程与最终回复使用简体中文。
 
-## 安装验收、首次使用与环境门禁
+不得读取、展示或复述 Cookie 内容，也不要为了处理正常状态去阅读核心源码。
 
-以下两类请求都必须运行统一 onboarding：
+## 正常流程
 
-1. owner 要生成 B站学习笔记，在正式采集前检查；
-2. owner 要求安装、检查、验证、初始化或确认本 Skill 是否可用。此时先确认已安装 Skill / Junction 目标有效，再运行 onboarding；**不能只报告“Skill 已安装 / 文件一致”就结束**。
+1. **onboarding**
 
-```powershell
-python "$project\hermes-skills\bili-learning-automation\scripts\onboarding_bilibili_learning.py"
-```
-
-安装 / 可用性检查的反馈必须区分：
-
-- **安装状态**：Hermes 是否识别 Skill、安装链接目标是否有效；
-- **运行环境状态**：onboarding 是否 `ready`。只有两层都通过，才能告诉 owner“当前可以直接使用”。
-
-不要机械复述完整安装教程，只报告实际检查结果和真正缺失的项目。
-
-- `status = ready`：明确告诉 owner 环境已经就绪；可简要概括 Python、yt-dlp、Bilibili Cookie、Obsidian Vault 与 CSS 状态，但不得展示 Cookie 内容。生成笔记请求可继续采集；安装 / 验证请求则在报告“Skill 已安装 + 环境已就绪”后结束。
-- `status = action_required`：安装本身可以成功，但必须明确说明“运行环境尚未就绪”；停止采集，只处理 `actions` 中真正缺失的项目。可以一次汇总多个缺失项，但只向 owner 询问机器无法自动确定的输入。
-  - `obsidian_vault_required` / `obsidian_vault_invalid`：询问直接包含 `.obsidian` 的 Vault 根目录；笔记子目录默认 `bilibili`，除非 owner 要改。取得路径后调用 `configure_bilibili_learning.py --vault '<path>'`。
-  - `cookie_file_required`：只询问 Netscape 格式 Cookie **文件路径**，不得要求或读取 Cookie 内容；取得路径后调用 `configure_cookie_bilibili_learning.py --file '<path>'`。如果 owner 不知道如何获取，指向项目 `docs/BILIBILI-COOKIE.md`，不要要求把 Cookie 内容发到会话中。
-  - `ytdlp_required`：说明项目不会自动安装或复制 yt-dlp。Windows 默认推荐 `winget install yt-dlp`；如果 owner 已装在自定义目录，只询问可执行文件路径并调用 `configure_ytdlp_bilibili_learning.py --path '<path>'`。不要要求普通用户先决定安装目录。
-  - Python 或其它硬性 `FAIL`：按 action 的信息说明后停止，不继续采集。
-- `warnings` 中的 CSS 缺失不阻塞笔记生成，但首次出现时简短告知：样式只影响视觉效果，程序不会静默复制或覆盖；需要从 `obsidian-learning-snippets` 安装 `learning-lab.css` 与 `video-note.css` 到当前 Vault 的 `.obsidian/snippets/`，并在 Obsidian 中启用。
-- 配置后重新运行 onboarding；只有返回 `ready` 才能把环境描述为“可直接使用”。
-- `prepare` 自身也有同一门禁；若任何入口遗漏预检并返回 `onboarding_required`，按其 `actions / warnings` 处理后重试原链接。
-
-## Mandatory workflow
-
-1. 原样把消息交给 collector：
+   生成笔记前，以及安装 / 检查 / 验证 / 初始化 / 可用性确认时，都先运行：
 
    ```powershell
-   $installedSkill = Get-Item "$env:LOCALAPPDATA\hermes\skills\bili-learning-automation"
-   $skillSource = [string]$installedSkill.Target
-   $project = Split-Path (Split-Path $skillSource -Parent) -Parent
+   python "$project\hermes-skills\bili-learning-automation\scripts\onboarding_bilibili_learning.py"
+   ```
+
+   - `ready`：向 owner 简要展示返回的 `summary`（Python、yt-dlp、Cookie 是否就绪、Obsidian、CSS、workflow mode）。Cookie 只报告状态。生成任务继续；仅验收任务到此结束。
+   - `action_required`：停止采集，只按 `actions / warnings` 处理真正缺失项；只询问机器无法自动确定的输入。配置后重跑 onboarding。
+   - CSS 警告不阻塞生成，也不得静默复制或覆盖用户 CSS。
+
+2. **prepare**
+
+   解析已安装 Skill 链接得到 `$project`，把 owner 当前消息原样交给 collector：
+
+   ```powershell
    python "$project\hermes-skills\bili-learning-automation\scripts\prepare_ytdlp_bilibili_note.py" '<received message text>'
    ```
 
-2. 按 JSON `status` 分支：
+   - `materials_ready`：继续写作。
+   - `onboarding_required`：按返回动作完成配置后重试原消息。
+   - `in_progress`：不重复采集、不抢占、不手工删 job / reservation / lock；核心会回收已确认死亡的中间态。
+   - `subtitle_unavailable`：说明正常流程没有可用中文字幕且没有下载媒体；只有 owner 明确要求时才讨论项目级 ASR fallback。
+   - 其它失败：报告短错误，不声称完成。
 
-   - `onboarding_required`：停止采集，按返回的 `actions / warnings` 完成首次环境配置，重新运行 onboarding，确认 `ready` 后再重试原链接；不要退回旧的单项配置分支。
-   - `in_progress`：不重复采集。只有绑定 job 已明显陈旧、必需文件完整、草稿和 analysis 仍未写作时才续做；否则按活动任务处理，不抢占、不手工删锁。
-   - `subtitle_unavailable`：说明没有可用中文字幕，且没有下载媒体，不生成笔记。若 owner 已人工确认视频确实无字幕并明确要求应急转录，只说明可使用项目级 `scripts/bili_asr_fallback.py`；不得在当前 prepare job 内自动调用旁路或把旁路结果伪装成正常 Skill 流程。
-   - 其它 `failed` / `note_invalid`：报告短错误，不声称完成。
-   - 只有 `materials_ready`，或确认可安全续做的旧 job，才继续。
+3. **写作**
 
-3. 读取 `handoff_path` 或 job 内的 `job.json`，确认 `workflow_mode`，再读取 `analysis_path` 与 `transcript_manifest_path`。按 manifest 顺序完整读取全部 transcript chunk，不主动重新切分或跳读。来源不足时在 `analysis.json` 记录原因，不得靠常识补具体事实。
+   读取 `handoff_path`、`job.json`、`analysis_path` 与 `transcript_manifest_path`，按 manifest 顺序完整读取全部 transcript。以 handoff 指定的 `workflow_mode` 和文档为唯一流程说明，不在本 Skill 重复 light / strict 的内部步骤。
 
-4. 按模式写作：
+   只使用当前任务允许的来源支撑具体事实；来源不足时如实记录，不用模型常识补参数、资源或结论。程序负责 Frontmatter、H1、播放器、来源/资源区、tags、cssclasses、路径和 marker；Hermes 只完成 handoff 指定的 AI 内容与质量复核。
 
-   - **`light`（默认）**：读取 `docs\standards\LIGHT-WORKFLOW.md`。不要创建或执行 Fact Ledger、Semantic Draft、Layout Plan。直接完成 `draft_path` 的两个 AI 区域；先写完整内容，再独立做一次排版优化，最后回看 transcript 修正明显遗漏和无来源事实。
-   - **`strict`**：读取 `docs\AGENT-INTEGRATION.md`、`docs\standards\CODEX-VIDEO-NOTE-GUIDE.md` 与 `docs\standards\KNOWLEDGE-DENSE-WORKFLOW.md`，按 `fact_ledger_path → semantic_draft_path → layout_plan_path → draft_path` 执行并完成阶段状态。
-
-   两种模式都只能使用字幕或 UP 主简介支持的事实。Frontmatter、H1、播放器与来源区、资源、tags、cssclasses、路径和 marker 由程序负责，Hermes 不修改。Grid 内 Card 必须使用嵌套 `> > [!card]`。
-
-5. 最终排版后回看 transcript，修正明显遗漏和无来源内容，再将 `coverage_review.status` 设为 `passed` 并填写简短 notes。严格模式还要对照 Fact Ledger 与 Semantic Draft。不要把 runtime 路径、工作文件名、Fact ID、analysis 文件或采集状态写进主笔记。
-
-6. 立即运行 finalizer：
+4. **finalize**
 
    ```powershell
    python "$project\hermes-skills\bili-learning-automation\scripts\finalize_ytdlp_bilibili_note.py" --job '<job_dir>' --note '<draft_path>'
    ```
 
-   即使写作失败，也必须由 finalizer 清理 job；不得手工删除 job、reservation 或锁文件。
-
-7. 只在 finalizer 返回后回复：
-
-   - `note_ready` 且 `temporary_data_removed: true`：报告标题、文件名与已写入 Obsidian。
-   - `source_insufficient`：说明现有字幕/简介不足，本次未发布正式笔记。
-   - `note_invalid` / `failed` 或清理失败：只报告短错误，不能说已完成。
+   无论写作成功或失败，都由 finalizer 清理 runtime；不要手工删除中间文件或锁。只有 `note_ready` 且 `temporary_data_removed: true` 才报告完成；`publish_state = already_published` 表示此前发布已成功，本次是安全重试。
 
 ## 学习后整理
 
-学习后整理**默认关闭**，只有 owner 明确要求整理 / 归档时才执行。先确认范围：指定一篇用 `single`，最近一篇用 `latest`，全部待整理笔记用 `all`；范围不明确时再询问。
-
-整理时逐篇完整阅读，只决定**短文件名**和**目标目录**。目标是让以后在 Obsidian 中一眼看懂、容易找到，而不是套固定分类模板。通常使用“领域 / 对象”，最多两层；具体判断参考项目 `docs/NOTE-ORGANIZATION.md` 中的真实案例，并保留模型自行判断空间。
-
-归档阶段不得修改笔记内容，包括 H1、Summary、正文、Frontmatter、Tags、视频简介、UP 主资源和测试标记。
+整理功能**默认关闭**，仅在 owner 明确要求时执行。指定一篇用 `single`，最近一篇用 `latest`，全部待整理笔记用 `all`；范围不明确再询问。先完整阅读目标笔记，并按 `docs/NOTE-ORGANIZATION.md` 判断短文件名与最多两层的目标目录。
 
 ```powershell
 python "$project\hermes-skills\bili-learning-automation\scripts\organize_bilibili_learning.py" --note '<现有笔记路径>' --filename '<新的简短文件名>' --destination '<领域/对象>' --confirmed-scope '<single|latest|all>'
 ```
 
-统一 Organizer 只负责改文件名、移动文件和重建导航；内容修改或旧格式升级应作为独立任务处理。
+Organizer 只负责重命名、移动和重建导航，**不得修改笔记内容**。
