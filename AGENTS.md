@@ -2,13 +2,21 @@
 
 本项目服务 Codex、Hermes 与 WorkBuddy。三者共用同一套采集、taxonomy、确定性笔记骨架、校验、发布和清理逻辑。
 
-## 首次使用与环境门禁
+## 安装验收、首次使用与环境门禁
 
-收到“生成 B站学习笔记”的任务时，正式采集前先运行统一 `bili-learning onboarding`（或等价入口）。不要根据仓库示例、本机历史或模型记忆猜测用户路径。
+下面两类任务都要运行统一 `bili-learning onboarding`（或等价入口）：
 
-- `status = action_required`：停止采集，只处理返回的 `actions`。Vault 要求用户提供直接包含 `.obsidian` 的根目录；Cookie 只接收 Netscape 文件路径，不读取或复述内容；yt-dlp 默认自动检测，缺失时说明项目不会自动安装，Windows 推荐 `winget install yt-dlp`，只有自定义安装才询问可执行文件路径。
+1. “生成 B站学习笔记”：正式采集前先检查；
+2. “安装 / 检查 / 验证 / 初始化 / 确认 bili-learning-automation 是否可用”：先确认当前入口或安装链接有效，再运行 onboarding。不能只验证文件存在、链接目标或 Skill 内容一致就结束。
+
+如果用户只是分析、解释或编辑仓库源码，并没有要求检查当前本机是否可用，不强制运行 onboarding。不要根据仓库示例、本机历史或模型记忆猜测用户路径。
+
+安装验收的反馈要明确区分“Skill 已安装”和“运行环境已就绪”。只有安装有效且 onboarding `ready`，才能告诉用户当前可以直接使用。
+
+- `status = ready`：简要报告 Python、yt-dlp、Bilibili Cookie、Obsidian Vault 与 CSS 的就绪状态；不要展示 Cookie 内容。安装 / 验证任务到这里结束，生成笔记任务才继续采集。
+- `status = action_required`：可以说明 Skill 安装成功，但必须明确运行环境尚未就绪；停止采集，只处理返回的 `actions`。Vault 要求用户提供直接包含 `.obsidian` 的根目录；Cookie 只接收 Netscape 文件路径，不读取或复述内容，不知道如何获取时指向 `docs/BILIBILI-COOKIE.md`；yt-dlp 默认自动检测，缺失时说明项目不会自动安装，Windows 推荐 `winget install yt-dlp`，只有自定义安装才询问可执行文件路径。
 - `warnings` 中的 CSS 缺失不阻塞笔记生成，但首次出现时应告知：共享真源是 `obsidian-learning-snippets`，需要 `learning-lab.css + video-note.css`，程序不会静默复制或覆盖；安装后还要在 Obsidian“设置 → 外观 → CSS 代码片段”中启用。
-- 配置后重新运行 onboarding；只有 `ready` 才进入采集。`prepare` 自身也有同一门禁，若返回 `onboarding_required`，按其 `actions / warnings` 处理后重试原链接。
+- 配置后重新运行 onboarding；只有 `ready` 才进入采集或把环境描述为“可直接使用”。`prepare` 自身也有同一门禁，若返回 `onboarding_required`，按其 `actions / warnings` 处理后重试原链接。
 
 ## 先读取任务模式
 

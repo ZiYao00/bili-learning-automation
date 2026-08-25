@@ -115,6 +115,14 @@ bili-learning-automation
 
 并且状态为启用 / enabled。
 
+这只能证明 **Hermes 已识别 Skill**，还不能证明当前电脑已经具备完整运行环境。安装验证完成后，建议在新的 Hermes 私聊中说：
+
+```text
+请重新读取 bili-learning-automation Skill，检查安装状态，并确认当前是否已经可以直接使用。
+```
+
+新版 Skill 会在确认安装入口有效后继续运行 onboarding，并分别反馈“Skill 安装状态”和“运行环境状态”。只有 onboarding `ready`，才应告诉你当前可以直接使用；如果 Vault、Bilibili Cookie 或 yt-dlp 等仍缺失，会只处理实际缺失项。Cookie 获取教程见 [Bilibili Cookie 获取与安全配置](BILIBILI-COOKIE.md)。
+
 如果没有看到，优先检查：
 
 1. Junction 路径是否正确；

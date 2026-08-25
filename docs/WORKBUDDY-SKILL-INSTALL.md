@@ -111,39 +111,33 @@ $HOME/.workbuddy/skills/bili-learning-automation/scripts/bridge.ps1
 
 都不需要修改 SKILL.md。
 
-## 5. 第一次使用与 Vault 绑定
+## 5. 安装完成后：先做一次可用性验收
 
-在 WorkBuddy 会话中发送：
+WorkBuddy 能读取 `SKILL.md`、目录链接有效，只能证明 **Skill 已安装**，还不能证明当前电脑已经可以生成笔记。
 
-```text
-帮我把这个视频转成学习笔记：
-https://www.bilibili.com/video/BVxxxxxxxxxx/
-```
-
-如果你还没有配置 Obsidian Vault，核心会返回：
+安装后可以直接在新的 WorkBuddy 会话里说：
 
 ```text
-configuration_required
+请读取 bili-learning-automation Skill，检查安装状态，并确认当前是否已经可以直接使用。
 ```
 
-这时 WorkBuddy 应询问你的 **Vault 根目录**，也就是直接包含 `.obsidian` 的目录，例如：
+新版 Skill 会先检查安装入口，再运行统一 onboarding，并分别反馈：
 
 ```text
-D:\Notes\MyVault
+Skill 安装状态
+运行环境状态
 ```
 
-它随后通过共享配置入口写入：
+只有 onboarding 返回 `ready`，才应告诉你“当前可以直接使用”。它会检查 Python、yt-dlp、Bilibili Cookie、Obsidian Vault 与 CSS；Cookie 只检查配置与文件存在，不读取或展示内容。
 
-```json
-{
-  "vault_root": "D:\\Notes\\MyVault",
-  "notes_subdir": "bilibili"
-}
-```
+如果返回 `action_required`，WorkBuddy 会只处理真正缺失的项目，例如：
 
-然后重新执行刚才的视频请求。
+- Vault 未配置：询问直接包含 `.obsidian` 的 Vault 根目录；
+- Cookie 未配置：只询问 Netscape Cookie **文件路径**；不知道如何获取时看 [Bilibili Cookie 获取与安全配置](BILIBILI-COOKIE.md)；
+- yt-dlp 未检测到：Windows 默认提示 `winget install yt-dlp`；
+- CSS 缺失：提醒安装，但不阻塞笔记生成。
 
-这个设计避免第三方用户首次使用时把私人笔记静默写进克隆仓库内部。
+配置完成后会重新运行 onboarding。这样不会出现“Skill 链接已经健康，但第一次真正发视频时才发现环境没准备好”的情况。
 
 如果你希望使用自己的 Vault 目录体系，也可以明确告诉 WorkBuddy，例如：
 

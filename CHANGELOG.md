@@ -19,6 +19,7 @@
 
 ### Fixed
 
+- 安装 / 检查 / 验证 Skill 现在也会执行 onboarding：Hermes、WorkBuddy 与 Codex 明确区分“Skill 已安装”和“运行环境已就绪”，避免只验证目录链接或 `SKILL.md` 一致就误报“可以使用”；同时清理 Hermes / WorkBuddy 适配层与 WorkBuddy 安装教程中残留的旧 `configuration_required` / `ytdlp_not_configured` 分支。
 - 本机 `config/local.json` 与 taxonomy 配置现在使用 `utf-8-sig` 读取，兼容 Windows 编辑器写入的 UTF-8 BOM，避免 `local_config_invalid_json`。
 
 ## [1.0.0] - 2026-08-23
