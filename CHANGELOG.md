@@ -4,11 +4,18 @@
 
 ### Added
 
+- 新增统一首次使用 onboarding：Hermes、WorkBuddy、Codex 在正式采集前共用同一结构化环境检查；Vault、Cookie、yt-dlp、Python 等必需项返回 `actions`，CSS 缺失只作为非阻塞 `warnings`。
+- 新增 `configure-cookie` 与 `configure-ytdlp` 本机配置入口，以及 Hermes 对应兼容 launcher；只保存 Cookie 文件路径或自定义 yt-dlp 路径，不读取 Cookie 内容，也不自动安装软件。
 - 新增 `scripts/bili_asr_fallback.py` 作为 `subtitle_unavailable` 的人工应急旁路：仅在确认视频完全无字幕后，临时下载低码率音轨并调用 SiliconFlow `FunAudioLLM/SenseVoiceSmall` 输出纯文本 transcript；默认从被 Git 忽略的 `config/local.json` 读取 `siliconflow.api_key`，公开仓库只保留示例占位符；不接入 collector / finalizer，也不改变默认“不下载媒体”的 Skill 行为。
 - Organizer 新增 `single` 范围，区分“用户明确指定单篇”与真正的 `latest`；`latest` 会验证文件确实是待整理目录中的最近一篇。
 - Organizer 会检测相同 BVID 的其它笔记并作为 `duplicate_bvid_notes` 提示，不自动覆盖或删除测试稿；输出同时区分逻辑 Vault 路径与 Junction 解析后的真实路径。
 - Organizer 简化为纯归档器：只改文件名和目标路径，不再改写 H1、简介、Tags、Frontmatter 或旧笔记结构；归档前后 Markdown 内容保持不变。
 - 归档目录改为浅层“领域 / 对象”结构，最多两层；例如 `02-图像/Krea2`、`01-视频/MiniMax-H3`，不再维护多层 `organization.categories` / legacy 迁移表。
+
+### Documentation
+
+- 新增 `docs/BILIBILI-COOKIE.md`，面向第一次使用的用户解释 Bilibili Cookie 的用途、Netscape `cookies.txt` 格式、浏览器导出方式、`SESSDATA` 常见误区、安全保存、`--cookies-from-browser` 风险、Windows `Failed to decrypt with DPAPI` 与 Cookie 失效处理。
+- Quickstart、README、配置、依赖、安全和故障排查文档统一补充 Cookie 获取入口，并明确 Agent 只接收 Cookie 文件路径、不接收凭据内容；同时清理 Quickstart / Troubleshooting 中残留的旧 Organizer 参数与 `configuration_required` 状态。
 
 ### Fixed
 

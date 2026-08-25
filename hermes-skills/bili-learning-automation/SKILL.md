@@ -7,6 +7,23 @@ description: Turn a Bilibili copied link, supported Bilibili short link, or BV i
 
 把 owner 私聊中的 B站复制链接、受支持的 Bilibili 短链接或 BV 号视为生成一篇学习笔记的请求。只在 owner 私聊中运行；群聊或发送者范围不确定时先确认。过程消息与最终回复使用简体中文，代码、路径、模型名和原始专有名词除外。
 
+## 首次使用与环境门禁
+
+收到生成笔记请求时，先运行统一 onboarding；不要凭经验自行猜测本机路径，也不要先启动 Bilibili 采集：
+
+```powershell
+python "$project\hermes-skills\bili-learning-automation\scripts\onboarding_bilibili_learning.py"
+```
+
+- `status = ready`：环境已满足正式采集要求。若 `warnings` 里提示 CSS 缺失，首次出现时简短告知：样式只影响视觉效果，程序不会静默复制或覆盖；需要从 `obsidian-learning-snippets` 安装 `learning-lab.css` 与 `video-note.css` 到当前 Vault 的 `.obsidian/snippets/`，并在 Obsidian 中启用。CSS 警告不阻塞采集。
+- `status = action_required`：停止采集，只处理 `actions` 中真正缺失的项目。可以一次汇总多个缺失项，但只向 owner 询问机器无法自动确定的输入。
+  - `obsidian_vault_required` / `obsidian_vault_invalid`：询问直接包含 `.obsidian` 的 Vault 根目录；笔记子目录默认 `bilibili`，除非 owner 要改。取得路径后调用 `configure_bilibili_learning.py --vault '<path>'`。
+  - `cookie_file_required`：只询问 Netscape 格式 Cookie **文件路径**，不得要求或读取 Cookie 内容；取得路径后调用 `configure_cookie_bilibili_learning.py --file '<path>'`。
+  - `ytdlp_required`：说明项目不会自动安装或复制 yt-dlp。Windows 默认推荐 `winget install yt-dlp`；如果 owner 已装在自定义目录，只询问可执行文件路径并调用 `configure_ytdlp_bilibili_learning.py --path '<path>'`。不要要求普通用户先决定安装目录。
+  - Python 或其它硬性 `FAIL`：按 action 的信息说明后停止，不继续采集。
+- 配置后重新运行 onboarding；只有返回 `ready` 才进入下面流程。
+- `prepare` 自身也有同一门禁；若任何入口遗漏预检并返回 `onboarding_required`，按其 `actions / warnings` 处理后重试原链接。
+
 ## Mandatory workflow
 
 1. 原样把消息交给 collector：

@@ -2,6 +2,14 @@
 
 本项目服务 Codex、Hermes 与 WorkBuddy。三者共用同一套采集、taxonomy、确定性笔记骨架、校验、发布和清理逻辑。
 
+## 首次使用与环境门禁
+
+收到“生成 B站学习笔记”的任务时，正式采集前先运行统一 `bili-learning onboarding`（或等价入口）。不要根据仓库示例、本机历史或模型记忆猜测用户路径。
+
+- `status = action_required`：停止采集，只处理返回的 `actions`。Vault 要求用户提供直接包含 `.obsidian` 的根目录；Cookie 只接收 Netscape 文件路径，不读取或复述内容；yt-dlp 默认自动检测，缺失时说明项目不会自动安装，Windows 推荐 `winget install yt-dlp`，只有自定义安装才询问可执行文件路径。
+- `warnings` 中的 CSS 缺失不阻塞笔记生成，但首次出现时应告知：共享真源是 `obsidian-learning-snippets`，需要 `learning-lab.css + video-note.css`，程序不会静默复制或覆盖；安装后还要在 Obsidian“设置 → 外观 → CSS 代码片段”中启用。
+- 配置后重新运行 onboarding；只有 `ready` 才进入采集。`prepare` 自身也有同一门禁，若返回 `onboarding_required`，按其 `actions / warnings` 处理后重试原链接。
+
 ## 先读取任务模式
 
 生成或修改 `notes\bilibili` 中的笔记前，先读取 collector 返回的 `handoff_path` 与 `job.json`，再根据 `workflow_mode` 选择说明：

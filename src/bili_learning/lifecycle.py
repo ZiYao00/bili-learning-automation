@@ -17,6 +17,7 @@ from .collector import (
     write_handoff,
 )
 from .config import DependencyError, load_settings
+from .doctor import onboarding_report
 from .input_resolver import resolve_input
 from .navigation import build_navigation
 from .publisher import publish_validated_draft
@@ -104,6 +105,19 @@ def prepare_note(
         return _status({"status": "temporary_data_removed"})
     if not message:
         return _status({"status": "failed", "message": "需要提供 B站复制链接、短链接或 BV 号。"}, 2)
+
+    if not dry_run:
+        onboarding = onboarding_report(settings)
+        if onboarding["status"] == "action_required":
+            return _status(
+                {
+                    "status": "onboarding_required",
+                    "message": "首次使用环境尚未准备完成；请先处理必需配置，再重试原链接。",
+                    "actions": onboarding["actions"],
+                    "warnings": onboarding["warnings"],
+                },
+                2,
+            )
 
     if settings.notes_is_fallback and not dry_run:
         return _status(

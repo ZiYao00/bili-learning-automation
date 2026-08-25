@@ -5,8 +5,15 @@ import json
 import sys
 from pathlib import Path
 
-from .config import DEFAULT_NOTES_SUBDIR, ConfigurationError, configure_obsidian, load_settings
-from .doctor import doctor_report, run_doctor
+from .config import (
+    DEFAULT_NOTES_SUBDIR,
+    ConfigurationError,
+    configure_cookie_file,
+    configure_obsidian,
+    configure_ytdlp_path,
+    load_settings,
+)
+from .doctor import doctor_report, onboarding_report, run_doctor
 from .lifecycle import FAILSAFE_SECONDS, finalize_note, prepare_note
 from .navigation import build_navigation
 from .organizer import find_duplicate_bvid_notes, organize_note
@@ -32,6 +39,7 @@ def main() -> None:
 
     doctor_parser = subparsers.add_parser("doctor", help="检查本机依赖和配置")
     doctor_parser.add_argument("--json", action="store_true", dest="as_json", help="输出机器可读诊断 JSON")
+    subparsers.add_parser("onboarding", help="输出首次使用所需的结构化环境检查")
 
     configure_parser = subparsers.add_parser("configure-obsidian", help="把本机 Obsidian Vault 写入 config/local.json")
     configure_parser.add_argument("--vault", type=Path, required=True, help="包含 .obsidian 的 Vault 根目录")
@@ -40,6 +48,10 @@ def main() -> None:
         default=DEFAULT_NOTES_SUBDIR,
         help="Vault 内用于保存本项目笔记的相对子目录",
     )
+    cookie_parser = subparsers.add_parser("configure-cookie", help="把 Bilibili Cookie 文件路径写入 config/local.json")
+    cookie_parser.add_argument("--file", type=Path, required=True, help="Netscape 格式 Cookie 文件路径")
+    ytdlp_parser = subparsers.add_parser("configure-ytdlp", help="把自定义 yt-dlp 路径写入 config/local.json")
+    ytdlp_parser.add_argument("--path", type=Path, required=True, help="yt-dlp 可执行文件路径")
 
     subparsers.add_parser("build-nav", help="重建 Obsidian 导航")
     prepare_parser = subparsers.add_parser("prepare", help="采集资料并创建 runtime 草稿任务")
@@ -65,10 +77,34 @@ def main() -> None:
 
     project_root = args.project_root.resolve() if args.project_root else find_project_root()
 
-    if args.command == "configure-obsidian":
+    if args.command in {"configure-obsidian", "configure-cookie", "configure-ytdlp"}:
         try:
-            config_path = configure_obsidian(project_root, args.vault, args.notes_subdir)
-            settings = load_settings(project_root)
+            if args.command == "configure-obsidian":
+                config_path = configure_obsidian(project_root, args.vault, args.notes_subdir)
+                settings = load_settings(project_root)
+                payload = {
+                    "schema_version": 1,
+                    "status": "configured",
+                    "config_path": str(config_path),
+                    "vault_root": str(settings.vault_root),
+                    "notes_root": str(settings.notes_root),
+                }
+            elif args.command == "configure-cookie":
+                config_path = configure_cookie_file(project_root, args.file)
+                payload = {
+                    "schema_version": 1,
+                    "status": "configured",
+                    "config_path": str(config_path),
+                    "cookie_file": str(args.file.expanduser().resolve()),
+                }
+            else:
+                config_path = configure_ytdlp_path(project_root, args.path)
+                payload = {
+                    "schema_version": 1,
+                    "status": "configured",
+                    "config_path": str(config_path),
+                    "ytdlp": str(args.path.expanduser().resolve()),
+                }
         except ConfigurationError as error:
             print(
                 json.dumps(
@@ -83,19 +119,7 @@ def main() -> None:
                 )
             )
             raise SystemExit(2)
-        print(
-            json.dumps(
-                {
-                    "schema_version": 1,
-                    "status": "configured",
-                    "config_path": str(config_path),
-                    "vault_root": str(settings.vault_root),
-                    "notes_root": str(settings.notes_root),
-                },
-                ensure_ascii=False,
-                indent=2,
-            )
-        )
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
         return
 
     settings = load_settings(project_root)
@@ -107,6 +131,10 @@ def main() -> None:
         code, lines = run_doctor(settings)
         print("\n".join(lines))
         raise SystemExit(code)
+    if args.command == "onboarding":
+        report = onboarding_report(settings)
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        raise SystemExit(0 if report["status"] == "ready" else 2)
     if args.command == "build-nav":
         build_navigation(settings)
         print(f"导航已刷新：{settings.notes_root / settings.navigation_dir}")

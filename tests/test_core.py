@@ -24,12 +24,14 @@ from bili_learning.config import (
     ConfigurationError,
     ExecutableResolution,
     Settings,
+    configure_cookie_file,
     configure_obsidian,
+    configure_ytdlp_path,
     find_ytdlp,
     load_settings,
     validate_taxonomy,
 )
-from bili_learning.doctor import doctor_report
+from bili_learning.doctor import doctor_report, onboarding_report
 from bili_learning.frontmatter import parse_frontmatter, parse_frontmatter_list
 from bili_learning.input_resolver import resolve_input
 from bili_learning.lifecycle import finalize_note, prepare_note
@@ -570,6 +572,74 @@ def test_configure_obsidian_preserves_other_local_values(tmp_path: Path, taxonom
     assert saved["notes_subdir"] == str(Path("Resources/Bilibili"))
 
 
+def test_onboarding_reports_required_actions(tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "bilibili-note-taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
+    monkeypatch.delenv("BILI_LEARNING_NOTES_ROOT", raising=False)
+    monkeypatch.delenv("BILI_LEARNING_VAULT_ROOT", raising=False)
+    monkeypatch.delenv("BILI_LEARNING_NOTES_SUBDIR", raising=False)
+    monkeypatch.delenv("BILI_LEARNING_COOKIE_FILE", raising=False)
+    monkeypatch.delenv("BILI_LEARNING_YTDLP", raising=False)
+
+    report = onboarding_report(load_settings(tmp_path))
+    action_codes = {action["code"] for action in report["actions"]}
+
+    assert report["status"] == "action_required"
+    assert "obsidian_vault_required" in action_codes
+    assert "ytdlp_required" in action_codes
+    assert "cookie_file_required" in action_codes
+
+
+def test_onboarding_css_warning_does_not_block_ready_state(tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "bilibili-note-taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
+    vault = tmp_path / "vault"
+    (vault / ".obsidian").mkdir(parents=True)
+    cookie = tmp_path / "cookies.txt"
+    cookie.write_text("# Netscape HTTP Cookie File\n", encoding="utf-8")
+    ytdlp = tmp_path / "yt-dlp.exe"
+    ytdlp.write_text("stub", encoding="utf-8")
+    (config_dir / "local.json").write_text(
+        json.dumps({"vault_root": str(vault), "notes_subdir": "bilibili", "cookie_file": str(cookie), "ytdlp": str(ytdlp)}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("bili_learning.doctor.subprocess.run", lambda *args, **kwargs: type("Result", (), {"returncode": 0, "stdout": "2026.01.01\n", "stderr": ""})())
+
+    report = onboarding_report(load_settings(tmp_path))
+
+    assert report["status"] == "ready"
+    assert report["actions"] == []
+    assert any(warning["code"] == "obsidian_css_missing" for warning in report["warnings"])
+
+
+def test_configure_cookie_and_ytdlp_preserve_existing_local_values(tmp_path: Path, taxonomy: dict) -> None:
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "bilibili-note-taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
+    vault = tmp_path / "vault"
+    (vault / ".obsidian").mkdir(parents=True)
+    (config_dir / "local.json").write_text(
+        json.dumps({"vault_root": str(vault), "notes_subdir": "bilibili", "workflow_mode": "strict"}),
+        encoding="utf-8",
+    )
+    cookie = tmp_path / "cookies.txt"
+    cookie.write_text("# Netscape HTTP Cookie File\n", encoding="utf-8")
+    ytdlp = tmp_path / "yt-dlp.exe"
+    ytdlp.write_text("stub", encoding="utf-8")
+
+    configure_cookie_file(tmp_path, cookie)
+    configure_ytdlp_path(tmp_path, ytdlp)
+    saved = json.loads((config_dir / "local.json").read_text(encoding="utf-8"))
+
+    assert saved["vault_root"] == str(vault)
+    assert saved["notes_subdir"] == "bilibili"
+    assert saved["workflow_mode"] == "strict"
+    assert saved["cookie_file"] == str(cookie.resolve())
+    assert saved["ytdlp"] == str(ytdlp.resolve())
+
+
 def _complete_ai_regions(text: str) -> str:
     return (
         text.replace("> 待智能体根据字幕填写。", "> 这是结论。")
@@ -1093,8 +1163,9 @@ def test_prepare_requires_explicit_notes_location_before_collection(
     payload, code = prepare_note(tmp_path, "BV1TXua68EYi")
 
     assert code == 2
-    assert payload["status"] == "configuration_required"
-    assert payload["required"] == "vault_root"
+    assert payload["status"] == "onboarding_required"
+    action_codes = {action["code"] for action in payload["actions"]}
+    assert "obsidian_vault_required" in action_codes
     assert called is False
 
 
@@ -1110,11 +1181,11 @@ def test_prepare_reports_ytdlp_dependency_code_without_auto_install(
 
     payload, code = prepare_note(tmp_path, "BV1TXua68EYi")
 
-    assert code == 1
-    assert payload["status"] == "failed"
-    assert payload["code"] == "ytdlp_not_configured"
-    assert "winget install yt-dlp" in payload["message"]
-    assert "不会自动安装" in payload["message"]
+    assert code == 2
+    assert payload["status"] == "onboarding_required"
+    ytdlp_action = next(action for action in payload["actions"] if action["code"] == "ytdlp_required")
+    assert ytdlp_action["recommended_command"] == "winget install yt-dlp"
+    assert "不会自动安装" in ytdlp_action["message"]
 
 
 def test_prepare_in_progress_returns_bound_job_dir(tmp_path: Path, taxonomy: dict) -> None:
@@ -1163,7 +1234,14 @@ def _write_e2e_config(project_root: Path, taxonomy: dict) -> None:
     (config_dir / "bilibili-note-taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
 
 
-    (config_dir / "local.json").write_text(json.dumps({"notes_root": "notes/bilibili"}), encoding="utf-8")
+    cookie = project_root / "cookies.txt"
+    cookie.write_text("# Netscape HTTP Cookie File\n", encoding="utf-8")
+    ytdlp = project_root / "yt-dlp.exe"
+    ytdlp.write_text("stub", encoding="utf-8")
+    (config_dir / "local.json").write_text(
+        json.dumps({"notes_root": "notes/bilibili", "cookie_file": str(cookie), "ytdlp": str(ytdlp)}),
+        encoding="utf-8",
+    )
 
 
 def _fake_ytdlp(_settings: Settings, job_dir: Path, canonical_url: str) -> None:
@@ -1213,10 +1291,10 @@ def test_e2e_strict_mode_still_publishes_after_stage_completion(
     tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _write_e2e_config(tmp_path, taxonomy)
-    (tmp_path / "config" / "local.json").write_text(
-        json.dumps({"notes_root": "notes/bilibili", "workflow_mode": "strict"}),
-        encoding="utf-8",
-    )
+    local_path = tmp_path / "config" / "local.json"
+    local_config = json.loads(local_path.read_text(encoding="utf-8"))
+    local_config["workflow_mode"] = "strict"
+    local_path.write_text(json.dumps(local_config), encoding="utf-8")
     monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", _fake_ytdlp)
     monkeypatch.setattr("bili_learning.lifecycle._schedule_failsafe_cleanup", lambda *args: None)
 

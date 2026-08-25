@@ -1,6 +1,6 @@
 # 配置说明
 
-普通用户优先使用 `config/local.json`。它保存当前电脑的本地路径与私密配置，并已被 Git 忽略；公开仓库只提交 `config/local.json.example`。
+普通用户优先让 Agent 通过 onboarding 检查并补齐缺失配置；这些本机值最终保存到 `config/local.json`。它用于保存当前电脑的本地路径与私密配置，并已被 Git 忽略；公开仓库只提交 `config/local.json.example`。高级用户也可以直接手工维护这个文件。
 
 新版本把 Obsidian 配置拆成两个概念：
 
@@ -92,7 +92,23 @@ Vault 内用于保存本项目笔记的**相对子目录**。默认推荐：
 
 ### `cookie_file`
 
-Netscape 格式 Bilibili Cookie 文件路径。这里只写路径，不要把 Cookie 内容放进 JSON、日志、Issue 或聊天记录。
+Netscape 格式 Bilibili Cookie 文件路径。当前正常采集流程要求该文件存在。
+
+项目需要的是完整的 Mozilla / Netscape `cookies.txt`，不是单个 `SESSDATA`、JSON 或浏览器请求头。这里只写**文件路径**，不要把 Cookie 内容放进 JSON、日志、Issue 或聊天记录。
+
+默认未显式配置时会检查：
+
+```text
+<repo-root>\key\bilibili_cookies.txt
+```
+
+也可以放在项目外的私密目录，例如：
+
+```json
+"cookie_file": "D:\\Private\\bilibili_cookies.txt"
+```
+
+第一次不知道怎样导出、怎样确认 Netscape 格式，或遇到 Windows Chrome `Failed to decrypt with DPAPI` 时，阅读 [Bilibili Cookie 获取与安全配置](BILIBILI-COOKIE.md)。
 
 ### `workflow_mode`
 
@@ -111,9 +127,32 @@ Netscape 格式 Bilibili Cookie 文件路径。这里只写路径，不要把 Co
 
 ---
 
-## 2. 第一次绑定 Vault
+## 2. 第一次初始化
 
-除了手工编辑 JSON，也可以使用统一配置命令：
+Agent 首次生成笔记前应先运行统一 onboarding，而不是直接启动采集：
+
+```powershell
+python .\hermes-skills\bili-learning-automation\scripts\onboarding_bilibili_learning.py
+```
+
+它只把**用户需要处理的首次配置**放进 `actions`：Vault、Cookie、yt-dlp 与 Python 环境；CSS 缺失放进 `warnings`，不阻塞 Markdown 笔记生成。完整项目诊断仍由 `doctor` 负责。
+
+可写入本机配置的统一入口包括：
+
+```powershell
+# Obsidian Vault；notes_subdir 默认 bilibili
+python .\hermes-skills\bili-learning-automation\scripts\configure_bilibili_learning.py --vault 'D:\Notes\MyVault'
+
+# Netscape Cookie 文件路径；不要把 Cookie 内容传给 Agent
+python .\hermes-skills\bili-learning-automation\scripts\configure_cookie_bilibili_learning.py --file 'D:\Private\bilibili_cookies.txt'
+
+# 仅当 yt-dlp 位于自定义目录且未加入 PATH 时使用
+python .\hermes-skills\bili-learning-automation\scripts\configure_ytdlp_bilibili_learning.py --path 'D:\Tools\yt-dlp.exe'
+```
+
+### 第一次绑定 Vault
+
+除了手工编辑 JSON，也可以使用统一 Vault 配置命令：
 
 ```powershell
 python .\hermes-skills\bili-learning-automation\scripts\configure_bilibili_learning.py --vault 'D:\Notes\MyVault' --notes-subdir 'bilibili'
@@ -138,7 +177,7 @@ python .\hermes-skills\bili-learning-automation\scripts\configure_bilibili_learn
 }
 ```
 
-Hermes / WorkBuddy 在首次收到 `configuration_required` 时，也应向用户询问这个 Vault 路径，再调用同一配置入口。
+Hermes / WorkBuddy / Codex 会在正式采集前通过 onboarding 发现 Vault 缺失，并在 `onboarding_required.actions` 中要求用户提供这个路径，再调用同一配置入口。
 
 ---
 
@@ -155,7 +194,7 @@ notes/bilibili
 如果没有显式配置 Vault 或旧版 `notes_root`：
 
 - doctor 会报告 `notes_repository_fallback`；
-- 普通新采集会返回 `configuration_required`；
+- 普通新采集会被 onboarding 门禁拦住并返回 `onboarding_required`；
 - yt-dlp 不会启动；
 - 不会静默把私人笔记写进代码仓库。
 

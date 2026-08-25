@@ -9,7 +9,7 @@
 | yt-dlp | 采集元数据、简介和字幕，不下载媒体 | 默认自动检测系统 PATH；环境变量 / `local.json` 只用于自定义路径覆盖 |
 | Bilibili Cookie | 获取需要登录态的字幕/元数据 | `BILI_LEARNING_COOKIE_FILE` |
 
-默认 Cookie 相对项目根目录为 `key/bilibili_cookies.txt`。Cookie 是凭据，只允许把文件路径传给 yt-dlp；不要读取、打印或写入示例配置。
+默认 Cookie 相对项目根目录为 `key/bilibili_cookies.txt`。当前正常采集要求存在 Mozilla / Netscape 格式的完整 Cookie 文件；不要只配置单个 `SESSDATA`。Cookie 是凭据，只允许把**文件路径**传给 yt-dlp；不要读取、打印或写入示例配置。第一次获取和导出方法见 [Bilibili Cookie 获取与安全配置](BILIBILI-COOKIE.md)。
 
 ## yt-dlp 检测与安装边界
 

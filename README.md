@@ -53,7 +53,7 @@ B站链接 / BV号
 | --- | --- |
 | Python 3.10+ | 运行核心脚本 |
 | yt-dlp | 获取字幕、简介和元数据 |
-| Bilibili Cookie 文件 | 通常用于登录态字幕 / 元数据访问 |
+| Bilibili Cookie 文件 | 提供已登录 Bilibili 的会话凭据；当前正常采集必需 |
 | Obsidian Vault | 保存生成的学习笔记 |
 | Hermes / WorkBuddy / Codex | 读取 transcript 并整理正文 |
 
@@ -63,7 +63,7 @@ B站链接 / BV号
 winget install yt-dlp
 ```
 
-Cookie 是账号凭据。项目只需要 Cookie **文件路径**，不要把 Cookie 内容写入 README、Issue、PR、日志或 Agent 对话。
+Cookie 是账号凭据。项目需要 **Mozilla / Netscape 格式的完整 `cookies.txt` 文件**，不是只复制 `SESSDATA`。项目只接收 Cookie **文件路径**，不要把 Cookie 内容写入 README、Issue、PR、日志或 Agent 对话。第一次不知道怎样获取时，直接阅读 [Bilibili Cookie 获取与安全配置](docs/BILIBILI-COOKIE.md)。
 
 ---
 
@@ -80,7 +80,9 @@ git clone https://github.com/ZiYao00/bili-learning-automation.git
 cd bili-learning-automation
 ```
 
-### 3.2 创建本机配置
+### 3.2 本机配置
+
+普通用户可以直接让 Agent 在 onboarding 时补齐缺失配置，不必先手工编辑 JSON。如果希望自己维护本机配置，可复制模板：
 
 ```powershell
 Copy-Item .\config\local.json.example .\config\local.json
@@ -108,7 +110,29 @@ Copy-Item .\config\local.json.example .\config\local.json
 
 更完整的字段和优先级见：[配置手册](docs/CONFIGURATION.md)。
 
-### 3.3 检查环境
+### 3.3 准备 Bilibili Cookie
+
+第一次使用时，先在浏览器正常登录 Bilibili，再导出 **Netscape `cookies.txt`**。不要只从 F12 里复制 `SESSDATA`；`yt-dlp --cookies` 需要完整 Cookie 文件。
+
+普通用户建议使用可信、支持 Netscape 格式的浏览器导出工具，尽量只导出 `bilibili.com` 当前站点，然后保存为例如：
+
+```text
+bilibili_cookies.txt
+```
+
+可以放在项目的 `key/bilibili_cookies.txt`，也可以放在项目外的私密目录，再把路径配置到 `cookie_file`。Cookie 内容不要发送给 Agent；Agent 只需要文件路径。
+
+完整教程，包括浏览器导出方式、格式判断、yt-dlp `--cookies-from-browser` 的安全注意事项、Windows `Failed to decrypt with DPAPI` 和 Cookie 失效处理，见：**[Bilibili Cookie 获取与安全配置](docs/BILIBILI-COOKIE.md)**。
+
+### 3.4 首次环境检查
+
+接入 Hermes / WorkBuddy / Codex 后，Agent 应在第一次正式采集前自动执行 onboarding，只向用户询问无法自动确定的缺失项。手动检查可运行：
+
+```powershell
+python .\hermes-skills\bili-learning-automation\scripts\onboarding_bilibili_learning.py
+```
+
+`action_required` 会返回需要处理的 Vault、Cookie、yt-dlp 等配置；CSS 缺失只作为非阻塞提醒。完整诊断仍可运行：
 
 ```powershell
 python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py
@@ -127,7 +151,7 @@ Doctor 会检查：
 
 Doctor **不会读取 Cookie 内容，也不会访问 Bilibili**。
 
-### 3.4 安装 Obsidian 样式
+### 3.5 安装 Obsidian 样式
 
 本项目使用共享 [Obsidian Learning Snippets](https://github.com/ZiYao00/obsidian-learning-snippets)。
 
@@ -148,7 +172,7 @@ video-note.css
 
 详细步骤见：[Obsidian 样式教程](docs/OBSIDIAN-STYLING.md)。
 
-### 3.5 安装或选择 Agent
+### 3.6 安装或选择 Agent
 
 | Agent | 使用方式 | 教程 |
 | --- | --- | --- |
@@ -272,7 +296,7 @@ Fact Ledger
 
 | 状态 | 含义 | 处理方式 |
 | --- | --- | --- |
-| `configuration_required` | 尚未绑定真实 Obsidian Vault | 配置 `vault_root` 后重试 |
+| `onboarding_required` | 首次环境仍缺少 Vault / Cookie / yt-dlp 等必需配置 | 按 `actions` 处理后重新检查并重试原链接 |
 | `materials_ready` | 字幕、简介和元数据已经准备完成 | Agent 继续处理 |
 | `in_progress` | 同一 BV 有活动任务 | 不要重复采集 |
 | `subtitle_unavailable` | 没有取得可用中文字幕 | 本次停止 |
@@ -311,6 +335,7 @@ archive/ materials/  # 本地资料
 ### 新手与操作教程
 
 - [新手快速上手](docs/QUICKSTART.md)：从下载项目到生成第一篇笔记；
+- [Bilibili Cookie 获取与安全配置](docs/BILIBILI-COOKIE.md)：第一次导出 Cookie、格式检查、安全保存和失效处理；
 - [Hermes Skill 安装教程](docs/HERMES-SKILL-INSTALL.md)：安装、更新和验证 Hermes 入口；
 - [WorkBuddy Skill 安装教程](docs/WORKBUDDY-SKILL-INSTALL.md)：安装、更新和验证 WorkBuddy 入口；
 - [Obsidian 样式教程](docs/OBSIDIAN-STYLING.md)：安装 CSS、启用样式和排查显示问题；

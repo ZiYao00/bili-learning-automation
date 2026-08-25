@@ -22,9 +22,9 @@ doctor 不访问 Bilibili，也不读取 Cookie 内容。
 
 | 你看到的问题 | 先看 |
 | --- | --- |
-| 返回 `configuration_required` / `in_progress` / `note_invalid` 等状态 | [第 1 节：状态表](#1-先看状态不要先猜原因) |
+| 返回 `onboarding_required` / `in_progress` / `note_invalid` 等状态 | [第 1 节：状态表](#1-先看状态不要先猜原因) |
 | 找不到 yt-dlp | [第 3 节：未找到 yt-dlp](#3-未找到-yt-dlp) |
-| Cookie 不存在或登录态失效 | [第 4 节：Cookie 文件不存在](#4-cookie-文件不存在) |
+| Cookie 不存在或登录态失效 | [第 4 节：Cookie 文件不存在或登录态失效](#4-cookie-文件不存在或登录态失效) |
 | 没有字幕 | [第 5 节：subtitle_unavailable](#5-subtitle_unavailable) |
 | Hermes 更新后仍像旧版本 | [第 8 节](#8-hermes-更新了-skill但好像还在使用旧版本) |
 | Hermes 只分析、不继续执行 | [第 9 节](#9-hermes-会分析但不继续执行) |
@@ -38,7 +38,7 @@ doctor 不访问 Bilibili，也不读取 Cookie 内容。
 
 | 状态 | 含义 | 推荐处理 |
 | --- | --- | --- |
-| `configuration_required` | 尚未显式绑定 Obsidian Vault | 提供包含 `.obsidian` 的 Vault 根目录；本次不会启动采集 |
+| `onboarding_required` | 首次环境仍缺少 Vault / Cookie / yt-dlp 等必需配置 | 按 `actions` 处理缺失项，重新运行 onboarding 后再重试原链接 |
 | `materials_ready` | 采集完成，等待智能体写笔记 | 正常继续 |
 | `in_progress` | 同 BV 已有活动任务 | 不重复采集；等待或由适配层安全续做陈旧 job |
 | `subtitle_unavailable` | 没有取得可用中文字幕 | 本次停止；若人工确认视频完全无字幕，可按第 5 节使用手动 ASR 旁路 |
@@ -110,9 +110,15 @@ winget install yt-dlp
 
 ---
 
-## 4. Cookie 文件不存在
+## 4. Cookie 文件不存在或登录态失效
 
-先确认配置里保存的是**Cookie 文件路径**，不是 Cookie 内容。
+如果 onboarding 返回：
+
+```text
+cookie_file_required
+```
+
+先确认配置里保存的是**Cookie 文件路径**，不是 Cookie 内容。项目需要 Mozilla / Netscape 格式的完整 `cookies.txt`，不是单个 `SESSDATA`、JSON 或 `Cookie:` 请求头。
 
 可能来源：
 
@@ -122,15 +128,46 @@ BILI_LEARNING_COOKIE_FILE
 key/bilibili_cookies.txt
 ```
 
+第一次完全不知道怎样获得 Cookie 时，不要在 F12 里手工拼字段，直接阅读：
+
+**[Bilibili Cookie 获取与安全配置](BILIBILI-COOKIE.md)**
+
+里面包含浏览器导出 Netscape `cookies.txt`、文件格式判断、保存位置、安全边界和失效后的重新导出方式。
+
+### 文件存在，但实际采集仍失败
+
+Doctor 只检查 Cookie **文件是否存在**，不会读取凭据或登录 Bilibili 验证有效性。因此 `[OK] cookie file exists` 不代表账号会话一定仍然有效。
+
+如果文件存在但 yt-dlp 仍然无法获取登录态资料，优先检查：
+
+1. 浏览器里的 Bilibili 账号是否仍然登录；
+2. 是否最近重新导出过 Cookie；
+3. 文件首行是否为 `# Netscape HTTP Cookie File` 或 `# HTTP Cookie File`；
+4. `config/local.json` 是否指向正确的新文件；
+5. 是否误用了只包含 `SESSDATA` 的文本，而不是完整 `cookies.txt`。
+
+### `Failed to decrypt with DPAPI`
+
+如果 Windows Chrome / Chromium 直接通过 `--cookies-from-browser` 读取时出现：
+
+```text
+Failed to decrypt with DPAPI
+```
+
+不要继续尝试绕过浏览器本地加密。改用浏览器内的可信 Cookie 导出工具生成 Netscape `cookies.txt`，或者使用 Firefox 登录 Bilibili 后重新导出，再把文件路径配置给项目。
+
+### 安全提醒
+
 不要把 Cookie 内容复制到：
 
 - README；
-- Issue；
+- Issue / PR；
 - 日志；
 - 聊天记录；
-- Git。
+- Git；
+- 截图或公开网盘。
 
-如果 Cookie 文件存在但 yt-dlp 仍然无法获取登录态资料，可能需要重新导出有效 Cookie。
+Agent 只需要 Cookie **文件路径**。
 
 ---
 

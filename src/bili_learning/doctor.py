@@ -6,7 +6,14 @@ import sys
 import tempfile
 from pathlib import Path
 
-from .config import OBSIDIAN_SNIPPET_NAMES, YTDLP_INSTALL_URL, YTDLP_WINDOWS_INSTALL_COMMAND, Settings
+from .config import (
+    DEFAULT_NOTES_SUBDIR,
+    OBSIDIAN_SNIPPET_NAMES,
+    OBSIDIAN_STYLE_REPOSITORY,
+    YTDLP_INSTALL_URL,
+    YTDLP_WINDOWS_INSTALL_COMMAND,
+    Settings,
+)
 
 MINIMUM_PYTHON = (3, 10)
 
@@ -126,6 +133,101 @@ def doctor_report(settings: Settings) -> dict[str, object]:
         "status": "ok" if not failures else "failed",
         "warnings": warnings,
         "checks": checks,
+    }
+
+
+def onboarding_report(settings: Settings) -> dict[str, object]:
+    report = doctor_report(settings)
+    checks = {str(check["code"]): check for check in report["checks"]}  # type: ignore[index]
+    actions: list[dict[str, object]] = []
+    warnings: list[dict[str, object]] = []
+
+    def add_action(code: str, message: str, **extra: object) -> None:
+        actions.append({"code": code, "message": message, **extra})
+
+    python_check = checks.get("python_version")
+    if python_check and python_check["status"] == "FAIL":
+        add_action(
+            "python_required",
+            f"需要 Python {MINIMUM_PYTHON[0]}.{MINIMUM_PYTHON[1]}+；当前环境不满足要求。",
+            required=f">={MINIMUM_PYTHON[0]}.{MINIMUM_PYTHON[1]}",
+        )
+
+    if settings.notes_is_fallback:
+        add_action(
+            "obsidian_vault_required",
+            "尚未绑定真实 Obsidian Vault。请提供直接包含 .obsidian 的 Vault 根目录。",
+            required_input="vault_root",
+            prompt="请提供 Obsidian Vault 根目录（即直接包含 .obsidian 的目录）。",
+            default_notes_subdir=DEFAULT_NOTES_SUBDIR,
+            config_path=str(settings.local_config_path),
+        )
+
+    vault_check = checks.get("obsidian_vault_detected")
+    if vault_check and vault_check["status"] == "FAIL":
+        add_action(
+            "obsidian_vault_invalid",
+            "已配置的 Vault 无效：目标目录必须直接包含 .obsidian。",
+            required_input="vault_root",
+            prompt="请重新提供直接包含 .obsidian 的 Obsidian Vault 根目录。",
+            current_value=str(settings.vault_root) if settings.vault_root is not None else "",
+        )
+
+    if settings.ytdlp.path is None or not settings.ytdlp.path.is_file():
+        add_action(
+            "ytdlp_required",
+            "未检测到 yt-dlp。项目不会自动安装或复制可执行文件。",
+            recommended_command=YTDLP_WINDOWS_INSTALL_COMMAND,
+            install_url=YTDLP_INSTALL_URL,
+            custom_path_supported=True,
+            prompt="如已在自定义目录安装 yt-dlp，请提供可执行文件路径；否则可先按推荐命令安装。",
+        )
+
+    if not settings.cookie_file.is_file():
+        add_action(
+            "cookie_file_required",
+            "未检测到 Bilibili Cookie 文件。请只提供 Netscape 格式 Cookie 文件路径，不要粘贴 Cookie 内容。",
+            required_input="cookie_file_path",
+            expected_path=str(settings.cookie_file),
+            prompt="请提供 Netscape 格式 Bilibili Cookie 文件路径；不要在聊天中粘贴 Cookie 内容。",
+        )
+
+    missing_css: list[str] = []
+    for snippet_name in OBSIDIAN_SNIPPET_NAMES:
+        code = f"obsidian_snippet_{snippet_name.removesuffix('.css').replace('-', '_')}"
+        check = checks.get(code)
+        if check and check["status"] == "WARN":
+            missing_css.append(snippet_name)
+    if missing_css:
+        destination = (
+            str(settings.vault_root / ".obsidian" / "snippets") if settings.vault_root is not None else "<vault_root>/.obsidian/snippets"
+        )
+        warnings.append(
+            {
+                "code": "obsidian_css_missing",
+                "message": "Obsidian 样式缺失不会阻止笔记生成，但排版效果会不完整；程序不会静默复制或覆盖 CSS。",
+                "missing": missing_css,
+                "repository": OBSIDIAN_STYLE_REPOSITORY,
+                "destination": destination,
+                "activation": "Obsidian → 设置 → 外观 → CSS 代码片段，并启用 learning-lab 与 video-note。",
+            }
+        )
+
+    vault_unknown = checks.get("obsidian_vault_unknown")
+    if vault_unknown and vault_unknown["status"] == "WARN":
+        warnings.append(
+            {
+                "code": "obsidian_vault_unknown",
+                "message": "当前使用兼容的旧版 notes_root，笔记仍可生成，但无法可靠检查 CSS；建议以后迁移到 vault_root + notes_subdir。",
+            }
+        )
+
+    return {
+        "schema_version": 1,
+        "status": "action_required" if actions else "ready",
+        "actions": actions,
+        "warnings": warnings,
+        "checks": report["checks"],
     }
 
 

@@ -2,7 +2,7 @@
 
 这份文档只讲一件事：**怎样让 Hermes 正确加载 `B站视频转笔记` Skill，并且以后更新仓库时自动使用最新版。**
 
-如果你还没有配置 yt-dlp、Cookie 或 Obsidian，请先看 [新手快速上手](QUICKSTART.md)。
+如果你还没有配置 yt-dlp、Cookie 或 Obsidian，请先看 [新手快速上手](QUICKSTART.md)；如果卡在 Cookie 获取，直接看 [Bilibili Cookie 获取与安全配置](BILIBILI-COOKIE.md)。
 
 ---
 

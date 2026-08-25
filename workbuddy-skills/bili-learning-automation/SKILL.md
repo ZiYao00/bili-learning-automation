@@ -25,6 +25,23 @@ runner="$HOME/.workbuddy/skills/bili-learning-automation/scripts/bridge.ps1"
 
 `$runner` 不存在时停止并说明安装无效，不猜测仓库路径。
 
+## 首次使用与环境门禁
+
+收到生成笔记请求时，先运行统一 onboarding，不要先启动采集：
+
+```bash
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$runner" onboarding
+```
+
+- `status = ready`：可以进入正式采集。若 `warnings` 提示 CSS 缺失，首次出现时简短告知：CSS 只影响视觉效果，不阻塞笔记生成；程序不会静默复制或覆盖，需要从 `obsidian-learning-snippets` 安装 `learning-lab.css` 与 `video-note.css` 到当前 Vault 的 `.obsidian/snippets/`，并在 Obsidian 中启用。
+- `status = action_required`：停止采集，只处理 `actions` 中真正缺失的项目；可以一次汇总多个缺失项，但只向用户询问机器无法自动确定的输入。
+  - `obsidian_vault_required` / `obsidian_vault_invalid`：询问直接包含 `.obsidian` 的 Vault 根目录，笔记子目录默认 `bilibili`；取得路径后执行 `configure-obsidian --vault '<path>'`。
+  - `cookie_file_required`：只询问 Netscape 格式 Cookie **文件路径**，不得要求、展示或复述 Cookie 内容；取得路径后执行 `configure-cookie --file '<path>'`。
+  - `ytdlp_required`：说明项目不会自动安装或复制 yt-dlp。Windows 默认推荐 `winget install yt-dlp`；若用户已经装在自定义目录，只询问可执行文件路径并执行 `configure-ytdlp --path '<path>'`，不要要求普通用户先决定安装目录。
+  - Python 或其它硬性 `FAIL`：按 action 信息说明后停止。
+- 配置后重新运行 onboarding；只有 `ready` 才继续。
+- `prepare` 自身也执行同一门禁；若返回 `onboarding_required`，按其 `actions / warnings` 完成配置后重试原链接。
+
 ## 必须执行的流程
 
 1. 原样把用户消息交给 collector：

@@ -25,8 +25,8 @@ Windows 用户准备下面几项即可：
 | --- | --- | --- |
 | Python 3.10+ | 运行核心脚本 | 是 |
 | yt-dlp | 获取视频元数据、简介、字幕 | 是 |
-| Bilibili Cookie 文件 | 获取需要登录态的字幕 / 元数据 | 通常需要 |
-| Obsidian Vault 或 Markdown 目录 | 保存学习笔记 | 是 |
+| Bilibili Cookie 文件 | 提供已登录 Bilibili 的会话凭据，用于字幕 / 元数据访问 | **是** |
+| Obsidian Vault | 保存学习笔记；Vault 根目录需直接包含 `.obsidian` | 是 |
 | Hermes / WorkBuddy / Codex | 负责阅读字幕并写正文 | 至少一种 |
 
 > Cookie 是账号凭据。项目只需要 Cookie **文件路径**，不要把 Cookie 内容写进 README、Issue、聊天记录或 Git。
@@ -51,9 +51,79 @@ python -m pip install -e ".[dev]"
 
 ---
 
-## 3. 配置笔记目录和 Cookie
+## 3. 首次使用：让 Agent 先做环境检查
 
-最适合普通用户的是 `config/local.json`。`yt-dlp` 不要求预先写死路径：首次 doctor 会自动检测，缺失时只给安装指引，不会自动安装。
+普通用户不需要先猜路径或逐项编辑配置。Hermes、WorkBuddy 与 Codex 的入口都应在正式采集前运行统一 onboarding；核心 `prepare` 也有同一门禁，避免某个 Agent 漏掉首次配置。
+
+统一检查会自动判断 Python、yt-dlp、Cookie、Obsidian Vault 和 CSS 状态，只对真正缺失的项目采取动作：
+
+- Vault 未配置：询问直接包含 `.obsidian` 的 Vault 根目录；笔记子目录默认 `bilibili`；
+- Cookie 未配置：只询问 Netscape 格式 Cookie **文件路径**，不要在聊天中粘贴 Cookie 内容；
+- yt-dlp 未检测到：项目不会自动安装或复制可执行文件，Windows 默认推荐 `winget install yt-dlp`；只有已经安装在自定义目录时才需要提供可执行文件路径；
+- CSS 缺失：只提醒，不阻塞笔记生成，也不会静默复制或覆盖用户文件。
+
+手动检查可运行：
+
+```powershell
+python .\hermes-skills\bili-learning-automation\scripts\onboarding_bilibili_learning.py
+```
+
+返回 `ready` 后即可正式采集；返回 `action_required` 时按 `actions` 中的缺失项处理，再重新检查。
+
+### Bilibili Cookie：第一次使用必须先准备
+
+如果 onboarding 返回：
+
+```text
+cookie_file_required
+```
+
+说明项目还没有找到可用的 Bilibili Cookie 文件。
+
+Cookie 可以理解为浏览器已经登录 Bilibili 的凭据。本项目需要的是 **Mozilla / Netscape 格式的完整 `cookies.txt` 文件**，不是单独复制一个 `SESSDATA`，也不是 JSON 或浏览器请求头。
+
+最适合普通用户的流程是：
+
+```text
+浏览器正常登录 Bilibili
+→ 打开 bilibili.com
+→ 使用可信、支持 Netscape cookies.txt 的导出工具
+→ 尽量只导出当前 bilibili.com 站点
+→ 保存为 bilibili_cookies.txt
+→ 只把“文件路径”告诉 Agent
+```
+
+`yt-dlp` 官方 FAQ 提到的浏览器导出工具示例包括 Chromium / Chrome 的 `Get cookies.txt LOCALLY` 与 Firefox 的 `cookies.txt`。安装浏览器扩展时务必确认来源和权限；名称相似的旧扩展不一定安全。
+
+导出的文件第一行应该是：
+
+```text
+# Netscape HTTP Cookie File
+```
+
+或：
+
+```text
+# HTTP Cookie File
+```
+
+个人本机最省事的保存位置是：
+
+```text
+<repo-root>\key\bilibili_cookies.txt
+```
+
+`key/` 已被 Git 忽略。也可以放在项目外的私密目录，例如 `D:\Private\bilibili_cookies.txt`，再把这个路径配置给 Agent。
+
+> **不要把真实 Cookie 内容发送给 Agent。** Agent 只需要文件路径。不要把 Cookie 提交到 Git、Issue、PR、日志、截图或公开网盘。
+
+如果不想安装浏览器扩展，yt-dlp 也可以使用 `--cookies-from-browser` 导出，但官方说明这种方式会把该浏览器中**所有网站的 Cookie**写入目标文件，因此生成的文件敏感程度更高，不建议新手把它长期放在项目目录中。
+
+完整的 Cookie 获取、格式检查、`Failed to decrypt with DPAPI` 处理和失效后重新导出说明见：**[Bilibili Cookie 获取与安全配置](BILIBILI-COOKIE.md)**。
+
+### 手工配置方式
+
+如需自行维护配置，最适合普通用户的是 `config/local.json`。`yt-dlp` 不要求预先写死路径：onboarding / doctor 会自动检测，缺失时只给安装指引，不会自动安装。
 
 先复制模板：
 
@@ -107,7 +177,7 @@ python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning
 
 如果环境正确，你应该看到 yt-dlp、Cookie、taxonomy、Vault、notes/runtime 写权限等检查通过。doctor 还会检查 `learning-lab.css` 与 `video-note.css` 是否位于当前 Vault 的 `.obsidian/snippets/`。
 
-如果看到 `notes_repository_fallback`，说明还没有显式绑定 Vault。此时新的视频采集会返回 `configuration_required`，不会再把私人笔记静默写入代码仓库。你可以修改 `config/local.json`，也可以运行：
+如果看到 `notes_repository_fallback`，说明还没有显式绑定 Vault。此时新的视频采集会被 onboarding 门禁拦住，并返回 `onboarding_required`；不会把私人笔记静默写入代码仓库。你可以修改 `config/local.json`，也可以运行：
 
 ```powershell
 python .\hermes-skills\bili-learning-automation\scripts\configure_bilibili_learning.py --vault 'D:\Notes\MyVault' --notes-subdir 'bilibili'
@@ -298,27 +368,30 @@ H3智能一体化节点重磅升级（2）.md
 
 “转成笔记”和“学习后归档”是两个阶段。普通链接转换只负责把资料放到 `00-待整理`，**不会自动整理**。
 
-只有你明确要求整理时，智能体才进入整理流程。如果请求里还没有说明范围，它必须先询问：
+只有你明确要求整理时，智能体才进入整理流程。如果你已经指定某一篇，直接使用 `single`；如果只说“整理笔记”却没有给出对象，智能体才需要询问：
 
 ```text
-要只整理最近一篇笔记，还是整理全部待整理笔记？
+要整理指定的一篇、最近一篇，还是全部待整理笔记？
 ```
 
-你选择范围后，智能体才会逐篇阅读内容并确定：
+你选择范围后，智能体会逐篇完整阅读，只决定两件事：
 
-- 更适合长期检索的短标题；
-- 一句简介摘要；
-- taxonomy 中唯一主分类；
-- 模型、工具和技术点 Tags；
-- 原视频标题保留信息。
+- 更短、更容易长期检索的**文件名**；
+- 最适合的**目标目录**，通常采用最多两层的“领域 / 对象”。
 
-核心命令需要显式传入确认范围、分类和 Tags：
+归档阶段不会修改 H1、Summary、正文、Frontmatter、Tags、视频简介或 UP 主资源。
+
+统一命令是：
 
 ```powershell
-bili-learning organize --note '<笔记路径>' --title '<短标题>' --intro '<一句简介摘要>' --category '<目标目录>' --tag '<标签1>' --tag '<标签2>' --confirmed-scope '<latest|all>'
+bili-learning organize `
+  --note '<现有笔记路径>' `
+  --filename '<新的简短文件名>' `
+  --destination '<领域/对象>' `
+  --confirmed-scope '<single|latest|all>'
 ```
 
-没有 `latest` / `all` 的明确确认时，Organizer 会拒绝执行。普通用户通常不需要手工运行命令，完整规则见 [笔记整理与归档教程](NOTE-ORGANIZATION.md)。
+普通用户通常不需要手工运行命令，完整规则见 [笔记整理与归档教程](NOTE-ORGANIZATION.md)。
 
 ---
 
@@ -326,7 +399,7 @@ bili-learning organize --note '<笔记路径>' --title '<短标题>' --intro '<�
 
 | 状态 | 含义 | 用户通常怎么做 |
 | --- | --- | --- |
-| `configuration_required` | 尚未显式绑定 Obsidian Vault | 告诉智能体你的 Vault 根目录；本次不会启动采集 |
+| `onboarding_required` | 首次环境仍缺少 Vault / Cookie / yt-dlp 等必需配置 | 按返回的 `actions` 处理，再重新检查并重试原链接 |
 | `materials_ready` | 字幕、简介等材料已经准备好 | 等智能体继续写笔记 |
 | `in_progress` | 同一 BV 号已有活动任务 | 不要重复启动；Hermes 可在安全条件下续做陈旧未完成 job |
 | `subtitle_unavailable` | 没有取得可用中文字幕 | 本次不会生成笔记，也不会下载音视频 |
@@ -387,7 +460,8 @@ python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning
 
 如果你已经成功生成第一篇笔记，可以按需要继续看：
 
-- [配置说明](CONFIGURATION.md)：换电脑、换 Vault、换 yt-dlp 路径；
+- [Bilibili Cookie 获取与安全配置](BILIBILI-COOKIE.md)：第一次导出 Cookie、格式检查、DPAPI 问题和失效更新；
+- [配置说明](CONFIGURATION.md)：换电脑、换 Vault、换 Cookie / yt-dlp 路径；
 - [Hermes Skill 安装](HERMES-SKILL-INSTALL.md)：Hermes 安装、更新、验证；
 - [Obsidian 样式教程](OBSIDIAN-STYLING.md)：CSS 安装和样式问题；
 - [故障排查](TROUBLESHOOTING.md)：状态和错误怎么处理；

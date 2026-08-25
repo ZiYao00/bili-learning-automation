@@ -53,7 +53,7 @@ A normal Windows setup needs:
 | --- | --- |
 | Python 3.10+ | Runs the core scripts |
 | yt-dlp | Collects subtitles, description, and metadata |
-| Bilibili Cookie file | Usually required for authenticated subtitle / metadata access |
+| Bilibili Cookie file | Provides an authenticated Bilibili browser session; required by the normal collection flow |
 | Obsidian Vault | Stores generated learning notes |
 | Hermes / WorkBuddy / Codex | Reads the transcript and writes the learning content |
 
@@ -63,7 +63,7 @@ The repository does not bundle or auto-install `yt-dlp.exe`.
 winget install yt-dlp
 ```
 
-Cookie files are credentials. Configure a **file path**; do not paste Cookie contents into README files, issues, pull requests, logs, or Agent conversations.
+Cookie files are credentials. The project expects a complete Mozilla/Netscape `cookies.txt` file, not a single `SESSDATA` value. Configure a **file path**; do not paste Cookie contents into README files, issues, pull requests, logs, or Agent conversations. The detailed beginner guide is [Bilibili Cookie setup](docs/BILIBILI-COOKIE.md) (Chinese).
 
 ---
 
@@ -78,7 +78,9 @@ git clone https://github.com/ZiYao00/bili-learning-automation.git
 cd bili-learning-automation
 ```
 
-### 3.2 Create machine-local configuration
+### 3.2 Machine-local configuration
+
+Normal users can let the Agent fill missing values during onboarding. If you prefer to maintain the local configuration manually, copy the template:
 
 ```powershell
 Copy-Item .\config\local.json.example .\config\local.json
@@ -97,7 +99,21 @@ Example:
 
 `config/local.json` is ignored by Git and is intended for machine-specific paths.
 
-### 3.3 Run doctor
+### 3.3 Prepare the Bilibili Cookie file
+
+Log into Bilibili in your browser and export a complete Mozilla/Netscape `cookies.txt` file. Do not copy only `SESSDATA`; yt-dlp expects the full Netscape cookie file. Store it as a private local file and configure only its path.
+
+The detailed beginner tutorial covers browser export, format validation, `--cookies-from-browser` security considerations, Windows `Failed to decrypt with DPAPI`, and cookie renewal: [Bilibili Cookie setup and security](docs/BILIBILI-COOKIE.md) (Chinese).
+
+### 3.4 First-run environment check
+
+After connecting Hermes, WorkBuddy, or Codex, the Agent should run onboarding before the first real collection and only ask the user for values that cannot be detected automatically. You can run the same check manually:
+
+```powershell
+python .\hermes-skills\bili-learning-automation\scripts\onboarding_bilibili_learning.py
+```
+
+`action_required` returns only the missing user-facing setup items such as the Vault, Cookie file path, or yt-dlp. Missing CSS is a non-blocking warning. For the full diagnostic report, run:
 
 ```powershell
 python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py
@@ -105,7 +121,7 @@ python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning
 
 Doctor checks Python, yt-dlp, Cookie-file presence, the Vault, CSS, taxonomy, write permissions, and required project files. It **does not read Cookie contents and does not access Bilibili**.
 
-### 3.4 Install Obsidian styling
+### 3.5 Install Obsidian styling
 
 The project uses the shared [Obsidian Learning Snippets](https://github.com/ZiYao00/obsidian-learning-snippets) repository.
 
@@ -124,7 +140,7 @@ into:
 
 Then enable both snippets in Obsidian.
 
-### 3.5 Choose an Agent entry point
+### 3.6 Choose an Agent entry point
 
 | Agent | Typical use | Documentation |
 | --- | --- | --- |
@@ -243,7 +259,7 @@ The project uses fixed-video quality regressions, but the README does not mainta
 
 | Status | Meaning | Normal action |
 | --- | --- | --- |
-| `configuration_required` | No real Obsidian Vault is configured | Configure `vault_root` and retry |
+| `onboarding_required` | First-run setup still lacks a required Vault / Cookie / yt-dlp item | Handle the returned `actions`, re-check, and retry the original link |
 | `materials_ready` | Subtitles, description, and metadata are ready | Agent continues |
 | `in_progress` | Another active task is processing the same BVID | Do not start a duplicate collection |
 | `subtitle_unavailable` | No usable Chinese subtitle was obtained | Stop this conversion |
@@ -282,6 +298,7 @@ Detailed documentation is currently maintained in Chinese.
 ### Tutorials
 
 - [Quick Start](docs/QUICKSTART.md)
+- [Bilibili Cookie setup and security](docs/BILIBILI-COOKIE.md) (Chinese)
 - [Hermes Skill Installation](docs/HERMES-SKILL-INSTALL.md)
 - [WorkBuddy Skill Installation](docs/WORKBUDDY-SKILL-INSTALL.md)
 - [Obsidian Styling](docs/OBSIDIAN-STYLING.md)

@@ -13,6 +13,7 @@ DEFAULT_NOTES_SUBDIR = "bilibili"
 DEFAULT_WORKFLOW_MODE = "light"
 SUPPORTED_WORKFLOW_MODES = {"light", "strict"}
 OBSIDIAN_SNIPPET_NAMES = ("learning-lab.css", "video-note.css")
+OBSIDIAN_STYLE_REPOSITORY = "https://github.com/ZiYao00/obsidian-learning-snippets"
 YTDLP_INSTALL_URL = "https://github.com/yt-dlp/yt-dlp/wiki/Installation"
 YTDLP_WINDOWS_INSTALL_COMMAND = "winget install yt-dlp"
 
@@ -212,6 +213,12 @@ def _resolve_notes_location(
     return notes_root, None, None, "taxonomy_fallback", True
 
 
+def _save_local_config(path: Path, payload: dict[str, Any]) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
 def configure_obsidian(project_root: Path, vault_root: Path, notes_subdir: str = DEFAULT_NOTES_SUBDIR) -> Path:
     project_root = project_root.resolve()
     vault_root = vault_root.expanduser().resolve()
@@ -226,9 +233,31 @@ def configure_obsidian(project_root: Path, vault_root: Path, notes_subdir: str =
     updated.pop("notes_root", None)
     updated["vault_root"] = str(vault_root)
     updated["notes_subdir"] = str(normalized_subdir)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(updated, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return path
+    return _save_local_config(path, updated)
+
+
+def configure_cookie_file(project_root: Path, cookie_file: Path) -> Path:
+    project_root = project_root.resolve()
+    cookie_file = cookie_file.expanduser().resolve()
+    if not cookie_file.is_file():
+        raise ConfigurationError("cookie_file_missing", f"Bilibili Cookie 文件不存在：{cookie_file}")
+
+    path, local_config = _load_local_config(project_root)
+    updated = dict(local_config)
+    updated["cookie_file"] = str(cookie_file)
+    return _save_local_config(path, updated)
+
+
+def configure_ytdlp_path(project_root: Path, ytdlp_path: Path) -> Path:
+    project_root = project_root.resolve()
+    ytdlp_path = ytdlp_path.expanduser().resolve()
+    if not ytdlp_path.is_file():
+        raise ConfigurationError("ytdlp_path_invalid", f"yt-dlp 路径不存在或不是文件：{ytdlp_path}")
+
+    path, local_config = _load_local_config(project_root)
+    updated = dict(local_config)
+    updated["ytdlp"] = str(ytdlp_path)
+    return _save_local_config(path, updated)
 
 
 def find_ytdlp(project_root: Path, local_config: dict[str, str]) -> ExecutableResolution:

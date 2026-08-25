@@ -2,7 +2,7 @@
 
 这份文档用于把项目自带的 **WorkBuddy 薄适配层**安装到本机 WorkBuddy，并保持它与仓库源码同步。
 
-如果 yt-dlp、Cookie、Obsidian 还没有配置，请先看 [新手快速上手](QUICKSTART.md)。
+如果 yt-dlp、Cookie、Obsidian 还没有配置，请先看 [新手快速上手](QUICKSTART.md)；如果卡在 Cookie 获取，直接看 [Bilibili Cookie 获取与安全配置](BILIBILI-COOKIE.md)。
 
 ## 1. WorkBuddy 适配层在哪里
 

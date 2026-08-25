@@ -7,7 +7,10 @@
 - 不要提交到 Git；
 - 不要复制到 Issue、PR、日志或示例文档；
 - 不要在调试输出中打印内容；
-- 程序只应把配置的 Cookie 文件路径交给 yt-dlp。
+- 程序只应把配置的 Cookie 文件路径交给 yt-dlp；
+- 不要把单个 `SESSDATA`、完整 Cookie 请求头或真实 `cookies.txt` 当作排错文本发送给 Agent。
+
+第一次获取、导出和更新 Cookie 的安全教程见 [Bilibili Cookie 获取与安全配置](docs/BILIBILI-COOKIE.md)。
 
 私人 Obsidian 笔记、`.runtime`、`archive`、`materials` 和本机第三方副本默认也不属于公开仓库内容。
 

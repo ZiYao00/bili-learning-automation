@@ -16,12 +16,26 @@
 
 - 下载项目；
 - 安装 / 检查 yt-dlp；
-- 配置 Obsidian Vault 与 Cookie；
-- 运行 doctor；
+- 配置 Obsidian Vault；
+- 获取、保存并配置 Netscape 格式的 Bilibili Cookie；
+- 运行 onboarding / doctor；
 - 安装 Obsidian CSS；
 - 选择 Hermes / WorkBuddy / Codex；
 - 完成第一次 B站链接转笔记；
 - 确认输出位置和常见状态。
+
+### [Bilibili Cookie 获取与安全配置](BILIBILI-COOKIE.md)
+
+第一次不知道 Cookie 从哪里来时看这里：
+
+- Cookie 是什么、为什么项目需要它；
+- 为什么不能只复制 `SESSDATA`；
+- 怎样导出 Netscape `cookies.txt`；
+- Cookie 文件放在哪里、怎样配置路径；
+- `--cookies-from-browser` 为什么要谨慎使用；
+- Windows Chrome `Failed to decrypt with DPAPI` 怎么处理；
+- Cookie 失效以后怎样重新导出；
+- 哪些内容绝对不能发给 Agent 或提交到 Git。
 
 ### [Hermes Skill 安装教程](HERMES-SKILL-INSTALL.md)
 
@@ -133,7 +147,7 @@ input
 
 覆盖：
 
-- `configuration_required`；
+- `onboarding_required`；
 - `in_progress`；
 - yt-dlp 未找到；
 - Cookie 文件不存在；
@@ -207,6 +221,7 @@ python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning
 
 ```text
 QUICKSTART
+→ BILIBILI-COOKIE（如果尚未准备 Cookie）
 → 对应 Agent 安装教程
 → OBSIDIAN-STYLING
 → 第一次发送 B站链接
