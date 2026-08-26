@@ -31,9 +31,9 @@ description: Turn a Bilibili copied link, supported short link, or BV id receive
    python "$project\hermes-skills\bili-learning-automation\scripts\prepare_ytdlp_bilibili_note.py" '<received message text>'
    ```
 
-   - `materials_ready`：继续写作。
+   - `materials_ready`：继续写作；若同时返回 `recovered: true`，表示核心已恢复此前完整的采集材料，不要重新调用 yt-dlp。
    - `onboarding_required`：按返回动作完成配置后重试原消息。
-   - `in_progress`：不重复采集、不抢占、不手工删 job / reservation / lock；核心会回收已确认死亡的中间态。
+   - `in_progress`：说明仍有活动任务；不重复采集、不抢占，也不要手工处理 runtime 内部状态。
    - `subtitle_unavailable`：说明正常流程没有可用中文字幕且没有下载媒体；只有 owner 明确要求时才讨论项目级 ASR fallback。
    - 其它失败：报告短错误，不声称完成。
 
@@ -49,7 +49,7 @@ description: Turn a Bilibili copied link, supported short link, or BV id receive
    python "$project\hermes-skills\bili-learning-automation\scripts\finalize_ytdlp_bilibili_note.py" --job '<job_dir>' --note '<draft_path>'
    ```
 
-   无论写作成功或失败，都由 finalizer 清理 runtime；不要手工删除中间文件或锁。只有 `note_ready` 且 `temporary_data_removed: true` 才报告完成；`publish_state = already_published` 表示此前发布已成功，本次是安全重试。
+   无论写作成功或失败，都由 finalizer 处理 runtime 生命周期；不要手工删除中间文件或锁。`note_ready` 即表示业务完成；`publish_state = already_published` 表示此前发布已成功，本次是安全重试。`temporary_data_retired` / `cleanup_warning` 仅反映临时数据维护状态，不得把已成功发布的笔记改判为失败。
 
 ## 学习后整理
 

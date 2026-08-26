@@ -48,7 +48,7 @@
 - 正文事实只来自当前字幕和 UP 主简介。来源不足时停止，不用模型常识补具体参数、资源或结论。
 - 不覆盖已有笔记，不把 Cookie、runtime 路径、日志或内部状态写进正式笔记。
 - 视频简介抓取失败不能当作视频没有简介。
-- 只有 finalizer 返回 `note_ready` 且临时数据清理成功，才能声称完成。
+- finalizer 返回 `note_ready` 即表示业务完成；临时数据采用 retire/维护语义，`temporary_data_retired` 或 `cleanup_warning` 不得覆盖已成功的发布结果。
 
 ## 共享 Obsidian 样式依赖
 

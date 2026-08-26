@@ -15,20 +15,25 @@
 ### Changed
 
 - WorkBuddy / Hermes 的 `SKILL.md` 收敛为薄控制层：保留 onboarding → prepare → handoff 写作 → finalize 主干，把 light / strict 细节、安装分支和确定性状态判断交回核心与按需文档，减少重复上下文和规则漂移。
-- onboarding 新增面向 Agent 的 `summary`，即使环境已经 `ready` 也会明确返回 Python、yt-dlp、Cookie 就绪状态、Obsidian、CSS 与 workflow mode；yt-dlp 单纯版本探测超时降级为非阻塞警告，真正不可执行仍需修复。
+- onboarding 新增面向 Agent 的 `summary`，即使环境已经 `ready` 也会明确返回 Python、yt-dlp、Cookie 就绪状态、Obsidian、CSS 与 workflow mode；yt-dlp 单纯版本探测超时不再作为面向用户的 warning，summary 保持 `ready`，完整 doctor 仍保留诊断记录，真正不可执行仍需修复。
+- runtime 生命周期改为业务主链零删除依赖：文件锁使用 OS 原生锁，reservation 改为 `active / released` 持久状态，活动 Job 完成后 retire 到 `.runtime/bilibili-learning/retired/`；物理删除从笔记成功条件中剥离。
 - 用户在转换消息中明确标注“视频简介 / UP主附加内容 / 附加信息 / 资源”等来源时，核心会作为 `user_supplied_source` 与 B站采集简介分层保留；两者不自动覆盖，冲突交给 Agent 明示来源差异。
 
 ### Documentation
 
 - 新增 `docs/BILIBILI-COOKIE.md`，面向第一次使用的用户解释 Bilibili Cookie 的用途、Netscape `cookies.txt` 格式、浏览器导出方式、`SESSDATA` 常见误区、安全保存、`--cookies-from-browser` 风险、Windows `Failed to decrypt with DPAPI` 与 Cookie 失效处理。
 - Quickstart、README、配置、依赖、安全和故障排查文档统一补充 Cookie 获取入口，并明确 Agent 只接收 Cookie 文件路径、不接收凭据内容；同时清理 Quickstart / Troubleshooting 中残留的旧 Organizer 参数与 `configuration_required` 状态。
+- README、Quickstart、架构、Agent 接入、WorkBuddy 安装和故障排查统一更新 runtime 新语义：核心恢复 `recovered: true`、OS 文件锁、reservation 状态化、Job retire、`note_ready` 与维护状态解耦，以及 WorkBuddy safe-delete / PowerShell / MSYS 路径兼容。
 
 ### Fixed
 
 - 安装 / 检查 / 验证 Skill 现在也会执行 onboarding：Hermes、WorkBuddy 与 Codex 明确区分“Skill 已安装”和“运行环境已就绪”，避免只验证目录链接或 `SKILL.md` 一致就误报“可以使用”；同时清理 Hermes / WorkBuddy 适配层与 WorkBuddy 安装教程中残留的旧 `configuration_required` / `ytdlp_not_configured` 分支。
 - 本机 `config/local.json` 与 taxonomy 配置现在使用 `utf-8-sig` 读取，兼容 Windows 编辑器写入的 UTF-8 BOM，避免 `local_config_invalid_json`。
-- runtime reservation 与文件锁记录 PID：中断后缺少 `job.json` 的半成品任务、已退出进程遗留的导航锁可由核心自动回收；官方 `cleanup_job` 也能释放尚未写出 `job.json` 的绑定 reservation。
-- finalizer 发布改为可安全重试：若前一次已经写出完全相同的正式笔记但返回丢失，重试返回 `note_ready + publish_state=already_published`，不同内容的同名文件仍严格拒绝覆盖。
+- 修复 WorkBuddy safe-delete 与旧 runtime 删除策略的冲突：正常锁释放、reservation 生命周期、Job 收尾和发布 staging 不再依赖 `Path.unlink()` / `shutil.rmtree()`；即使沙箱返回 `windows-sandbox-recycle-bin-unavailable`，业务主链仍可继续。
+- 死进程绑定的完整 Job 现在由核心自动恢复：验证 `job.json`、草稿、analysis、transcript manifest 与字幕，缺少 `agent_handoff.md` 时自动重建，并返回 `materials_ready + recovered: true`；恢复过程明确禁止重新调用 yt-dlp。
+- reservation claim / bind / release 使用独立 OS 文件锁串行化，保留同一 BVID 只有一个活动任务的并发原子性；死进程留下的不完整 Job 会先 retire 再允许新任务继续。
+- finalizer 发布改为可安全重试：若前一次已经写出完全相同的正式笔记但返回丢失，重试返回 `note_ready + publish_state=already_published`，不同内容的同名文件仍严格拒绝覆盖；runtime retire/维护失败只返回 warning，不覆盖已经成功的发布状态。
+- WorkBuddy 实机链接转换已在上述修复后通过，覆盖 `prepare → 写作 → finalize → note_ready → retire` 主链。
 
 ## [1.0.0] - 2026-08-23
 

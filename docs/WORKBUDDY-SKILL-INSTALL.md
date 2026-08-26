@@ -175,13 +175,22 @@ WorkBuddy ──┼→ bili-learning core → Obsidian
 Codex ──────┘
 ```
 
-同一个 BV 号如果已经由某个入口启动，其他入口再次请求会收到：
+同一个 BV 号如果仍由某个入口真实运行，其他入口再次请求会收到：
 
 ```text
 in_progress
 ```
 
-这是共享 reservation 的并发保护。不要为了让第二个入口强行继续而手工删除 reservation 或 lock。
+这是共享 reservation 的并发保护。reservation 使用 `active / released` 状态，并由 OS 文件锁保证 claim / bind / release 原子性。
+
+如果原持有进程已经退出但采集材料完整，核心会直接恢复原 Job，必要时重建 `agent_handoff.md`，并返回：
+
+```text
+materials_ready
+recovered: true
+```
+
+此时 WorkBuddy 直接继续写作，不会重新运行 yt-dlp。不要为了让第二个入口强行继续而手工删除 reservation、lock 或 Job。
 
 ## 8. 更新仓库以后怎么办
 
@@ -199,23 +208,30 @@ git pull
 
 如果 CSS 有版本更新，是否覆盖 Vault 中已有 CSS 应由用户明确决定。
 
-## 9. WorkBuddy 特有的 `PYTHONPATH` 问题
+## 9. WorkBuddy 的 safe-delete、PowerShell 与 MSYS 路径兼容
 
-WorkBuddy 的 Bash 环境可能注入自己的 safe-delete Python 垫片。它会影响 runtime 清理，因此所有调用都先进入 `bridge.ps1`；该启动壳会清除 `PYTHONPATH`，并优先使用项目自己的 `.venv`：
+WorkBuddy 的 Bash 环境可能注入 safe-delete Python 垫片，也可能直接阻止 `powershell.exe`。当前适配层按下面的顺序处理：
 
-```bash
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$runner" ...
-```
+1. 正常优先调用安装 Skill 中的 `bridge.ps1`；它会清除注入的 `PYTHONPATH`，并优先使用项目自己的 `.venv`；
+2. 如果 WorkBuddy 沙箱明确阻止 `powershell.exe`，则解析已安装 Junction 的真实目标，直接使用仓库 `.venv\Scripts\python.exe` 调用同一适配层的 `bridge.py`；
+3. 如果当前 Bash 把 Windows 路径表示成 `/g/...` 一类 MSYS 路径，先转换为真实 Windows 路径再交给 Windows Python，不能手工拼接盘符。
 
-普通用户不需要自己修改核心 `cleanup_job`、finalizer 或删除策略。
+新版核心同时取消了正常业务链对 delete 权限的依赖：
 
-如果出现：
+- 文件锁使用 OS 原生锁，锁文件不需要 `unlink()`；
+- reservation 使用 `active / released` 状态，不靠删除文件释放；
+- 完整的死进程 Job 由核心直接恢复，不重新采集；
+- Job 完成后 retire 到 `.runtime/bilibili-learning/retired/`；
+- `note_ready` 与 runtime retire/维护状态解耦；
+- 发布 staging 保留在 Job 内，不要求发布后删除临时文件。
 
-- collector 已采集完成但清理报错；
-- finalizer 已发布但 runtime 还在；
-- Python 环境相关错误；
+因此 WorkBuddy 返回的 `windows-sandbox-recycle-bin-unavailable` 不应再让当前版本的 `prepare → 写作 → finalize` 主链失败。本轮修复已经通过 WorkBuddy 实机链接转换测试。
 
-优先让 WorkBuddy 重新读取当前适配层，再运行 doctor。不要手工批量删除 job、reservation 或 lock。
+如果最新版本仍因 safe-delete 中断：
+
+- 先确认仓库已更新、Junction 指向当前仓库、当前会话已重新读取最新 `SKILL.md`；
+- 再运行 doctor 检查环境；
+- **不要修改 WorkBuddy 内置 `sitecustomize.py`，不要为了兼容本项目关闭全局安全保护，也不要手工批量删除 job、reservation 或 lock。**
 
 ## 10. 诊断
 

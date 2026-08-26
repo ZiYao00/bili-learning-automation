@@ -10,16 +10,16 @@
 
 ## 必须执行的流程
 
-1. 把原始消息交给 collector，并按返回的 `status` 分支。`configuration_required` 时停止采集并询问 Vault；`ytdlp_not_configured` 时只提供安装指引；`in_progress` 不重复采集；只有 `materials_ready` 或确认可安全续做的旧 job 才继续。
+1. 先通过统一 onboarding 门禁确认环境；再把原始消息交给 collector，并按返回的 `status` 分支。`onboarding_required` 时按 `actions / warnings` 处理；`in_progress` 表示仍有真实活动任务，不重复采集；`materials_ready` 正常继续。若同时返回 `recovered: true`，表示共享核心已恢复此前完整 Job，不要再次调用 yt-dlp，也不要在适配层自行判断 stale / PID。
 2. 读取 `handoff_path`、`job.json`、`analysis_path`、`workflow_mode` 与 `transcript_manifest_path`。按 manifest 顺序完整读取全部 transcript chunk，不自行重新切分或跳读。
 3. 先判断字幕与简介是否足以支撑可信笔记，并填写 `analysis.json`。来源不足时停止，不用模型常识补具体参数、资源或结论。
 4. 按 `workflow_mode` 执行：
    - `light`：读取 `docs\standards\LIGHT-WORKFLOW.md`，直接完成正文；先写完整内容，再做一次独立排版优化，不创建 Fact Ledger、Semantic Draft 或 Layout Plan。
    - `strict`：按 `fact_ledger_path → semantic_draft_path → layout_plan_path → draft_path` 执行，完整规则见 `CODEX-VIDEO-NOTE-GUIDE.md` 与 `KNOWLEDGE-DENSE-WORKFLOW.md`。
 5. 最终排版后回看 transcript，修正明显遗漏和无来源内容；严格模式还要对照 Fact Ledger 与 Semantic Draft。完成后更新 `coverage_review`。
-6. 无论成功、失败或中断，都必须由 finalizer 清理 job。只有返回 `note_ready` 且 `temporary_data_removed: true` 才能报告完成。
+6. 无论成功、失败或中断，都由 finalizer 接管 runtime 生命周期。`note_ready` 即表示业务完成；`temporary_data_retired` / `cleanup_warning` 只描述 Job retire 或维护状态，不得把已经发布成功的笔记改判为失败。
 
-`configuration_required`、`in_progress`、`subtitle_unavailable`、`source_insufficient`、`failed` 和 `note_invalid` 都不是完成状态。
+`onboarding_required`、`in_progress`、`subtitle_unavailable`、`source_insufficient`、`failed` 和 `note_invalid` 都不是完成状态。
 
 ## 学习后整理授权
 
@@ -36,7 +36,7 @@ Organizer 在改写短标题时会保留原视频标题，并统一更新 Tags�
 ## 数据契约
 
 - 新生成的 `job.json` 使用 `schema_version: 1`，并包含 `workflow_mode: light | strict`；当前默认值为 `light`。
-- collector 与 finalizer 的 JSON 响应包含 `schema_version: 1`、`status` 和可读 `message`（如适用）；`materials_ready` 还会返回 `workflow_mode`。智能体必须以 `status` 与 `workflow_mode` 判断分支。
+- collector 与 finalizer 的 JSON 响应包含 `schema_version: 1`、`status` 和可读 `message`（如适用）；`materials_ready` 还会返回 `workflow_mode`，恢复旧 Job 时额外返回 `recovered: true`。智能体必须以结构化状态判断分支，不解析底层锁或 PID 来自行接管任务。
 - Frontmatter 的 `author`、`published`、`duration`、`source`、tags 与 `cssclasses`，以及标题下方“作者 · 日期 · 时长 · BVID”元信息行由程序生成，智能体不得自行改写；视频笔记固定使用 `learning-page + video-note` 以接入共享 Obsidian 视觉系统。
 - `analysis.json` 是 runtime-only 质量报告，不进入最终 Obsidian 笔记。它用于记录来源充分性、知识索引和覆盖复核状态。
 - 只有 `strict` 模式会在 `agent_work_dir` 创建 `fact-ledger.md`、`semantic-draft.md` 与 `layout-plan.md`，并返回对应路径；`light` 模式不创建这些文件。
@@ -46,9 +46,9 @@ Organizer 在改写短标题时会保留原视频标题，并统一更新 Tags�
 - 默认流程只采集 metadata、UP 主原始简介和 `ai-zh`/`zh.*` 的 SRT 字幕；不得下载音视频、启动 Chrome/CDP 或回退到 ASR。
 - `confirmed_empty` 仅代表 info-json 明确给出空字符串且（如存在）简介 sidecar 与其一致；字段缺失、`null`、类型异常或两者不一致都必须失败。
 - Cookie 内容不得读取、打印、上传、编辑、提交或写入笔记；collector 仅可把配置的 Cookie 文件路径传给 yt-dlp。
-- 原始字幕、元数据、简介、`analysis.json`、日志和智能体临时工作文件只允许存在于 `.runtime/bilibili-learning` 的单个 job；finalizer 负责精确清理。
-- 智能体只可编辑既定的 `analysis.json`、草稿中的两个 AI 区域，以及当前模式明确提供的 runtime 工作文件。原始 SRT 会被转换为 `transcript-manifest.json` 与一个或多个 transcript chunk；转换只移除 SRT 序号、毫秒精度与空行，保留字幕文字、顺序和 cue 边界，不做摘要或语义过滤。`light` 模式直接读取 transcript 并写笔记；`strict` 模式才使用 `fact-ledger.md`、`semantic-draft.md`、`layout-plan.md`。`agent_work_dir` 不得存放最终笔记或持久资料；其内容随 job 一并清理。
-- 智能体不得手工删除 job、reservation 或锁文件。finalizer 清理失败时必须如实报告失败状态，保留现场供后续诊断；只有用户明确授权后，才可对已核实的单个遗留文件执行回收站归档。
+- 原始字幕、元数据、简介、`analysis.json`、日志和智能体临时工作文件只允许存在于 `.runtime/bilibili-learning` 的单个活动 Job；finalizer / failsafe 负责把 Job 退出活动区并 retire 到 `retired/`。物理删除属于独立维护，不是笔记成功前提。
+- 智能体只可编辑既定的 `analysis.json`、草稿中的两个 AI 区域，以及当前模式明确提供的 runtime 工作文件。原始 SRT 会被转换为 `transcript-manifest.json` 与一个或多个 transcript chunk；转换只移除 SRT 序号、毫秒精度与空行，保留字幕文字、顺序和 cue 边界，不做摘要或语义过滤。`light` 模式直接读取 transcript 并写笔记；`strict` 模式才使用 `fact-ledger.md`、`semantic-draft.md`、`layout-plan.md`。`agent_work_dir` 不得存放最终笔记或持久资料；任务结束后随 Job 一并 retire。
+- 智能体不得手工删除 job、reservation 或锁文件。锁、reservation、恢复与 retire 都由共享核心管理；`note_ready` 已成立时，即使返回 `temporary_data_retired: false` 或 `cleanup_warning`，也只能作为维护警告报告，不能把已成功发布的笔记改判为失败。
 - 不得覆盖已有笔记；同一 BVID 仅在**活动任务期间**由 reservation 防止并发处理，任务完成后允许再次转换。草稿只存在于 runtime，只有 finalizer 校验通过后才原子发布到 `note_path`。
 
 ## 来源充分性判断

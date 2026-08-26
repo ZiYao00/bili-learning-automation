@@ -202,16 +202,6 @@ def onboarding_report(settings: Settings) -> dict[str, object]:
             current_value=str(settings.ytdlp.path) if settings.ytdlp.path is not None else "",
         )
 
-    ytdlp_timeout = checks.get("ytdlp_version_check_timeout")
-    if ytdlp_timeout and ytdlp_timeout["status"] == "WARN":
-        warnings.append(
-            {
-                "code": "ytdlp_version_check_timeout",
-                "message": "yt-dlp 版本探测超时，但文件已检测到；这不会阻塞首次配置，正式采集会再次验证。",
-                "path": str(settings.ytdlp.path) if settings.ytdlp.path is not None else "",
-            }
-        )
-
     if not settings.cookie_file.is_file():
         add_action(
             "cookie_file_required",
@@ -253,7 +243,7 @@ def onboarding_report(settings: Settings) -> dict[str, object]:
 
     ytdlp_status = "missing"
     if settings.ytdlp.path is not None and settings.ytdlp.path.is_file():
-        ytdlp_status = "unusable" if ytdlp_unusable else ("warning" if ytdlp_timeout else "ready")
+        ytdlp_status = "unusable" if ytdlp_unusable else "ready"
     summary = {
         "python": {"status": "ready" if sys.version_info >= MINIMUM_PYTHON else "required", "version": sys.version.split()[0]},
         "yt_dlp": {

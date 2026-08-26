@@ -300,6 +300,7 @@ BVxxxxxxxxxx
 → 回看字幕完成覆盖复核
 → finalizer 校验
 → 写入 Obsidian
+→ runtime Job 退出活动区并 retire
 ```
 
 ---
@@ -325,7 +326,7 @@ transcript/transcript-02.txt
 
 短字幕通常直接读取一个 chunk；长字幕会按完整字幕 cue 自动切块。极小尾块会自动并入前一块，避免智能体为了几十个字符再多执行一次读取。
 
-这些文件只是临时数据，任务结束后由 finalizer / failsafe 清理。用户不需要手工删除。
+这些文件属于 runtime 数据。任务结束后，finalizer / failsafe 会把 Job 从活动区 retire 到 `.runtime/bilibili-learning/retired/`；物理删除属于后续维护，不是笔记成功的前提。用户不需要手工删除。
 
 ---
 
@@ -400,15 +401,15 @@ bili-learning organize `
 | 状态 | 含义 | 用户通常怎么做 |
 | --- | --- | --- |
 | `onboarding_required` | 首次环境仍缺少 Vault / Cookie / yt-dlp 等必需配置 | 按返回的 `actions` 处理，再重新检查并重试原链接 |
-| `materials_ready` | 字幕、简介等材料已经准备好 | 等智能体继续写笔记 |
-| `in_progress` | 同一 BV 号已有活动任务 | 不要重复启动；Hermes 可在安全条件下续做陈旧未完成 job |
+| `materials_ready` | 字幕、简介等材料已经准备好 | 等智能体继续写笔记；若同时返回 `recovered: true`，表示核心已恢复旧 Job，不会重新采集 |
+| `in_progress` | 同一 BV 号仍有真实活动任务 | 不要重复启动，也不要手工处理 reservation / lock |
 | `subtitle_unavailable` | 没有取得可用中文字幕 | 本次不会生成笔记，也不会下载音视频 |
 | `source_insufficient` | 字幕 / 简介不足以写可靠笔记 | 换资料更完整的视频 |
-| `note_ready` | finalizer 已校验并正式发布 | 完成 |
+| `note_ready` | finalizer 已校验并正式发布 | 完成；runtime retire/维护状态不改变发布结果 |
 | `note_invalid` | 草稿没有通过最终校验 | 查看错误，不要绕过 finalizer |
 | `failed` | 采集、配置或运行过程失败 | 先运行 doctor，再看故障排查 |
 
-> `in_progress` 是并发保护，不代表视频以后不能再次转换。当前任务结束后，同一个视频仍然可以重新生成另一篇笔记。
+> `in_progress` 是并发保护，不代表视频以后不能再次转换。进程异常结束但材料完整时，核心会自动恢复为 `materials_ready + recovered: true`；正常任务完成并 retire 后，同一个视频仍然可以重新生成另一篇笔记。
 
 ---
 
@@ -452,7 +453,7 @@ python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning
 - 把 Cookie 内容贴进聊天或日志；
 - 为了字幕失败而自动下载视频做 ASR。
 
-这些操作容易破坏并发保护、清理机制或隐私边界。
+这些操作容易破坏并发保护、Job 恢复 / retire 生命周期或隐私边界。
 
 ---
 

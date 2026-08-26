@@ -15,7 +15,7 @@ description: Turn a Bilibili copied link, supported short link, or BV id into a 
 runner="$HOME/.workbuddy/skills/bili-learning-automation/scripts/bridge.ps1"
 ```
 
-`$runner` 不存在时停止并说明 Skill 安装无效。正常优先通过 `bridge.ps1` 调用；若 WorkBuddy 沙箱明确阻止 `powershell.exe`，解析已安装 Skill 链接目标得到仓库根，再用该仓库 `.venv/Scripts/python.exe` 调同目录 `bridge.py`，不要写死 `G:\...` 路径。
+`$runner` 不存在时停止并说明 Skill 安装无效。正常优先通过 `bridge.ps1` 调用；若 WorkBuddy 沙箱明确阻止 `powershell.exe`，解析已安装 Skill 链接目标得到仓库根，再用该仓库 `.venv/Scripts/python.exe` 调同目录 `bridge.py`，不要写死 `G:\...` 路径。若当前 shell 把 Windows 路径表示为 `/g/...` 一类 MSYS 路径，先转换为真实 Windows 路径再交给 `python.exe`，不要手工拼接盘符。
 
 不得读取、展示或复述 Cookie 内容。
 
@@ -41,9 +41,9 @@ runner="$HOME/.workbuddy/skills/bili-learning-automation/scripts/bridge.ps1"
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$runner" prepare '<用户消息原文>'
    ```
 
-   - `materials_ready`：继续写作。
+   - `materials_ready`：继续写作；若同时返回 `recovered: true`，表示核心已恢复此前完整的采集材料，不要重新调用 yt-dlp。
    - `onboarding_required`：按返回动作完成配置后重试原消息。
-   - `in_progress`：不重复采集、不抢占、不手工删 job / reservation / lock；核心会回收已确认死亡的中间态。
+   - `in_progress`：说明仍有活动任务；不重复采集、不抢占，也不要手工处理 runtime 内部状态。
    - `subtitle_unavailable`：说明正常流程没有可用中文字幕且没有下载媒体；只有用户明确要求时才讨论项目级 ASR fallback。
    - 其它失败：报告短错误，不声称完成。
 
@@ -61,7 +61,7 @@ runner="$HOME/.workbuddy/skills/bili-learning-automation/scripts/bridge.ps1"
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$runner" finalize --job '<job_dir>' --note '<draft_path>'
    ```
 
-   无论写作成功或失败，都由 finalizer 清理 runtime；不要手工删除中间文件或锁。只有 `note_ready` 且 `temporary_data_removed: true` 才报告完成；`publish_state = already_published` 表示此前发布已成功，本次是安全重试。
+   无论写作成功或失败，都由 finalizer 处理 runtime 生命周期；不要手工删除中间文件或锁。`note_ready` 即表示业务完成；`publish_state = already_published` 表示此前发布已成功，本次是安全重试。`temporary_data_retired` / `cleanup_warning` 仅反映临时数据维护状态，不得把已成功发布的笔记改判为失败。
 
 ## 学习后整理
 

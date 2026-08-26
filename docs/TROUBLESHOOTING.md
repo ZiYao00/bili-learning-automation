@@ -23,6 +23,7 @@ doctor 不访问 Bilibili，也不读取 Cookie 内容。
 | 你看到的问题 | 先看 |
 | --- | --- |
 | 返回 `onboarding_required` / `in_progress` / `note_invalid` 等状态 | [第 1 节：状态表](#1-先看状态不要先猜原因) |
+| WorkBuddy 出现 `windows-sandbox-recycle-bin-unavailable` / safe-delete | [第 2 节：旧 Job 恢复与 safe-delete](#2-in_progressrecovered-与旧-job-恢复) |
 | 找不到 yt-dlp | [第 3 节：未找到 yt-dlp](#3-未找到-yt-dlp) |
 | Cookie 不存在或登录态失效 | [第 4 节：Cookie 文件不存在或登录态失效](#4-cookie-文件不存在或登录态失效) |
 | 没有字幕 | [第 5 节：subtitle_unavailable](#5-subtitle_unavailable) |
@@ -39,46 +40,57 @@ doctor 不访问 Bilibili，也不读取 Cookie 内容。
 | 状态 | 含义 | 推荐处理 |
 | --- | --- | --- |
 | `onboarding_required` | 首次环境仍缺少 Vault / Cookie / yt-dlp 等必需配置 | 按 `actions` 处理缺失项，重新运行 onboarding 后再重试原链接 |
-| `materials_ready` | 采集完成，等待智能体写笔记 | 正常继续 |
-| `in_progress` | 同 BV 已有活动任务 | 不重复采集；等待或由适配层安全续做陈旧 job |
+| `materials_ready` | 采集完成，等待智能体写笔记 | 正常继续；若同时有 `recovered: true`，表示核心已恢复此前完整 Job，不会重复采集 |
+| `in_progress` | 同 BV 仍有真实活动任务 | 不重复采集，不手工删 job / reservation / lock |
 | `subtitle_unavailable` | 没有取得可用中文字幕 | 本次停止；若人工确认视频完全无字幕，可按第 5 节使用手动 ASR 旁路 |
 | `source_insufficient` | 字幕 / 简介不足以写可靠笔记 | 换资料更完整的视频 |
-| `note_ready` | Finalizer 校验通过 | 完成 |
+| `note_ready` | Finalizer 校验通过并已发布 | 业务完成；runtime retire/维护状态不改变发布结果 |
 | `note_invalid` | 草稿未通过最终校验 | 看错误原因，不绕过 finalizer |
 | `failed` | 配置、采集或运行失败 | 先 doctor，再按下面对应项检查 |
 
 ---
 
-## 2. `in_progress`：为什么不能马上重新采集
+## 2. `in_progress`、`recovered` 与旧 Job 恢复
 
-`in_progress` 是并发保护。
+`in_progress` 是并发保护，只表示同一个 BV **仍有真实活动任务**。
 
 如果 Hermes、WorkBuddy 或其他入口正在处理同一个 BV，第二个入口再次采集可能造成：
 
 - 同一视频重复下载字幕；
 - 两个 Agent 同时改 analysis / draft；
 - 两个 finalizer 竞争同一输出；
-- 临时 job 和锁状态混乱。
+- runtime 状态互相覆盖。
 
 所以活动任务期间不会重复采集。
 
-这**不代表视频以后不能再次转换**。当前 job 结束并被清理后，可以重新生成另一篇笔记。
+这**不代表视频以后不能再次转换**。正常任务完成后，Job 会退出活动区并 retire；reservation 会切换为 `released`，之后同一个视频仍可再次生成新笔记。
 
-### Hermes 遇到旧的未完成 job
+### 进程异常结束，但材料已经完整
 
-新版 Hermes 适配层会优先使用 collector 返回的绑定 `job_dir`。
+旧版本主要依赖适配层判断“能否续做”；当前版本已经把恢复逻辑收回共享核心。
 
-只有同时满足以下条件时才续做：
+如果 reservation 的持有进程已经结束，而绑定 Job 仍具备 `job.json`、草稿、`analysis.json`、transcript manifest、字幕等完整材料，`prepare` 会：
 
-- reservation 已明显陈旧；
-- job 必需文件完整；
-- transcript manifest 和 chunks 完整；
-- 草稿 AI 区仍未填写；
-- `analysis.json` 仍处于 pending。
+1. 验证已有 Job 是否完整；
+2. 缺少 `agent_handoff.md` 时自动重建；
+3. **不重新调用 yt-dlp**；
+4. 返回 `materials_ready`，并附带 `recovered: true`。
 
-这样可以接回“会话中断但材料已经采集完成”的任务，同时避免抢占真正还在执行的任务。
+因此 Agent 只需要按正常 `materials_ready` 继续写作，不需要自己判断 PID、stale timeout 或底层锁状态。
 
-不要手工删除 reservation / lock 来强制绕过。
+### WorkBuddy 的 safe-delete / `windows-sandbox-recycle-bin-unavailable`
+
+当前 runtime 主链已经不再依赖删除权限：
+
+- `note-names.lock`、navigation lock 和 reservation claim 使用 OS 文件锁；锁文件可以长期存在，不靠 `unlink()` 释放；
+- reservation 使用 `active / released` 状态覆盖，不靠删除文件释放；
+- Job 完成后从活动区移动到 `.runtime/bilibili-learning/retired/`，物理删除属于后续维护；
+- Finalizer 的 `note_ready` 与 runtime retire/维护状态解耦；
+- 发布 staging 保留在 Job 内，不再要求发布后删除临时文件。
+
+因此 WorkBuddy 的 safe-delete 即使阻止 `Path.unlink()` / `shutil.rmtree()`，也不应再让正常 `prepare → finalize` 主链失败。
+
+如果当前版本仍出现 `windows-sandbox-recycle-bin-unavailable` 并中断任务，优先确认 WorkBuddy 是否重新读取了最新 Skill / 仓库代码；**不要修改 WorkBuddy 内置 `sitecustomize.py`，也不要手工删除 reservation / lock / job 来绕过。**
 
 ---
 
@@ -402,7 +414,7 @@ all    = 全部待整理笔记
 为了无字幕自动下载视频做 ASR
 ```
 
-这些操作可能让当前问题暂时消失，但会破坏并发保护、清理边界或数据可信度。
+这些操作可能让当前问题暂时消失，但会破坏并发保护、Job 恢复 / retire 生命周期或数据可信度。
 
 更好的顺序是：
 

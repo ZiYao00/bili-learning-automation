@@ -4,7 +4,7 @@
 
 `bili-learning-automation` converts Bilibili subtitles, the uploader's original description, and video metadata into Obsidian learning notes.
 
-The default pipeline uses `yt-dlp --skip-download`, so **video and audio are not downloaded**. An Agent reads the transcript and writes the learning content, while the program manages deterministic metadata, paths, validation, publication, and temporary-job cleanup.
+The default pipeline uses `yt-dlp --skip-download`, so **video and audio are not downloaded**. An Agent reads the transcript and writes the learning content, while the program manages deterministic metadata, paths, validation, publication, concurrency protection, job recovery, and the runtime retire lifecycle.
 
 > First installation: start with **[Quick Start](docs/QUICKSTART.md)**.
 > The detailed operating documentation is currently maintained in Chinese and is Windows-first.
@@ -24,6 +24,7 @@ Bilibili URL / BV ID
 → re-check transcript coverage
 → finalizer validates the draft
 → publish to Obsidian / 00-待整理
+→ retire the runtime job from the active task area
 ```
 
 The note format is intended to retain useful source information such as:
@@ -260,15 +261,15 @@ The project uses fixed-video quality regressions, but the README does not mainta
 | Status | Meaning | Normal action |
 | --- | --- | --- |
 | `onboarding_required` | First-run setup still lacks a required Vault / Cookie / yt-dlp item | Handle the returned `actions`, re-check, and retry the original link |
-| `materials_ready` | Subtitles, description, and metadata are ready | Agent continues |
-| `in_progress` | Another active task is processing the same BVID | Do not start a duplicate collection |
+| `materials_ready` | Subtitles, description, and metadata are ready | Agent continues; `recovered: true` means the core resumed a complete prior job without re-collecting |
+| `in_progress` | Another task is still genuinely active for the same BVID | Do not start a duplicate collection or manually alter runtime state |
 | `subtitle_unavailable` | No usable Chinese subtitle was obtained | Stop this conversion |
 | `source_insufficient` | Current source is insufficient for a reliable note | Use a source with better text coverage |
-| `note_ready` | Finalizer passed and the note was published | Done |
+| `note_ready` | Finalizer passed and the note was published | Business flow is complete; runtime retire/maintenance state does not change the publish result |
 | `note_invalid` | Draft failed final validation | Fix the reported issue; do not bypass finalizer |
 | `failed` | Configuration, collection, or runtime failure | Run doctor, then use Troubleshooting |
 
-See [Troubleshooting](docs/TROUBLESHOOTING.md) for detailed diagnosis.
+The core can recover a complete job left by a dead process and rebuild a missing handoff. Normal locks, reservations, and job lifecycle no longer depend on delete permission. See [Troubleshooting](docs/TROUBLESHOOTING.md) for detailed diagnosis.
 
 ---
 
@@ -280,7 +281,7 @@ These are ignored by Git by default:
 key/                 # Cookie / local credentials
 config/local.json    # machine-specific paths
 notes/**             # private learning notes
-.runtime/            # temporary jobs
+.runtime/            # active / retired runtime jobs
 .codex-backups/      # local backups
 archive/ materials/  # local materials
 ```

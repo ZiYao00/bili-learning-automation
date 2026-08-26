@@ -651,7 +651,7 @@ def test_onboarding_css_warning_does_not_block_ready_state(tmp_path: Path, taxon
     assert report["summary"]["css"]["status"] == "missing_optional"
 
 
-def test_onboarding_ytdlp_version_timeout_is_non_blocking_warning(
+def test_onboarding_ytdlp_version_timeout_stays_ready_without_user_warning(
     tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     settings = _settings(tmp_path, taxonomy)
@@ -663,8 +663,8 @@ def test_onboarding_ytdlp_version_timeout_is_non_blocking_warning(
     report = onboarding_report(settings)
 
     assert report["status"] == "ready"
-    assert any(warning["code"] == "ytdlp_version_check_timeout" for warning in report["warnings"])
-    assert report["summary"]["yt_dlp"]["status"] == "warning"
+    assert not any(warning["code"] == "ytdlp_version_check_timeout" for warning in report["warnings"])
+    assert report["summary"]["yt_dlp"]["status"] == "ready"
 
 
 def test_configure_cookie_and_ytdlp_preserve_existing_local_values(tmp_path: Path, taxonomy: dict) -> None:
@@ -1158,6 +1158,35 @@ def test_reservation_spans_job_lifecycle_and_cleanup_releases_it(tmp_path: Path)
     assert claim_reservation(runtime, "BV1TXua68EYi").path.is_file()
 
 
+def test_reservation_claim_is_atomic_across_concurrent_callers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import bili_learning.runtime as runtime_module
+
+    runtime = tmp_path / ".runtime" / "bilibili-learning"
+    barrier = threading.Barrier(2)
+    original_write = runtime_module._write_json_atomic
+
+    def delayed_write(path: Path, payload: dict[str, object]) -> None:
+        time.sleep(0.05)
+        original_write(path, payload)
+
+    monkeypatch.setattr(runtime_module, "_write_json_atomic", delayed_write)
+
+    def attempt_claim() -> str:
+        barrier.wait()
+        try:
+            claim_reservation(runtime, "BV1TXua68EYi")
+        except ReservationBusyError:
+            return "busy"
+        return "claimed"
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(lambda _index: attempt_claim(), range(2)))
+
+    assert sorted(results) == ["busy", "claimed"]
+
+
 def test_reservation_default_stale_window_is_two_hours(tmp_path: Path) -> None:
     runtime = tmp_path / ".runtime" / "bilibili-learning"
     reservation = claim_reservation(runtime, "BV1TXua68EYi")
@@ -1227,7 +1256,9 @@ def test_core_prepare_dry_run_returns_versioned_status_and_releases_reservation(
     assert payload["schema_version"] == 1
     assert payload["status"] == "ready_to_process"
     locks = tmp_path / ".runtime" / "bilibili-learning" / "locks"
-    assert not list(locks.glob("*.reservation.json"))
+    reservations = list(locks.glob("*.reservation.json"))
+    assert len(reservations) == 1
+    assert json.loads(reservations[0].read_text(encoding="utf-8"))["state"] == "released"
 
 
 def test_prepare_requires_explicit_notes_location_before_collection(
@@ -1287,6 +1318,32 @@ def test_prepare_in_progress_returns_bound_job_dir(tmp_path: Path, taxonomy: dic
     assert payload["status"] == "in_progress"
     assert payload["job_dir"] == str(job)
     cleanup_job(settings.runtime_root, job)
+
+
+def test_prepare_recovers_complete_job_from_dead_owner_without_recollecting(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_e2e_config(tmp_path, taxonomy)
+    monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", _fake_ytdlp)
+    monkeypatch.setattr("bili_learning.lifecycle._schedule_failsafe_cleanup", lambda *args: None)
+    prepared, code = prepare_note(tmp_path, "BV1TXua68EYi")
+    assert code == 0 and prepared["status"] == "materials_ready"
+
+    handoff = Path(prepared["handoff_path"])
+    handoff.replace(handoff.with_name("agent_handoff.saved"))
+    monkeypatch.setattr("bili_learning.runtime._process_is_alive", lambda _pid: False)
+
+    def fail_if_recollected(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        raise AssertionError("recoverable job must not run yt-dlp again")
+
+    monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", fail_if_recollected)
+    recovered, recover_code = prepare_note(tmp_path, "BV1TXua68EYi")
+
+    assert recover_code == 0
+    assert recovered["status"] == "materials_ready"
+    assert recovered["recovered"] is True
+    assert recovered["job_dir"] == prepared["job_dir"]
+    assert Path(recovered["handoff_path"]).is_file()
 
 
 def test_prepare_allows_a_new_note_for_an_existing_source(
@@ -1398,7 +1455,7 @@ def test_e2e_strict_mode_still_publishes_after_stage_completion(
     assert Path(prepared["note_path"]).is_file()
 
 
-def test_finalize_reports_failure_when_cleanup_fails(tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_finalize_keeps_note_ready_when_cleanup_fails(tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch) -> None:
     _write_e2e_config(tmp_path, taxonomy)
     monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", _fake_ytdlp)
     monkeypatch.setattr("bili_learning.lifecycle._schedule_failsafe_cleanup", lambda *args: None)
@@ -1421,18 +1478,48 @@ def test_finalize_reports_failure_when_cleanup_fails(tmp_path: Path, taxonomy: d
 
     result, code = finalize_note(tmp_path, Path(prepared["job_dir"]), draft)
 
-    assert code == 1
-    assert result["status"] == "failed"
+    assert code == 0
+    assert result["status"] == "note_ready"
+    assert result["publish_state"] == "published"
+    assert result["temporary_data_retired"] is False
     assert result["temporary_data_removed"] is False
     assert result["note_path"] == prepared["note_path"]
-    assert "WinError 32" in result["cleanup_error"]
+    assert "WinError 32" in result["cleanup_warning"]
 
     retried, retry_code = finalize_note(tmp_path, Path(prepared["job_dir"]), draft)
     assert retry_code == 0
     assert retried["status"] == "note_ready"
     assert retried["publish_state"] == "already_published"
-    assert retried["temporary_data_removed"] is True
+    assert retried["temporary_data_retired"] is True
+    assert retried["temporary_data_removed"] is False
     assert not Path(prepared["job_dir"]).exists()
+
+
+def test_safe_delete_failures_do_not_break_prepare_or_finalize(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_e2e_config(tmp_path, taxonomy)
+    monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", _fake_ytdlp)
+    monkeypatch.setattr("bili_learning.lifecycle._schedule_failsafe_cleanup", lambda *args: None)
+
+    def blocked_delete(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        raise OSError("windows-sandbox-recycle-bin-unavailable")
+
+    monkeypatch.setattr(Path, "unlink", blocked_delete)
+    monkeypatch.setattr("shutil.rmtree", blocked_delete)
+
+    prepared, code = prepare_note(tmp_path, "BV1TXua68EYi")
+    assert code == 0 and prepared["status"] == "materials_ready"
+    draft = Path(prepared["draft_path"])
+    draft.write_text(_complete_ai_regions(draft.read_text(encoding="utf-8")), encoding="utf-8")
+    _write_passed_analysis(Path(prepared["analysis_path"]))
+
+    completed, finalize_code = finalize_note(tmp_path, Path(prepared["job_dir"]), draft)
+
+    assert finalize_code == 0
+    assert completed["status"] == "note_ready"
+    assert completed["temporary_data_retired"] is True
+    assert Path(prepared["note_path"]).is_file()
 
 
 def test_e2e_unfinished_draft_never_enters_navigation_and_invalid_draft_is_not_published(
@@ -1844,7 +1931,7 @@ def test_file_lock_blocks_concurrent_owner(tmp_path: Path) -> None:
         with pytest.raises(RuntimeError, match="已有任务正在处理"):
             with file_lock(lock):
                 pass
-    assert not lock.exists()
+    assert lock.is_file()
 
 
 def test_file_lock_recovers_fresh_dead_owner(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1856,7 +1943,7 @@ def test_file_lock_recovers_fresh_dead_owner(tmp_path: Path, monkeypatch: pytest
     with file_lock(lock):
         assert lock.is_file()
 
-    assert not lock.exists()
+    assert lock.is_file()
 
 
 def test_file_lock_recovers_stale_file(tmp_path: Path) -> None:
@@ -1867,4 +1954,4 @@ def test_file_lock_recovers_stale_file(tmp_path: Path) -> None:
     os.utime(lock, (old, old))
     with file_lock(lock, stale_seconds=3600):
         assert lock.is_file()
-    assert not lock.exists()
+    assert lock.is_file()

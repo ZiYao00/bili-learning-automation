@@ -4,7 +4,7 @@
 
 `bili-learning-automation` 用于把 Bilibili 视频的字幕、UP 主简介和元数据整理为 Obsidian 学习笔记。
 
-默认流程使用 `yt-dlp --skip-download`，**不下载视频或音频**。Agent 负责阅读字幕和整理知识，程序负责元数据、文件路径、校验、发布和临时数据清理。
+默认流程使用 `yt-dlp --skip-download`，**不下载视频或音频**。Agent 负责阅读字幕和整理知识，程序负责元数据、文件路径、校验、发布，以及 runtime 任务的恢复、并发保护与 retire 生命周期。
 
 > 第一次使用：直接阅读 **[新手快速上手](docs/QUICKSTART.md)**。
 > 不知道该看哪份文档：打开 **[文档中心](docs/README.md)**。
@@ -24,6 +24,7 @@ B站链接 / BV号
 → 回看字幕做覆盖复核
 → finalizer 校验
 → 发布到 Obsidian 的 00-待整理
+→ runtime Job 退出活动区并 retire
 ```
 
 生成笔记时重点保留来源中具有长期参考价值的信息，例如：
@@ -297,15 +298,15 @@ Fact Ledger
 | 状态 | 含义 | 处理方式 |
 | --- | --- | --- |
 | `onboarding_required` | 首次环境仍缺少 Vault / Cookie / yt-dlp 等必需配置 | 按 `actions` 处理后重新检查并重试原链接 |
-| `materials_ready` | 字幕、简介和元数据已经准备完成 | Agent 继续处理 |
-| `in_progress` | 同一 BV 有活动任务 | 不要重复采集 |
+| `materials_ready` | 字幕、简介和元数据已经准备完成 | Agent 继续处理；若同时有 `recovered: true`，表示核心已恢复旧 Job，不会重复采集 |
+| `in_progress` | 同一 BV 仍有真实活动任务 | 不要重复采集或手工处理 runtime |
 | `subtitle_unavailable` | 没有取得可用中文字幕 | 本次停止 |
 | `source_insufficient` | 现有字幕 / 简介不足以形成可信笔记 | 更换资料更完整的视频 |
-| `note_ready` | Finalizer 校验通过并发布 | 完成 |
+| `note_ready` | Finalizer 校验通过并已发布 | 业务完成；runtime retire/维护状态不改变发布结果 |
 | `note_invalid` | 草稿未通过最终校验 | 按错误信息修复，不绕过 finalizer |
 | `failed` | 配置、采集或运行失败 | 先运行 doctor，再查故障排查 |
 
-更完整的症状、原因和处理方式见：[疑难解答 / 故障排查](docs/TROUBLESHOOTING.md)。
+核心会自动恢复“进程已结束但材料完整”的 Job，并重建缺失的 handoff；正常锁、reservation 和 Job 生命周期不依赖删除权限。更完整的症状、原因和处理方式见：[疑难解答 / 故障排查](docs/TROUBLESHOOTING.md)。
 
 ---
 
@@ -317,7 +318,7 @@ Fact Ledger
 key/                 # Cookie / 本机凭据
 config/local.json    # 本机路径配置
 notes/**             # 私人学习笔记
-.runtime/            # 临时任务
+.runtime/            # 活动 / retired runtime 任务
 .codex-backups/      # 本地备份
 archive/ materials/  # 本地资料
 ```

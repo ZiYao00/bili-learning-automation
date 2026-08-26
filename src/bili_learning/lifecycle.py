@@ -45,7 +45,10 @@ def _status(payload: dict[str, Any], code: int = 0) -> tuple[dict[str, Any], int
 def _windowless_python() -> str:
     if sys.platform != "win32":
         return sys.executable
-    for candidate in (Path(getattr(sys, "_base_executable", sys.executable)).with_name("pythonw.exe"), Path(sys.executable).with_name("pythonw.exe")):
+    for candidate in (
+        Path(getattr(sys, "_base_executable", sys.executable)).with_name("pythonw.exe"),
+        Path(sys.executable).with_name("pythonw.exe"),
+    ):
         if candidate.is_file():
             return str(candidate)
     return sys.executable
@@ -89,6 +92,82 @@ def _schedule_failsafe_cleanup(job_dir: Path, project_root: Path, runner: Path |
     )
 
 
+def _materials_payload(job_dir: Path, job: dict[str, Any], handoff: Path, *, recovered: bool) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "status": "materials_ready",
+        "bvid": job["bvid"],
+        "canonical_url": job["canonical_url"],
+        "job_dir": str(job_dir),
+        "handoff_path": str(handoff),
+        "note_path": job["note_path"],
+        "draft_path": job["draft_path"],
+        "analysis_path": job["analysis_path"],
+        "agent_work_dir": job["agent_work_dir"],
+        "workflow_mode": job["workflow_mode"],
+        **{
+            key: job[key]
+            for key in ("fact_ledger_path", "semantic_draft_path", "layout_plan_path")
+            if key in job
+        },
+        "transcript_manifest_path": job["transcript_manifest_path"],
+        "transcript_mode": job["transcript_mode"],
+        "transcript_chunk_count": job["transcript_chunk_count"],
+        "subtitle_path": job["subtitle_path"],
+        "description_status": job["description_status"],
+        "media_files": 0,
+    }
+    if recovered:
+        payload["recovered"] = True
+    return payload
+
+
+def _recover_materials_ready(
+    project_root: Path,
+    job_dir: Path,
+    *,
+    cleanup_runner: Path | None,
+) -> tuple[dict[str, Any], int] | None:
+    try:
+        job = json.loads((job_dir / "job.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(job, dict):
+        return None
+
+    required_keys = (
+        "bvid",
+        "canonical_url",
+        "note_path",
+        "draft_path",
+        "analysis_path",
+        "agent_work_dir",
+        "workflow_mode",
+        "transcript_manifest_path",
+        "transcript_mode",
+        "transcript_chunk_count",
+        "subtitle_path",
+        "description_status",
+    )
+    if any(key not in job or job[key] in (None, "") for key in required_keys):
+        return None
+    required_files = (
+        Path(str(job["draft_path"])),
+        Path(str(job["analysis_path"])),
+        Path(str(job["transcript_manifest_path"])),
+        Path(str(job["subtitle_path"])),
+    )
+    if any(not path.is_file() for path in required_files):
+        return None
+
+    handoff = job_dir / "agent_handoff.md"
+    if not handoff.is_file():
+        handoff = write_handoff(job_dir, job)
+    _schedule_failsafe_cleanup(job_dir, project_root, cleanup_runner)
+    payload = _materials_payload(job_dir, job, handoff, recovered=True)
+    payload["stale_jobs_removed"] = 0
+    return _status(payload)
+
+
 def prepare_note(
     project_root: Path,
     message: str | None,
@@ -101,8 +180,13 @@ def prepare_note(
     settings = load_settings(project_root)
     if cleanup_job_path is not None:
         time.sleep(max(0, after_seconds))
-        cleanup_job(settings.runtime_root, cleanup_job_path)
-        return _status({"status": "temporary_data_removed"})
+        retired = cleanup_job(settings.runtime_root, cleanup_job_path)
+        return _status(
+            {
+                "status": "temporary_data_retired",
+                "retired_path": str(retired) if retired else None,
+            }
+        )
     if not message:
         return _status({"status": "failed", "message": "需要提供 B站复制链接、短链接或 BV 号。"}, 2)
 
@@ -140,6 +224,8 @@ def prepare_note(
         resolved = resolve_input(message)
         reservation = claim_reservation(settings.runtime_root, resolved.bvid)
         if dry_run:
+            release_reservation(settings.runtime_root, reservation.bvid)
+            ready = True
             return _status(
                 {
                     "status": "ready_to_process",
@@ -185,35 +271,16 @@ def prepare_note(
         handoff = write_handoff(job_dir, job)
         ready = True
         _schedule_failsafe_cleanup(job_dir, project_root, cleanup_runner)
-        return _status(
-            {
-                "status": "materials_ready",
-                "bvid": resolved.bvid,
-                "canonical_url": resolved.canonical_url,
-                "job_dir": str(job_dir),
-                "handoff_path": str(handoff),
-                "note_path": job["note_path"],
-                "draft_path": job["draft_path"],
-                "analysis_path": job["analysis_path"],
-                "agent_work_dir": job["agent_work_dir"],
-                "workflow_mode": job["workflow_mode"],
-                **{
-                    key: job[key]
-                    for key in ("fact_ledger_path", "semantic_draft_path", "layout_plan_path")
-                    if key in job
-                },
-                "transcript_manifest_path": job["transcript_manifest_path"],
-                "transcript_mode": job["transcript_mode"],
-                "transcript_chunk_count": job["transcript_chunk_count"],
-                "subtitle_path": str(subtitle),
-                "description_status": job["description_status"],
-                "media_files": 0,
-                "stale_jobs_removed": stale_removed,
-            }
-        )
+        payload = _materials_payload(job_dir, job, handoff, recovered=False)
+        payload["stale_jobs_removed"] = stale_removed
+        return _status(payload)
     except DependencyError as error:
         return _status({"status": "failed", "code": error.code, "message": str(error)}, 1)
     except ReservationBusyError as error:
+        if error.recoverable and error.job_dir:
+            recovered = _recover_materials_ready(project_root, Path(error.job_dir), cleanup_runner=cleanup_runner)
+            if recovered is not None:
+                return recovered
         return _status(
             {
                 "status": "in_progress",
@@ -228,9 +295,15 @@ def prepare_note(
         return _status({"status": "failed", "message": str(error)}, 1)
     finally:
         if job_dir and not ready:
-            cleanup_job(settings.runtime_root, job_dir)
+            try:
+                cleanup_job(settings.runtime_root, job_dir)
+            except Exception:
+                pass
         elif reservation and not ready:
-            release_reservation(settings.runtime_root, reservation.bvid)
+            try:
+                release_reservation(settings.runtime_root, reservation.bvid)
+            except Exception:
+                pass
 
 
 def finalize_note(project_root: Path, job_path: Path, note_path: Path) -> tuple[dict[str, Any], int]:
@@ -267,15 +340,12 @@ def finalize_note(project_root: Path, job_path: Path, note_path: Path) -> tuple[
     except Exception as error:
         payload, code = {"status": "failed", "message": str(error)}, 1
     try:
-        cleanup_job(settings.runtime_root, job_dir)
-        payload["temporary_data_removed"] = True
-    except Exception as error:
+        retired = cleanup_job(settings.runtime_root, job_dir)
+        payload["temporary_data_retired"] = True
+        payload["retired_path"] = str(retired) if retired else None
         payload["temporary_data_removed"] = False
-        payload["cleanup_error"] = str(error)
-        if code == 0:
-            payload, code = {
-                **payload,
-                "status": "failed",
-                "message": "笔记已写入但临时数据清理失败",
-            }, 1
+    except Exception as error:
+        payload["temporary_data_retired"] = False
+        payload["temporary_data_removed"] = False
+        payload["cleanup_warning"] = str(error)
     return _status(payload, code)

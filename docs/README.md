@@ -54,7 +54,9 @@
 - 适配层位置；
 - 本机安装方式；
 - 如何验证；
-- 更新项目后如何同步。
+- 更新项目后如何同步；
+- WorkBuddy safe-delete、PowerShell 阻断与 MSYS 路径兼容；
+- 旧 Job 自动恢复与 `recovered: true`。
 
 ### [Obsidian 样式教程](OBSIDIAN-STYLING.md)
 
@@ -111,6 +113,7 @@ input
 → Agent
 → finalizer
 → Obsidian
+→ runtime retire / recovery
 ```
 
 适合需要理解源码或定位模块责任的人。
@@ -125,7 +128,8 @@ input
 - 哪些内容由 Python 固定生成；
 - 来源事实边界；
 - `analysis.json` / coverage review；
-- finalizer 与清理要求。
+- `materials_ready + recovered: true` 的恢复语义；
+- finalizer、Job retire 与维护状态要求。
 
 ### [内容质量标准](standards/LIGHT-WORKFLOW.md)
 
@@ -148,7 +152,8 @@ input
 覆盖：
 
 - `onboarding_required`；
-- `in_progress`；
+- `in_progress` / `recovered` 与旧 Job 恢复；
+- WorkBuddy safe-delete / `windows-sandbox-recycle-bin-unavailable`；
 - yt-dlp 未找到；
 - Cookie 文件不存在；
 - `subtitle_unavailable`；
