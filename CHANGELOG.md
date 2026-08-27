@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-27
+
 ### Added
 
 - 新增统一首次使用 onboarding：Hermes、WorkBuddy、Codex 在正式采集前共用同一结构化环境检查；Vault、Cookie、yt-dlp、Python 等必需项返回 `actions`，CSS 缺失只作为非阻塞 `warnings`。
