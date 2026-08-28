@@ -166,6 +166,11 @@ def create_job(
     job_dir: Path,
     description_sidecar: str | None = None,
     user_supplied_source: dict[str, str] | None = None,
+    *,
+    operation_mode: str = "create",
+    update_target_path: Path | None = None,
+    update_target_sha256: str | None = None,
+    existing_note_snapshot_path: Path | None = None,
 ) -> dict[str, Any]:
     if isinstance(source, Path):
         source = SourceMaterial(SOURCE_MODE_SUBTITLE, source)
@@ -179,13 +184,18 @@ def create_job(
         published = f"{published[:4]}-{published[4:6]}-{published[6:]}"
 
     with waiting_file_lock(settings.runtime_root / "locks" / NOTE_NAME_LOCK):
-        note_directory = settings.notes_root.joinpath(*filing["category_path"])
-        reserved_paths = _reserved_note_paths(settings.runtime_root)
-        sequence = 1
-        note_path = note_directory / note_filename(canonical_title, sequence)
-        while note_path.exists() or note_path.resolve() in reserved_paths:
-            sequence += 1
+        if operation_mode == "update":
+            if update_target_path is None or update_target_sha256 is None or existing_note_snapshot_path is None:
+                raise ValueError("更新 Job 缺少目标笔记、哈希或快照")
+            note_path = update_target_path
+        else:
+            note_directory = settings.notes_root.joinpath(*filing["category_path"])
+            reserved_paths = _reserved_note_paths(settings.runtime_root)
+            sequence = 1
             note_path = note_directory / note_filename(canonical_title, sequence)
+            while note_path.exists() or note_path.resolve() in reserved_paths:
+                sequence += 1
+                note_path = note_directory / note_filename(canonical_title, sequence)
 
         filename = note_path.name
         draft_path = job_dir / filename
@@ -228,6 +238,16 @@ def create_job(
             "analysis_path": str(analysis_path),
             "agent_work_dir": str(agent_work_dir),
             "workflow_mode": settings.workflow_mode,
+            "operation_mode": operation_mode,
+            **(
+                {
+                    "update_target_path": str(update_target_path),
+                    "update_target_sha256": update_target_sha256,
+                    "existing_note_snapshot_path": str(existing_note_snapshot_path),
+                }
+                if operation_mode == "update"
+                else {}
+            ),
             **workflow_paths,
         }
         (job_dir / "job.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -268,12 +288,26 @@ def _source_guidance(payload: dict[str, Any]) -> str:
     )
 
 
+def _operation_guidance(payload: dict[str, Any]) -> str:
+    operation = str(payload.get("operation_mode") or "create")
+    if operation == "update":
+        return (
+            "任务操作：`update`。先完整读取 `existing_note_snapshot_path`；以旧笔记为基线，"
+            "合并当前新来源和用户补充内容，保留仍受来源支持的旧知识与人工修改。"
+            "不要为了重新排版而缩短或删除旧笔记已有的高价值信息。"
+        )
+    if operation == "rerun":
+        return "任务操作：`rerun`。用户已明确要求重新执行一次；这是独立新笔记，不覆盖已有笔记。"
+    return "任务操作：`create`。这是首次生成。"
+
+
 def _write_strict_handoff(job_dir: Path, payload: dict[str, Any]) -> Path:
     handoff = job_dir / "agent_handoff.md"
     guidance = _source_guidance(payload)
+    operation_guidance = _operation_guidance(payload)
     handoff.write_text(
         "# B站视频转笔记任务\n\n"
-        f"{guidance}\n\n"
+        f"{guidance}\n\n{operation_guidance}\n\n"
         "1. 读取 `job.json`、`source_manifest_path`（旧 Job 使用 `transcript_manifest_path`）、`agent_work_dir`、`fact_ledger_path`、`semantic_draft_path`、`layout_plan_path` 与共享内容标准。manifest 会标明来源模式、chunk 和是否存在真实时间戳；只读取实际列出的 chunk，不自行重新切分。\n"
         "2. 判断当前来源、B站简介及明确存在的 `user_supplied_source` 是否足以支撑可信笔记，并填写 `analysis_path`。来源不足时不要编造正文。\n"
         "3. 长视频、百科型、参数密集或实测证据多的内容，先完成 Fact Ledger；简单短记可按规则标记 `not_applicable` 并填写原因。仍须保留参数、关系、条件、例外、冲突与实测证据。\n"
@@ -288,10 +322,11 @@ def _write_strict_handoff(job_dir: Path, payload: dict[str, Any]) -> Path:
 
 def _light_handoff_text(payload: dict[str, Any]) -> str:
     guidance = _source_guidance(payload)
+    operation_guidance = _operation_guidance(payload)
     return (
         "# B站视频转笔记任务\n\n"
         "工作模式：`light`。不创建 Fact Ledger、Semantic Draft 或 Layout Plan。\n\n"
-        f"{guidance}\n\n"
+        f"{guidance}\n\n{operation_guidance}\n\n"
         "1. 读取 `job.json`、`source_manifest_path`（旧 Job 使用 `transcript_manifest_path`）和 `docs/standards/LIGHT-WORKFLOW.md`。按 manifest 完整读取实际存在的 source chunk，不自行重新切分或跳读。\n"
         "2. 判断当前来源、B站简介及明确存在的 `user_supplied_source` 是否足以支撑可信笔记，并填写 `analysis_path`。来源不足时停止，不用模型常识补参数、资源或结论。\n"
         "3. 直接在 `draft_path` 的两个 AI 区域写完整内容；优先保留参数、工具、步骤、条件、比较、兼容性、作者建议和实测结果。`description_only` 只写来源支持的纯资源分享短记。\n"

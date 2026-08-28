@@ -41,6 +41,9 @@ doctor 不访问 Bilibili，也不读取 Cookie 内容。
 | --- | --- | --- |
 | `onboarding_required` | 首次环境仍缺少 Vault / Cookie / yt-dlp 等必需配置 | 按 `actions` 处理缺失项，重新运行 onboarding 后再重试原链接 |
 | `materials_ready` | 采集完成，等待智能体写笔记 | 正常继续；若同时有 `recovered: true`，表示核心已恢复此前完整 Job，不会重复采集 |
+| `existing_note_found` | 当前 BVID 已有已发布笔记 | 采集尚未开始；先让用户选择更新、重新执行或取消 |
+| `update_target_required` | 同一 BVID 有多篇笔记且未指定更新目标 | 让用户明确选择具体笔记，不自动猜最新或最旧 |
+| `update_conflict` | 更新期间目标笔记被再次修改 | 原笔记未被覆盖；重新读取最新版本后再发起更新 |
 | `in_progress` | 同 BV 仍有真实活动任务 | 不重复采集，不手工删 job / reservation / lock |
 | `subtitle_unavailable` | 没有取得可用中文字幕 | 本次停止；若人工确认视频完全无字幕，可按第 5 节使用手动 ASR 旁路 |
 | `source_insufficient` | 字幕 / 简介不足以写可靠笔记 | 换资料更完整的视频 |
@@ -63,7 +66,7 @@ doctor 不访问 Bilibili，也不读取 Cookie 内容。
 
 所以活动任务期间不会重复采集。
 
-这**不代表视频以后不能再次转换**。正常任务完成后，Job 会退出活动区并 retire；reservation 会切换为 `released`，之后同一个视频仍可再次生成新笔记。
+这**不代表视频以后不能再次处理**。正常任务完成后，Job 会退出活动区并 retire；reservation 会切换为 `released`。之后再次发送同一 BVID 时，核心先返回 `existing_note_found`：只有用户明确选择 `rerun` 才生成独立新笔记，选择 `update` 则保留指定旧笔记路径并进入受控更新。
 
 ### 进程异常结束，但材料已经完整
 

@@ -294,7 +294,7 @@ BVxxxxxxxxxx
 （默认流程无字幕后）ASR，下载音频转文字 → asr_text
 ```
 
-不得只凭标题、视频类型猜测或历史 memory 自动跳过字幕。正常情况下，你不需要输入底层命令、指定文件名或手工处理 runtime。
+不得只凭标题、视频类型猜测或历史 memory 自动跳过字幕。三个入口都会先按 BVID 检查是否已经发布过：发现重复时先询问“更新已有笔记 / 重新执行一次 / 取消”，不会先生成 `（2）` 再事后提醒。更新保留原路径并用 runtime 快照 + SHA-256 防止覆盖用户刚做的人工修改；只有明确选择重新执行时，同标题才继续使用递增序号。正常情况下，你不需要输入底层命令、指定文件名或手工处理 runtime。
 
 智能体会自动完成：
 
@@ -354,7 +354,7 @@ subtitle / ASR 模式会生成 source chunks：短文本通常一个，长文本
 H3智能一体化节点重磅升级.md
 ```
 
-如果同名文件已经存在，会自动生成：
+如果用户明确选择“重新执行一次”，且同名文件已经存在，会生成：
 
 ```text
 H3智能一体化节点重磅升级（2）.md
@@ -410,6 +410,9 @@ bili-learning organize `
 | --- | --- | --- |
 | `onboarding_required` | 首次环境仍缺少 Vault / Cookie / yt-dlp 等必需配置 | 按返回的 `actions` 处理，再重新检查并重试原链接 |
 | `materials_ready` | 当前 `source_mode` 的标准 Job 已准备好 | 按 `source_manifest_path` 和 handoff 继续；`recovered: true` 表示核心已恢复同一来源模式的旧 Job |
+| `existing_note_found` | 当前 BVID 已经发布过笔记 | 先选择更新、重新执行或取消；选择后继续使用触发提示时的原始完整消息 |
+| `update_target_required` | 同一 BVID 有多篇笔记，尚未指定更新目标 | 明确选择要更新的具体笔记，不自动猜最新一篇 |
+| `update_conflict` | 更新期间原笔记又发生了修改 | 不覆盖现有文件；重新发起更新 |
 | `in_progress` | 同一 BV 号仍有真实活动任务 | 不要重复启动，也不要手工处理 reservation / lock |
 | `subtitle_unavailable` | 没有取得可用中文字幕 | 本次不会生成笔记，也不会下载音视频 |
 | `source_insufficient` | 当前来源模式不足以写可靠笔记 | 默认/ASR 可换更完整文字；description-only 应补充简介资料或改走字幕流程 |

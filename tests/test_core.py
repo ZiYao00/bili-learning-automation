@@ -1343,7 +1343,7 @@ def test_prepare_requires_explicit_notes_location_before_collection(
         raise AssertionError("yt-dlp should not run before explicit notes configuration")
 
     monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", fail_if_called)
-    payload, code = prepare_note(tmp_path, "BV1TXua68EYi")
+    payload, code = prepare_note(tmp_path, "BV1TXua68EYi", on_existing="rerun")
 
     assert code == 2
     assert payload["status"] == "onboarding_required"
@@ -1362,7 +1362,7 @@ def test_prepare_reports_ytdlp_dependency_code_without_auto_install(
     monkeypatch.delenv("BILI_LEARNING_YTDLP", raising=False)
     monkeypatch.setattr("bili_learning.config.shutil.which", lambda _name: None)
 
-    payload, code = prepare_note(tmp_path, "BV1TXua68EYi")
+    payload, code = prepare_note(tmp_path, "BV1TXua68EYi", on_existing="rerun")
 
     assert code == 2
     assert payload["status"] == "onboarding_required"
@@ -1380,7 +1380,7 @@ def test_prepare_in_progress_returns_bound_job_dir(tmp_path: Path, taxonomy: dic
     (job / "job.json").write_text(json.dumps({"bvid": "BV1TXua68EYi"}), encoding="utf-8")
     bind_reservation(reservation, job)
 
-    payload, code = prepare_note(tmp_path, "BV1TXua68EYi")
+    payload, code = prepare_note(tmp_path, "BV1TXua68EYi", on_existing="rerun")
 
     assert code == 2
     assert payload["status"] == "in_progress"
@@ -1414,7 +1414,7 @@ def test_prepare_recovers_complete_job_from_dead_owner_without_recollecting(
     assert Path(recovered["handoff_path"]).is_file()
 
 
-def test_prepare_allows_a_new_note_for_an_existing_source(
+def test_prepare_rerun_allows_a_new_note_for_an_existing_source(
     tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _write_e2e_config(tmp_path, taxonomy)
@@ -1425,7 +1425,7 @@ def test_prepare_allows_a_new_note_for_an_existing_source(
     )
     monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", _fake_ytdlp)
     monkeypatch.setattr("bili_learning.lifecycle._schedule_failsafe_cleanup", lambda *args: None)
-    payload, code = prepare_note(tmp_path, "BV1TXua68EYi")
+    payload, code = prepare_note(tmp_path, "BV1TXua68EYi", on_existing="rerun")
     assert code == 0 and payload["status"] == "materials_ready"
     assert Path(payload["note_path"]).name == "H3 分段工作流.md"
     assert payload["source_package_mode"] == "direct"
@@ -1472,6 +1472,143 @@ def _fake_ytdlp(
     (job_dir / f"{bvid}.description").write_text("原始简介", encoding="utf-8")
     if include_subtitles:
         (job_dir / f"{bvid}.ai-zh.srt").write_text("1\n00:00:00,000 --> 00:00:01,000\n字幕\n", encoding="utf-8")
+
+
+def _finalize_prepared_note(project_root: Path, prepared: dict) -> tuple[dict, int]:
+    draft = Path(prepared["draft_path"])
+    draft.write_text(_complete_ai_regions(draft.read_text(encoding="utf-8")), encoding="utf-8")
+    _write_passed_analysis(Path(prepared["analysis_path"]))
+    return finalize_note(project_root, Path(prepared["job_dir"]), draft)
+
+
+def test_duplicate_bvid_stops_before_collection_and_requests_user_choice(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_e2e_config(tmp_path, taxonomy)
+    monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", _fake_ytdlp)
+    monkeypatch.setattr("bili_learning.lifecycle._schedule_failsafe_cleanup", lambda *args: None)
+    first, code = prepare_note(tmp_path, "BV1TXua68EYi")
+    assert code == 0
+    completed, finalize_code = _finalize_prepared_note(tmp_path, first)
+    assert finalize_code == 0 and completed["status"] == "note_ready"
+
+    def fail_if_collected(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        raise AssertionError("duplicate preflight must run before yt-dlp")
+
+    monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", fail_if_collected)
+    duplicate, duplicate_code = prepare_note(tmp_path, "BV1TXua68EYi")
+
+    assert duplicate_code == 2
+    assert duplicate["status"] == "existing_note_found"
+    assert duplicate["existing_note_count"] == 1
+    assert duplicate["allowed_actions"] == ["update", "rerun", "cancel"]
+    assert duplicate["update_target_required"] is False
+    assert Path(duplicate["existing_notes"][0]["path"]).resolve() == Path(first["note_path"]).resolve()
+
+
+def test_update_existing_note_preserves_path_and_uses_snapshot(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_e2e_config(tmp_path, taxonomy)
+    monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", _fake_ytdlp)
+    monkeypatch.setattr("bili_learning.lifecycle._schedule_failsafe_cleanup", lambda *args: None)
+    first, code = prepare_note(tmp_path, "BV1TXua68EYi")
+    assert code == 0
+    completed, finalize_code = _finalize_prepared_note(tmp_path, first)
+    assert finalize_code == 0 and completed["status"] == "note_ready"
+    original_path = Path(first["note_path"])
+    original_text = original_path.read_text(encoding="utf-8")
+
+    update, update_code = prepare_note(tmp_path, "BV1TXua68EYi", on_existing="update")
+
+    assert update_code == 0 and update["status"] == "materials_ready"
+    assert update["operation_mode"] == "update"
+    assert Path(update["note_path"]).resolve() == original_path.resolve()
+    snapshot = Path(update["existing_note_snapshot_path"])
+    assert snapshot.read_text(encoding="utf-8") == original_text
+    assert "任务操作：`update`" in Path(update["handoff_path"]).read_text(encoding="utf-8")
+
+    completed, finalize_code = _finalize_prepared_note(tmp_path, update)
+    assert finalize_code == 0
+    assert completed["status"] == "note_ready"
+    assert completed["publish_state"] == "updated"
+    assert Path(completed["note_path"]).resolve() == original_path.resolve()
+    assert not original_path.with_name("H3 分段工作流（2）.md").exists()
+
+
+def test_update_requires_target_when_multiple_same_bvid_notes_exist(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_e2e_config(tmp_path, taxonomy)
+    monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", _fake_ytdlp)
+    monkeypatch.setattr("bili_learning.lifecycle._schedule_failsafe_cleanup", lambda *args: None)
+    first, code = prepare_note(tmp_path, "BV1TXua68EYi")
+    assert code == 0
+    assert _finalize_prepared_note(tmp_path, first)[1] == 0
+    second, code = prepare_note(tmp_path, "BV1TXua68EYi", on_existing="rerun")
+    assert code == 0
+    assert _finalize_prepared_note(tmp_path, second)[1] == 0
+
+    result, result_code = prepare_note(tmp_path, "BV1TXua68EYi", on_existing="update")
+
+    assert result_code == 2
+    assert result["status"] == "update_target_required"
+    assert len(result["existing_notes"]) == 2
+
+    selected = Path(result["existing_notes"][1]["path"])
+    update, update_code = prepare_note(
+        tmp_path,
+        "BV1TXua68EYi",
+        on_existing="update",
+        update_target=selected,
+    )
+    assert update_code == 0 and update["status"] == "materials_ready"
+    assert Path(update["note_path"]).resolve() == selected.resolve()
+
+
+def test_update_conflict_does_not_overwrite_manual_change(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_e2e_config(tmp_path, taxonomy)
+    monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", _fake_ytdlp)
+    monkeypatch.setattr("bili_learning.lifecycle._schedule_failsafe_cleanup", lambda *args: None)
+    first, code = prepare_note(tmp_path, "BV1TXua68EYi")
+    assert code == 0
+    assert _finalize_prepared_note(tmp_path, first)[1] == 0
+    target = Path(first["note_path"])
+
+    update, code = prepare_note(tmp_path, "BV1TXua68EYi", on_existing="update")
+    assert code == 0
+    target.write_text(target.read_text(encoding="utf-8") + "\nmanual change\n", encoding="utf-8")
+    draft = Path(update["draft_path"])
+    draft.write_text(_complete_ai_regions(draft.read_text(encoding="utf-8")), encoding="utf-8")
+    _write_passed_analysis(Path(update["analysis_path"]))
+
+    result, finalize_code = finalize_note(tmp_path, Path(update["job_dir"]), draft)
+
+    assert finalize_code == 2
+    assert result["status"] == "update_conflict"
+    assert "manual change" in target.read_text(encoding="utf-8")
+
+
+def test_same_title_different_bvid_does_not_trigger_duplicate_prompt(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_e2e_config(tmp_path, taxonomy)
+    existing = tmp_path / "notes" / "bilibili" / "00-待整理" / "H3 分段工作流.md"
+    existing.parent.mkdir(parents=True)
+    existing.write_text(
+        '---\nsource: "https://www.bilibili.com/video/BV1DIFFERENT/"\n---\n\n# H3 分段工作流\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", _fake_ytdlp)
+    monkeypatch.setattr("bili_learning.lifecycle._schedule_failsafe_cleanup", lambda *args: None)
+
+    prepared, code = prepare_note(tmp_path, "BV1TXua68EYi")
+
+    assert code == 0 and prepared["status"] == "materials_ready"
+    assert prepared["operation_mode"] == "create"
+    assert Path(prepared["note_path"]).name == "H3 分段工作流（2）.md"
 
 
 def test_prepare_transcript_builds_standard_job_and_finalizes(
@@ -1628,7 +1765,7 @@ def test_e2e_draft_publish_navigation_and_repeated_video(
     nav = tmp_path / "notes" / "bilibili" / "99-导航" / "首页.md"
     assert nav.is_file()
 
-    repeated, code = prepare_note(tmp_path, "BV1TXua68EYi")
+    repeated, code = prepare_note(tmp_path, "BV1TXua68EYi", on_existing="rerun")
     assert code == 0 and repeated["status"] == "materials_ready"
     assert Path(repeated["note_path"]).name == "H3 分段工作流（2）.md"
 
@@ -1857,6 +1994,12 @@ def test_agent_skills_require_organize_scope_confirmation() -> None:
         assert "prepare-transcript" in text
         assert "不得把纯文本伪造成 SRT" in text
         assert "不得制造时间戳" in text
+        assert "existing_note_found" in text
+        assert "--on-existing rerun" in text
+        assert "--on-existing update" in text
+        assert "--update-target" in text
+        assert "原始完整消息" in text
+        assert "update_conflict" in text
 
 
 def test_organize_note_only_renames_moves_and_rebuilds_navigation(tmp_path: Path, taxonomy: dict) -> None:

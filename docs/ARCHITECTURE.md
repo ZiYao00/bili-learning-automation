@@ -6,7 +6,8 @@
 已授权智能体入口中的复制链接 / BV 号 / 受支持短链
 → input_resolver 规范化 BVID 与 canonical URL
 → 适配层只根据当前消息的明确意图选择 source_mode：默认 `subtitle_srt`；明确授权 ASR 后使用 `asr_text`；明确“纯资源分享 / 只整理简介 / 不用字幕”使用 `description_only`
-→ `prepare` / `prepare-transcript` / `prepare-description` 统一进入 `_prepare_materials`，由 `SourceMaterial + source manifest` 生成标准 Job；默认不下载媒体，ASR 文本不伪造时间戳
+→ `prepare` / `prepare-transcript` / `prepare-description` 先按 BVID 检查已发布笔记；默认重复返回 `existing_note_found`，用户明确选择 rerun / update 后才继续 `_prepare_materials`
+→ rerun 继续创建独立新笔记并使用递增序号；update 绑定既有路径、保存旧笔记快照与 SHA-256，再由 SourceMaterial + source manifest 生成标准 Job
 → taxonomy 生成 tags 与后续整理建议；原视频标题的新笔记进入 00-待整理
 → Python 在 runtime 写入确定性 Markdown 草稿、analysis.json 与统一 source package
 → workflow_mode 路由：light 直接写作；strict 额外创建三份阶段工作文件
@@ -75,7 +76,7 @@ taxonomy 的 route.path 不直接决定新文件的路径。新笔记统一先�
 
 ## 可靠性原则
 
-- 文件名使用原视频标题，同名时在 `note-names.lock` OS 文件锁保护下使用递增序号，避免覆盖。已完成视频允许再次转换并生成新笔记。
+- 默认重复 BVID 不直接执行；先返回 `existing_note_found` 由用户选择。明确 rerun 时，文件名使用原视频标题并在 `note-names.lock` 保护下递增 `（2）/（3）`；明确 update 时保留原路径和文件名，finalizer 只在目标 SHA-256 仍与 Job 启动时一致时原子替换，否则返回 `update_conflict`。
 - 同一 BVID 仅在活动 collector、智能体写作与 finalizer 期间使用 reservation 防止并发；reservation 使用 `active / released` 状态文件，并由 OS 文件锁保护 claim / bind / release 的原子性。任务完成后切换为 `released`，允许再次转换。
 - 如果 reservation 持有进程已经结束，而绑定 Job 的 `job.json`、草稿、`analysis.json`、source manifest 及该模式必需的 source 文件 / chunks 仍完整，核心只在请求的 `source_mode` 与旧 Job 一致时恢复并返回 `materials_ready + recovered: true`；description-only 不要求独立 source 文件。
 - `note-names.lock`、navigation lock 与 reservation lock 使用 OS 原生文件锁；锁文件本身可以长期存在，进程退出时由操作系统释放锁，不依赖 `unlink()` 或 stale-lock 删除。

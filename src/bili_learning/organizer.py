@@ -1,27 +1,14 @@
 from __future__ import annotations
 
 import os
-import re
 from pathlib import Path, PurePosixPath
 
 from .config import Settings
 from .navigation import build_navigation
+from .note_library import extract_bvid, find_notes_by_bvid
 from .note_template import note_filename, safe_title
 
 ORGANIZE_SCOPES = {"single", "latest", "all"}
-
-
-def _extract_bvid(text: str) -> str | None:
-    patterns = (
-        r"player\.html\?bvid=(BV[0-9A-Za-z]+)",
-        r"bilibili\.com/video/(BV[0-9A-Za-z]+)",
-        r"\b(BV[0-9A-Za-z]{8,})\b",
-    )
-    for pattern in patterns:
-        match = re.search(pattern, text)
-        if match:
-            return match.group(1)
-    return None
 
 
 def find_duplicate_bvid_notes(settings: Settings, source: Path) -> tuple[str | None, list[Path]]:
@@ -29,24 +16,11 @@ def find_duplicate_bvid_notes(settings: Settings, source: Path) -> tuple[str | N
     if not source_resolved.is_file():
         return None, []
     text = source_resolved.read_text(encoding="utf-8-sig")
-    bvid = _extract_bvid(text)
+    bvid = extract_bvid(text)
     if not bvid:
         return None, []
 
-    notes_root = settings.notes_root.resolve()
-    navigation_root = (notes_root / settings.navigation_dir).resolve()
-    duplicates: list[Path] = []
-    for candidate in notes_root.rglob("*.md"):
-        resolved = candidate.resolve()
-        if resolved == source_resolved or resolved == navigation_root or navigation_root in resolved.parents:
-            continue
-        try:
-            candidate_text = resolved.read_text(encoding="utf-8-sig")
-        except (OSError, UnicodeError):
-            continue
-        if _extract_bvid(candidate_text) == bvid:
-            duplicates.append(resolved)
-    duplicates.sort(key=lambda path: str(path).lower())
+    duplicates = [item.path.resolve() for item in find_notes_by_bvid(settings, bvid) if item.path.resolve() != source_resolved]
     return bvid, duplicates
 
 

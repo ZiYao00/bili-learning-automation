@@ -22,6 +22,8 @@
 
 不得根据标题、历史 memory 或模型猜测自动跳过字幕。默认“转换链接”使用 `prepare / subtitle_srt`；当前消息明确要求“纯资源分享 / 只整理简介 / 不用字幕 / 跳过字幕”才使用 `prepare-description / description_only`；默认入口返回 `subtitle_unavailable` 后，只有用户明确要求 ASR 才使用独立 ASR 工具与 `prepare-transcript / asr_text`。
 
+三个入口在采集前都会按 BVID 检查已发布笔记。默认发现重复时返回 `existing_note_found`，Agent 必须先让用户选择更新、重新执行或取消；重新执行用 `--on-existing rerun`，更新用 `--on-existing update --update-target <path>`，并始终复用触发提示时的原始完整消息。多篇重复笔记不得自动猜更新目标。更新 Job 会保存旧笔记快照并做 SHA-256 冲突检查，`update_conflict` 时不得强制覆盖。
+
 三个入口共用同一个 Job lifecycle。生成笔记前读取 collector 返回的 `handoff_path`、`job.json`、`analysis_path` 与 `source_manifest_path`，再根据 `workflow_mode` 选择说明。旧 Job 的 `transcript_manifest_path` 仅作为 schema-v1 兼容别名。
 
 ### `light`（当前默认实验模式）

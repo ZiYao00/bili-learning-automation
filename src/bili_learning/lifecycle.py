@@ -21,7 +21,8 @@ from .config import DependencyError, load_settings
 from .doctor import onboarding_report
 from .input_resolver import extract_user_supplied_source, resolve_input
 from .navigation import build_navigation
-from .publisher import publish_validated_draft
+from .note_library import find_notes_by_bvid, note_sha256, validate_update_target
+from .publisher import UpdateConflictError, publish_validated_draft, publish_validated_update
 from .quality import load_analysis_report, validate_analysis_report
 from .runtime import (
     Reservation,
@@ -43,6 +44,7 @@ from .validator import validate_note
 
 FAILSAFE_SECONDS = 2 * 60 * 60
 STATUS_SCHEMA_VERSION = 1
+EXISTING_ACTIONS = {"ask", "update", "rerun"}
 
 
 def _status(payload: dict[str, Any], code: int = 0) -> tuple[dict[str, Any], int]:
@@ -174,8 +176,12 @@ def _materials_payload(job_dir: Path, job: dict[str, Any], handoff: Path, *, rec
         "transcript_source_path": _job_source_path(job),
         "asr_fallback_used": _job_source_mode(job) == SOURCE_MODE_ASR,
         "description_status": job["description_status"],
+        "operation_mode": str(job.get("operation_mode") or "create"),
         "media_files": 0,
     }
+    for key in ("update_target_path", "existing_note_snapshot_path"):
+        if job.get(key):
+            payload[key] = job[key]
     if job.get("subtitle_path"):
         payload["subtitle_path"] = job["subtitle_path"]
     if recovered:
@@ -205,6 +211,8 @@ def _recover_materials_ready(
     *,
     cleanup_runner: Path | None,
     expected_source_mode: str | None = None,
+    expected_operation_mode: str | None = None,
+    expected_update_target: Path | None = None,
 ) -> tuple[dict[str, Any], int] | None:
     try:
         job = json.loads((job_dir / "job.json").read_text(encoding="utf-8"))
@@ -229,6 +237,13 @@ def _recover_materials_ready(
     source_mode = _job_source_mode(job)
     if expected_source_mode is not None and source_mode != expected_source_mode:
         return None
+    operation_mode = str(job.get("operation_mode") or "create")
+    if expected_operation_mode is not None and operation_mode != expected_operation_mode:
+        return None
+    if expected_update_target is not None:
+        job_target = job.get("update_target_path")
+        if not job_target or Path(str(job_target)).resolve() != expected_update_target.resolve():
+            return None
     source_manifest = _job_source_manifest_path(job)
     source_package_mode = _job_source_package_mode(job)
     source_chunk_count = _job_source_chunk_count(job)
@@ -245,6 +260,11 @@ def _recover_materials_ready(
         if source_path is None:
             return None
         required_files.append(Path(source_path))
+    if operation_mode == "update":
+        snapshot = job.get("existing_note_snapshot_path")
+        if not snapshot:
+            return None
+        required_files.append(Path(str(snapshot)))
     if any(not path.is_file() for path in required_files):
         return None
     if not _manifest_files_complete(Path(source_manifest)):
@@ -279,10 +299,14 @@ def _prepare_materials(
     source_path: Path | None = None,
     dry_run: bool = False,
     cleanup_runner: Path | None = None,
+    on_existing: str = "ask",
+    update_target: Path | None = None,
 ) -> tuple[dict[str, Any], int]:
     settings = load_settings(project_root)
     if source_mode not in SOURCE_MODES:
         return _status({"status": "failed", "message": f"不支持的 source_mode：{source_mode}"}, 2)
+    if on_existing not in EXISTING_ACTIONS:
+        return _status({"status": "failed", "message": f"不支持的 on_existing：{on_existing}"}, 2)
     if not message:
         return _status({"status": "failed", "message": "需要提供 B站复制链接、短链接或 BV 号。"}, 2)
     if dry_run and source_mode != SOURCE_MODE_SUBTITLE:
@@ -320,6 +344,58 @@ def _prepare_materials(
         settings.runtime_root.mkdir(parents=True, exist_ok=True)
         stale_removed = cleanup_stale_jobs(settings)
         resolved = resolve_input(message)
+        existing_notes = find_notes_by_bvid(settings, resolved.bvid)
+        selected_update_target: Path | None = None
+        selected_update_hash: str | None = None
+
+        if existing_notes and on_existing == "ask":
+            ready = True
+            return _status(
+                {
+                    "status": "existing_note_found",
+                    "bvid": resolved.bvid,
+                    "canonical_url": resolved.canonical_url,
+                    "source_mode": source_mode,
+                    "existing_note_count": len(existing_notes),
+                    "existing_notes": [item.as_dict() for item in existing_notes],
+                    "allowed_actions": ["update", "rerun", "cancel"],
+                    "update_target_required": len(existing_notes) > 1,
+                    "message": "这条 B站视频已经转换过；请确认更新已有笔记、重新执行一次或取消。",
+                    "stale_jobs_removed": stale_removed,
+                },
+                2,
+            )
+        if on_existing == "update":
+            if not existing_notes:
+                ready = True
+                return _status(
+                    {
+                        "status": "existing_note_not_found",
+                        "bvid": resolved.bvid,
+                        "message": "未找到相同 BVID 的已发布笔记，不能执行更新。",
+                    },
+                    2,
+                )
+            if update_target is None:
+                if len(existing_notes) > 1:
+                    ready = True
+                    return _status(
+                        {
+                            "status": "update_target_required",
+                            "bvid": resolved.bvid,
+                            "existing_notes": [item.as_dict() for item in existing_notes],
+                            "message": "找到多篇相同 BVID 笔记；请选择要更新的具体目标。",
+                        },
+                        2,
+                    )
+                selected_update_target = validate_update_target(settings, resolved.bvid, existing_notes[0].path)
+            else:
+                selected_update_target = validate_update_target(settings, resolved.bvid, update_target)
+                if selected_update_target.resolve() not in {item.path.resolve() for item in existing_notes}:
+                    raise ValueError("更新目标不在当前 BVID 的已发布笔记列表中")
+            selected_update_hash = note_sha256(selected_update_target)
+
+        requested_operation_mode = "update" if on_existing == "update" else ("rerun" if on_existing == "rerun" else "create")
         reservation = claim_reservation(settings.runtime_root, resolved.bvid)
         if dry_run:
             release_reservation(settings.runtime_root, reservation.bvid)
@@ -341,6 +417,13 @@ def _prepare_materials(
 
         job_dir = new_job_dir(settings, resolved.bvid)
         bind_reservation(reservation, job_dir)
+        existing_note_snapshot: Path | None = None
+        if selected_update_target is not None:
+            assert selected_update_hash is not None
+            existing_note_snapshot = job_dir / "existing-note.md"
+            shutil.copyfile(selected_update_target, existing_note_snapshot)
+            if note_sha256(existing_note_snapshot) != selected_update_hash:
+                raise RuntimeError("更新目标在任务启动时发生变化，请重新选择更新。")
         run_ytdlp(
             settings,
             job_dir,
@@ -359,6 +442,8 @@ def _prepare_materials(
                         "status": "subtitle_unavailable",
                         "bvid": resolved.bvid,
                         "message": "未取得 ai-zh 或 zh 字幕；默认流程未下载音频或视频。",
+                        "operation_mode": requested_operation_mode,
+                        **({"update_target_path": str(selected_update_target)} if selected_update_target else {}),
                     },
                     2,
                 )
@@ -371,6 +456,7 @@ def _prepare_materials(
         else:
             source = SourceMaterial(SOURCE_MODE_DESCRIPTION)
 
+        operation_mode = requested_operation_mode
         job = create_job(
             settings,
             resolved.bvid,
@@ -380,6 +466,10 @@ def _prepare_materials(
             job_dir,
             description_sidecar=description_sidecar,
             user_supplied_source=extract_user_supplied_source(message),
+            operation_mode=operation_mode,
+            update_target_path=selected_update_target,
+            update_target_sha256=selected_update_hash,
+            existing_note_snapshot_path=existing_note_snapshot,
         )
         handoff = write_handoff(job_dir, job)
         ready = True
@@ -396,6 +486,8 @@ def _prepare_materials(
                 Path(error.job_dir),
                 cleanup_runner=cleanup_runner,
                 expected_source_mode=source_mode,
+                expected_operation_mode=requested_operation_mode,
+                expected_update_target=selected_update_target,
             )
             if recovered is not None:
                 return recovered
@@ -433,6 +525,8 @@ def prepare_note(
     cleanup_job_path: Path | None = None,
     after_seconds: int = FAILSAFE_SECONDS,
     cleanup_runner: Path | None = None,
+    on_existing: str = "ask",
+    update_target: Path | None = None,
 ) -> tuple[dict[str, Any], int]:
     if cleanup_job_path is not None:
         settings = load_settings(project_root)
@@ -450,6 +544,8 @@ def prepare_note(
         source_mode=SOURCE_MODE_SUBTITLE,
         dry_run=dry_run,
         cleanup_runner=cleanup_runner,
+        on_existing=on_existing,
+        update_target=update_target,
     )
 
 
@@ -459,6 +555,8 @@ def prepare_transcript_note(
     transcript_path: Path,
     *,
     cleanup_runner: Path | None = None,
+    on_existing: str = "ask",
+    update_target: Path | None = None,
 ) -> tuple[dict[str, Any], int]:
     return _prepare_materials(
         project_root,
@@ -466,6 +564,8 @@ def prepare_transcript_note(
         source_mode=SOURCE_MODE_ASR,
         source_path=transcript_path,
         cleanup_runner=cleanup_runner,
+        on_existing=on_existing,
+        update_target=update_target,
     )
 
 
@@ -474,12 +574,16 @@ def prepare_description_note(
     message: str | None,
     *,
     cleanup_runner: Path | None = None,
+    on_existing: str = "ask",
+    update_target: Path | None = None,
 ) -> tuple[dict[str, Any], int]:
     return _prepare_materials(
         project_root,
         message,
         source_mode=SOURCE_MODE_DESCRIPTION,
         cleanup_runner=cleanup_runner,
+        on_existing=on_existing,
+        update_target=update_target,
     )
 
 
@@ -503,17 +607,30 @@ def finalize_note(project_root: Path, job_path: Path, note_path: Path) -> tuple[
             if errors:
                 payload, code = {"status": "note_invalid", "message": "；".join(errors)}, 2
             else:
-                published_now = publish_validated_draft(
-                    note_path,
-                    Path(job["note_path"]),
-                    allow_existing_identical=True,
-                )
+                operation_mode = str(job.get("operation_mode") or "create")
+                if operation_mode == "update":
+                    publish_validated_update(
+                        note_path,
+                        Path(job["note_path"]),
+                        expected_sha256=str(job["update_target_sha256"]),
+                    )
+                    publish_state = "updated"
+                else:
+                    published_now = publish_validated_draft(
+                        note_path,
+                        Path(job["note_path"]),
+                        allow_existing_identical=True,
+                    )
+                    publish_state = "published" if published_now else "already_published"
                 build_navigation(settings)
                 payload = {
                     "status": "note_ready",
                     "note_path": job["note_path"],
-                    "publish_state": "published" if published_now else "already_published",
+                    "operation_mode": operation_mode,
+                    "publish_state": publish_state,
                 }
+    except UpdateConflictError as error:
+        payload, code = {"status": "update_conflict", "message": str(error)}, 2
     except Exception as error:
         payload, code = {"status": "failed", "message": str(error)}, 1
     try:

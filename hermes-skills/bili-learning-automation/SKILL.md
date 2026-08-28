@@ -45,7 +45,9 @@ description: Turn a Bilibili copied link, supported short link, or BV id receive
      python "$project\hermes-skills\bili-learning-automation\scripts\prepare_transcript_bilibili_note.py" '<received message text>' --transcript '<transcript.txt>'
      ```
 
-   三个入口共用同一 Job lifecycle。`materials_ready` 后继续写作；`recovered: true` 表示核心已恢复同一来源模式的完整 Job，不要重新采集。`onboarding_required` 按返回动作处理；`in_progress` 不抢占、不手工处理 runtime；其它失败只报告短错误。
+   三个入口共用同一 Job lifecycle。`materials_ready` 后继续写作；`recovered: true` 表示核心已恢复同一来源模式的完整 Job，不要重新采集。`onboarding_required` 按返回动作处理；`in_progress` 不抢占、不手工处理 runtime。
+
+   如果返回 `existing_note_found`，停止采集并列出现有笔记，询问 owner：**更新已有笔记 / 重新执行一次 / 取消**。只有一篇时“更新”可直接使用该目标；多篇时必须让 owner 指定具体笔记。owner 选择后，用触发重复提示的**原始完整消息**重试同一来源入口：重新执行追加 `--on-existing rerun`；更新追加 `--on-existing update --update-target '<现有笔记路径>'`；取消则不再调用核心。不要只把后续回复“更新/重跑”当作新的输入消息，否则会丢失用户原先附带的资源和说明。`update_conflict` 表示原笔记在更新期间被修改，必须报告冲突，不得强制覆盖。
 
    不得把纯文本伪造成 SRT、不得制造时间戳、手工创建 `job.json` / draft / source manifest，或直接修改已发布的正式笔记来绕过 finalizer。
 

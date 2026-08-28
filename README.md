@@ -210,6 +210,8 @@ BVxxxxxxxxxx
 
 项目不会仅凭标题、历史 memory 或“看起来像资源分享”自动跳过字幕。
 
+三个来源入口都会先按 BVID 检查已发布笔记。已经转换过时，默认**不会立刻再生成一篇**，而是先询问：更新已有笔记、重新执行一次或取消。更新保留原文件路径并在 runtime 保存旧笔记快照；finalizer 会用 SHA-256 检查更新期间是否发生人工修改。只有用户明确选择“重新执行一次”时，才创建独立新笔记并在同标题后使用 `（2）`、`（3）` 等序号。
+
 正常情况下，用户不需要手工：
 
 - 下载字幕；
@@ -224,7 +226,7 @@ BVxxxxxxxxxx
 <notes_root>/00-待整理/
 ```
 
-同名文件已经存在时，会生成 `（2）`、`（3）` 等序号，不覆盖旧笔记。
+用户明确选择“重新执行一次”后，同名文件已存在时会生成 `（2）`、`（3）` 等序号，不覆盖旧笔记；选择“更新”则保留原路径和原文件名。
 
 ---
 
@@ -310,6 +312,9 @@ Fact Ledger
 | --- | --- | --- |
 | `onboarding_required` | 首次环境仍缺少 Vault / Cookie / yt-dlp 等必需配置 | 按 `actions` 处理后重新检查并重试原链接 |
 | `materials_ready` | 当前 `source_mode` 的标准 Job 已准备完成 | Agent 按 `source_manifest_path` 和 handoff 继续；`recovered: true` 表示核心已恢复同一来源模式的旧 Job |
+| `existing_note_found` | 当前 BVID 已有已发布笔记 | 停止采集，先让用户选择更新、重新执行或取消；重试时保留原始完整消息 |
+| `update_target_required` | 同一 BVID 有多篇笔记且尚未指定更新目标 | 让用户明确选择要更新的具体笔记，不猜最新或最旧 |
+| `update_conflict` | 更新期间目标笔记被人工修改 | 不覆盖现有文件；报告冲突并重新发起更新 |
 | `in_progress` | 同一 BV 仍有真实活动任务 | 不要重复采集或手工处理 runtime |
 | `subtitle_unavailable` | 没有取得可用中文字幕 | 本次停止 |
 | `source_insufficient` | 当前来源模式不足以形成可信笔记 | 默认/ASR 可换更完整来源；description-only 应补充简介资料或改走字幕流程 |

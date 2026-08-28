@@ -178,6 +178,8 @@ Pure resource note; description only; no subs  → description_only
 
 The project does not skip subtitles merely because the title looks like a preview/resource post, and it does not use historical memory to select a source mode.
 
+All three source routes check published notes by BVID before collection. If that BVID already exists, the default behavior is to ask whether to update an existing note, rerun as a new note, or cancel. Update preserves the selected note path and stores a runtime snapshot plus SHA-256 guard; rerun creates a separate note and only then uses `（2）`, `（3）`, and later suffixes for a same-title collision.
+
 Normally you do not need to manually:
 
 - download subtitles;
@@ -192,7 +194,7 @@ New notes are first published to:
 <notes_root>/00-待整理/
 ```
 
-If the same filename already exists, the project creates `（2）`, `（3）`, and so on instead of overwriting the existing note.
+After the user explicitly chooses rerun, a same-title collision creates `（2）`, `（3）`, and so on instead of overwriting an existing note. Update keeps the selected existing path and filename.
 
 ---
 
@@ -273,6 +275,9 @@ The project uses fixed-video quality regressions, but the README does not mainta
 | --- | --- | --- |
 | `onboarding_required` | First-run setup still lacks a required Vault / Cookie / yt-dlp item | Handle the returned `actions`, re-check, and retry the original link |
 | `materials_ready` | A standard Job for the selected `source_mode` is ready | Continue through `source_manifest_path` and the handoff; `recovered: true` means the core resumed a complete Job for the same source mode |
+| `existing_note_found` | A published note already has the same BVID | Stop before collection and ask: update, rerun, or cancel; preserve the original full message when retrying |
+| `update_target_required` | Multiple notes share the BVID and no update target was selected | Ask the user to choose the exact note; do not guess latest/oldest |
+| `update_conflict` | The update target changed after the Job started | Do not overwrite it; report the conflict and start a fresh update if requested |
 | `in_progress` | Another task is still genuinely active for the same BVID | Do not start a duplicate collection or manually alter runtime state |
 | `subtitle_unavailable` | No usable Chinese subtitle was obtained | Stop this conversion |
 | `source_insufficient` | The selected source mode is insufficient for a reliable note | Use fuller subtitle/ASR text, or add description material / switch away from description-only |

@@ -11,15 +11,16 @@
 ## 必须执行的流程
 
 1. 先通过统一 onboarding 门禁确认环境，再按当前消息的明确意图选择入口：默认 `prepare / subtitle_srt`；明确“纯资源分享 / 只整理简介 / 不用字幕”使用 `prepare-description / description_only`；默认入口返回 `subtitle_unavailable` 后，只有用户明确授权 ASR 才先取得纯文本并调用 `prepare-transcript / asr_text`。不得根据标题、历史 memory 或模型猜测自动改变来源模式。三个入口共用同一 Job lifecycle。
-2. 读取 `handoff_path`、`job.json`、`analysis_path`、`workflow_mode` 与 `source_manifest_path`。按 manifest 完整读取实际存在的 source chunks，不自行切分或跳读。`description_only` 的 manifest 没有伪造 chunk；此时只读取 Job 中的标题、metadata、UP 主简介和明确用户补充来源。旧 Job 仍兼容 `transcript_manifest_path`。
-3. 判断当前 `source_mode` 允许的来源是否足以支撑可信笔记，并填写 `analysis.json`。`description_only` 不得推断视频口播、画面参数或未提供的资源内容；任何模式来源不足时都停止，不用模型常识补事实。
-4. 按 `workflow_mode` 执行：
+2. 三个入口都会在真正采集前按 BVID 检查已发布笔记。`existing_note_found` 时停止并让用户选择：更新 / 重新执行 / 取消。更新使用 `--on-existing update --update-target <path>`；重新执行使用 `--on-existing rerun`；多篇时更新必须明确目标。重试时必须复用触发重复提示的原始完整消息，保留其中的资源与用户说明。`update_conflict` 时不得强制覆盖。
+3. 读取 `handoff_path`、`job.json`、`analysis_path`、`workflow_mode` 与 `source_manifest_path`。按 manifest 完整读取实际存在的 source chunks，不自行切分或跳读。`description_only` 的 manifest 没有伪造 chunk；此时只读取 Job 中的标题、metadata、UP 主简介和明确用户补充来源。旧 Job 仍兼容 `transcript_manifest_path`。
+4. 判断当前 `source_mode` 允许的来源是否足以支撑可信笔记，并填写 `analysis.json`。`description_only` 不得推断视频口播、画面参数或未提供的资源内容；任何模式来源不足时都停止，不用模型常识补事实。
+5. 按 `workflow_mode` 执行：
    - `light`：读取 `docs\standards\LIGHT-WORKFLOW.md`，直接完成正文；先写完整内容，再做一次独立排版优化，不创建 Fact Ledger、Semantic Draft 或 Layout Plan。
    - `strict`：按 `fact_ledger_path → semantic_draft_path → layout_plan_path → draft_path` 执行，完整规则见 `CODEX-VIDEO-NOTE-GUIDE.md` 与 `KNOWLEDGE-DENSE-WORKFLOW.md`。
-5. 最终排版后回看当前 Job 允许的来源，修正明显遗漏和无来源内容；strict 模式还要对照 Fact Ledger 与 Semantic Draft。完成后更新 `coverage_review`。
-6. 无论成功、失败或中断，都由 finalizer 接管 runtime 生命周期。`note_ready` 即表示业务完成；`temporary_data_retired` / `cleanup_warning` 只描述 Job retire 或维护状态，不得把已经发布成功的笔记改判为失败。
+6. 最终排版后回看当前 Job 允许的来源，修正明显遗漏和无来源内容；strict 模式还要对照 Fact Ledger 与 Semantic Draft。完成后更新 `coverage_review`。
+7. 无论成功、失败或中断，都由 finalizer 接管 runtime 生命周期。`note_ready` 即表示业务完成；`temporary_data_retired` / `cleanup_warning` 只描述 Job retire 或维护状态，不得把已经发布成功的笔记改判为失败。
 
-`onboarding_required`、`in_progress`、`subtitle_unavailable`、`source_insufficient`、`failed` 和 `note_invalid` 都不是完成状态。
+`onboarding_required`、`existing_note_found`、`update_target_required`、`update_conflict`、`in_progress`、`subtitle_unavailable`、`source_insufficient`、`failed` 和 `note_invalid` 都不是完成状态。
 
 ## 学习后整理授权
 
@@ -35,7 +36,7 @@ Organizer 在改写短标题时会保留原视频标题，并统一更新 Tags�
 
 ## 数据契约
 
-- 新生成的 `job.json` 继续使用 `schema_version: 1`，包含 `source_mode: subtitle_srt | asr_text | description_only`、`source_manifest_path`、source package 状态与 `workflow_mode: light | strict`。旧 `transcript_*` 字段作为迁移期兼容别名保留，新适配层使用 `source_*`。
+- 新生成的 `job.json` 继续使用 `schema_version: 1`，包含 `source_mode: subtitle_srt | asr_text | description_only`、`operation_mode: create | rerun | update`、`source_manifest_path`、source package 状态与 `workflow_mode: light | strict`。update Job 额外包含 `update_target_path`、`update_target_sha256`、`existing_note_snapshot_path`；旧 `transcript_*` 字段作为迁移期兼容别名保留。
 - collector 与 finalizer 的 JSON 响应包含 `schema_version: 1`、`status` 和可读 `message`（如适用）；`materials_ready` 返回 `source_mode`、`source_manifest_path`、source package 状态与 `workflow_mode`，恢复时额外返回 `recovered: true`。智能体必须以结构化状态判断分支，不解析底层锁或 PID。
 - Frontmatter 的 `author`、`published`、`duration`、`source`、tags 与 `cssclasses`，以及标题下方“作者 · 日期 · 时长 · BVID”元信息行由程序生成，智能体不得自行改写；视频笔记固定使用 `learning-page + video-note` 以接入共享 Obsidian 视觉系统。
 - `analysis.json` 是 runtime-only 质量报告，不进入最终 Obsidian 笔记。它用于记录来源充分性、知识索引和覆盖复核状态。
@@ -49,7 +50,7 @@ Organizer 在改写短标题时会保留原视频标题，并统一更新 Tags�
 - metadata、简介、source manifest、`analysis.json`、日志和智能体临时工作文件只允许存在于单个 runtime Job。SRT / ASR 模式包含 source 文件与 chunks；ASR 先复制为 runtime `asr-transcript.txt`；description-only 不伪造 source 文件或 chunks。finalizer / failsafe 负责 retire。
 - 智能体只可编辑 `analysis.json`、草稿中的两个 AI 区域及当前模式明确提供的 runtime 工作文件。SRT 保留文字、顺序和 cue 边界；ASR 按标点/换行确定性分段且不生成虚假时间戳；description-only 的 manifest 只有来源契约而没有伪造 chunk。三种模式均不做摘要或语义过滤。
 - 智能体不得手工删除 job、reservation 或锁文件。锁、reservation、恢复与 retire 都由共享核心管理；`note_ready` 已成立时，即使返回 `temporary_data_retired: false` 或 `cleanup_warning`，也只能作为维护警告报告，不能把已成功发布的笔记改判为失败。
-- 不得覆盖已有笔记；同一 BVID 仅在**活动任务期间**由 reservation 防止并发处理，任务完成后允许再次转换。草稿只存在于 runtime，只有 finalizer 校验通过后才原子发布到 `note_path`。
+- 默认创建流程不得覆盖已有笔记；相同 BVID 已发布时先返回 `existing_note_found`。只有用户明确选择 `rerun` 才创建独立序号笔记；只有明确选择 `update` 且目标 BVID 一致时才允许受控替换原路径。更新 Job 保存旧笔记快照和启动时 SHA-256，finalizer 检测到目标在任务期间变化时返回 `update_conflict`。
 
 ## 来源充分性判断
 

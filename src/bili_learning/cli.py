@@ -27,6 +27,16 @@ def find_project_root() -> Path:
     raise RuntimeError("未找到 bili-learning-automation 项目根目录")
 
 
+def _add_existing_note_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--on-existing",
+        choices=("ask", "update", "rerun"),
+        default="ask",
+        help="相同 BVID 已存在时：询问、更新指定旧笔记或明确重新生成一篇",
+    )
+    parser.add_argument("--update-target", type=Path, help="--on-existing update 时要更新的现有笔记路径")
+
+
 def main() -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -60,13 +70,16 @@ def main() -> None:
     prepare_parser.add_argument("--cleanup-job", type=Path)
     prepare_parser.add_argument("--after-seconds", type=int, default=FAILSAFE_SECONDS)
     prepare_parser.add_argument("--cleanup-runner", type=Path, help=argparse.SUPPRESS)
+    _add_existing_note_arguments(prepare_parser)
     transcript_parser = subparsers.add_parser("prepare-transcript", help="把已授权取得的纯文本 transcript 接入标准 Job")
     transcript_parser.add_argument("message", help="Bilibili 复制链接、短链或 BV 号")
     transcript_parser.add_argument("--transcript", type=Path, required=True, help="已有的无时间戳纯文本 transcript")
     transcript_parser.add_argument("--cleanup-runner", type=Path, help=argparse.SUPPRESS)
+    _add_existing_note_arguments(transcript_parser)
     description_parser = subparsers.add_parser("prepare-description", help="只采集元数据和 UP 主简介，创建纯资源分享 Job")
     description_parser.add_argument("message", help="Bilibili 复制链接、短链或 BV 号")
     description_parser.add_argument("--cleanup-runner", type=Path, help=argparse.SUPPRESS)
+    _add_existing_note_arguments(description_parser)
     finalize_parser = subparsers.add_parser("finalize", help="校验 runtime 草稿并发布笔记")
     finalize_parser.add_argument("--job", type=Path, required=True)
     finalize_parser.add_argument("--note", type=Path, required=True)
@@ -154,6 +167,8 @@ def main() -> None:
             cleanup_job_path=args.cleanup_job,
             after_seconds=args.after_seconds,
             cleanup_runner=args.cleanup_runner,
+            on_existing=args.on_existing,
+            update_target=args.update_target,
         )
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         raise SystemExit(code)
@@ -163,6 +178,8 @@ def main() -> None:
             args.message,
             args.transcript,
             cleanup_runner=args.cleanup_runner,
+            on_existing=args.on_existing,
+            update_target=args.update_target,
         )
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         raise SystemExit(code)
@@ -171,6 +188,8 @@ def main() -> None:
             project_root,
             args.message,
             cleanup_runner=args.cleanup_runner,
+            on_existing=args.on_existing,
+            update_target=args.update_target,
         )
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         raise SystemExit(code)
