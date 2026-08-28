@@ -27,7 +27,7 @@ Windows 用户准备下面几项即可：
 | yt-dlp | 获取视频元数据、简介、字幕 | 是 |
 | Bilibili Cookie 文件 | 提供已登录 Bilibili 的会话凭据，用于字幕 / 元数据访问 | **是** |
 | Obsidian Vault | 保存学习笔记；Vault 根目录需直接包含 `.obsidian` | 是 |
-| Hermes / WorkBuddy / Codex | 负责阅读字幕并写正文 | 至少一种 |
+| ChatGPT / Codex / Hermes / WorkBuddy | 负责阅读来源并写正文；ChatGPT 需本地桥接 | 至少一种 |
 
 > Cookie 是账号凭据。项目只需要 Cookie **文件路径**，不要把 Cookie 内容写进 README、Issue、聊天记录或 Git。
 
@@ -53,7 +53,7 @@ python -m pip install -e ".[dev]"
 
 ## 3. 首次使用：让 Agent 先做环境检查
 
-普通用户不需要先猜路径或逐项编辑配置。Hermes、WorkBuddy 与 Codex 的入口都应在正式采集前运行统一 onboarding；核心 `prepare` 也有同一门禁，避免某个 Agent 漏掉首次配置。
+普通用户不需要先猜路径或逐项编辑配置。ChatGPT、Codex、Hermes 与 WorkBuddy 的入口都应在正式采集前运行统一 onboarding；核心 `prepare` 也有同一门禁，避免某个 Agent 漏掉首次配置。ChatGPT 还必须先连接本地工作区桥接。
 
 统一检查会自动判断 Python、yt-dlp、Cookie、Obsidian Vault 和 CSS 状态，只对真正缺失的项目采取动作：
 
@@ -65,7 +65,7 @@ python -m pip install -e ".[dev]"
 手动检查可运行：
 
 ```powershell
-python .\hermes-skills\bili-learning-automation\scripts\onboarding_bilibili_learning.py
+python .\scripts\run_bili_learning.py onboarding
 ```
 
 返回 `ready` 后即可正式采集；返回 `action_required` 时按 `actions` 中的缺失项处理，再重新检查。
@@ -172,7 +172,7 @@ winget install yt-dlp
 正式测试前先运行 doctor：
 
 ```powershell
-python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py
+python .\scripts\run_bili_learning.py doctor
 ```
 
 如果环境正确，你应该看到 yt-dlp、Cookie、taxonomy、Vault、notes/runtime 写权限等检查通过。doctor 还会检查 `learning-lab.css` 与 `video-note.css` 是否位于当前 Vault 的 `.obsidian/snippets/`。
@@ -188,7 +188,7 @@ python .\hermes-skills\bili-learning-automation\scripts\configure_bilibili_learn
 如果要让智能体读取结构化诊断结果：
 
 ```powershell
-python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py --json
+python .\scripts\run_bili_learning.py doctor --json
 ```
 
 > doctor 不访问 Bilibili、不读取 Cookie 内容，也不会留下测试文件。
@@ -230,9 +230,30 @@ video-note
 
 | 入口 | 适合场景 | 使用方式 |
 | --- | --- | --- |
+| ChatGPT Work | 在 ChatGPT 中调用本机项目 | 安装专用 ZIP，并连接本地工作区桥接 |
+| Codex | 本地生成、开发与测试 | 使用仓库级 Codex Skill 或独立安装包 |
 | Hermes | 手机 / 微信直接发 B站链接 | 安装 Hermes Skill 后私聊发送链接 |
 | WorkBuddy | WorkBuddy 会话中转笔记 | 安装 WorkBuddy 适配层后发送链接 |
-| Codex | 开发、测试、手动执行 | 在项目目录中按共享协议调用核心流程 |
+
+### ChatGPT Work
+
+ChatGPT 使用独立适配层：
+
+```text
+chatgpt-skills/bili-learning-automation-chatgpt/
+```
+
+不要上传整个仓库，也不要把 Hermes、WorkBuddy 或 Codex ZIP 装进 ChatGPT。完整步骤见 [ChatGPT Skill 安装教程](CHATGPT-SKILL-INSTALL.md)。
+
+### Codex
+
+Codex 仓库级 Skill 位于：
+
+```text
+.agents/skills/bili-learning-automation-codex/
+```
+
+进入项目后 Codex 可自动发现，也可以用 Junction 或独立 ZIP 安装。完整步骤见 [Codex Skill 安装教程](CODEX-SKILL-INSTALL.md)。
 
 ### Hermes
 
@@ -242,9 +263,8 @@ Hermes 使用：
 hermes-skills/bili-learning-automation/
 ```
 
-建议使用 Junction 安装，更新仓库后无需再次复制文件。完整步骤见：
-
-[Hermes Skill 安装教程](HERMES-SKILL-INSTALL.md)
+建议使用 Junction 安装，更新仓库后无需再次复制文件。完整步骤见 [Hermes Skill 安装教程](HERMES-SKILL-INSTALL.md)。
+如果需要静态副本，使用 Release 中的 `bili-learning-automation-hermes.zip`；该 ZIP 只包含独立指令，运行时仍需明确指定本机项目根目录。
 
 ### WorkBuddy
 
@@ -254,19 +274,8 @@ WorkBuddy 适配层位于：
 workbuddy-skills/bili-learning-automation/
 ```
 
-它只是入口适配层，实际仍调用同一套 Source Mode、`_prepare_materials`、Job、source manifest、finalizer 和笔记标准。
-
-第一次安装见 [WorkBuddy Skill 安装教程](WORKBUDDY-SKILL-INSTALL.md)。
-
-### Codex
-
-Codex 不需要额外复制一份 Skill。进入项目后先读取：
-
-```text
-AGENTS.md
-```
-
-再按 collector 返回的 `workflow_mode` 选择 `LIGHT-WORKFLOW.md` 或严格流程文档。普通使用默认采用 `light`。
+它只是入口适配层，实际仍调用同一套 Source Mode、`_prepare_materials`、Job、source manifest、finalizer 和笔记标准。第一次安装见 [WorkBuddy Skill 安装教程](WORKBUDDY-SKILL-INSTALL.md)。
+如果需要静态副本，使用 Release 中的 `bili-learning-automation-workbuddy.zip`；该 ZIP 只包含独立指令，运行时仍需明确指定本机项目根目录。
 
 ---
 

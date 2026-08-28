@@ -67,10 +67,10 @@ description: Turn a Bilibili copied link, supported short link, or BV id receive
 
 ## 学习后整理
 
-整理功能默认关闭，仅在 owner 明确要求时执行。指定一篇用 `single`，最近一篇用 `latest`，全部待整理笔记用 `all`；范围不明确再询问。先完整阅读目标笔记，并按 `docs/NOTE-ORGANIZATION.md` 判断短文件名与最多两层的目标目录。
+整理功能默认关闭，仅在 owner 明确要求时执行。指定一篇用 `single`，最近一篇用 `latest`，全部待整理笔记用 `all`；范围不明确再询问。先完整阅读目标笔记，并按 `docs/NOTE-ORGANIZATION.md` 判断长期价值：知识型/混合型继续普通归档；只有纯资源型才在整理阶段压缩进 `05-资源` 集合页。不得把 `knowledge / resource / mixed` 判断提前到生成阶段，也不得在 finalize 后自动整理。
 
 ```powershell
 python "$project\hermes-skills\bili-learning-automation\scripts\organize_bilibili_learning.py" --note '<现有笔记路径>' --filename '<新的简短文件名>' --destination '<领域/对象>' --confirmed-scope '<single|latest|all>'
 ```
 
-Organizer 只负责重命名、移动和重建导航，不得修改笔记内容。
+默认 `archive` 仍只负责重命名、移动和重建导航，不得修改笔记内容。纯资源型先在 `<runtime_root>/resource-cards/` 写短资源卡，再调用 `--mode resource --collection '<集合页>' --card-file '<card.md>'`；核心会备份原独立笔记、合并资源卡并刷新导航。

@@ -30,6 +30,10 @@ Hermes 默认从这里加载用户 Skill：
 
 这样以后 `git pull` 或本地更新项目后，Hermes 看到的就是同一份源码，不会出现“仓库已经更新，但 Hermes 还在用旧副本”的问题。
 
+### 独立 ZIP（静态副本）
+
+Release 还提供 `bili-learning-automation-hermes.zip`。它只包含一个同名 `SKILL.md`，不包含 Python 核心、Cookie、笔记或本机配置；解压到 Hermes 的 Skill 根目录后，运行时仍需让 Hermes 确认用户指定的完整项目根目录。它适合不能使用 Junction 的环境，但仓库更新后需要重新下载并替换该静态副本。
+
 ---
 
 ## 2. 确认项目目录

@@ -1,0 +1,6 @@
+interface:
+  display_name: "B站视频转笔记 · Codex"
+  short_description: "在本地项目中生成并维护 Obsidian B站学习笔记。"
+  default_prompt: "Use $bili-learning-automation-codex to check this local project and turn the supplied Bilibili link into an Obsidian learning note."
+policy:
+  allow_implicit_invocation: true

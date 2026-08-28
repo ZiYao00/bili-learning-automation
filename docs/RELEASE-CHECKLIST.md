@@ -19,13 +19,14 @@ v1.0.0 is ready when all of the following are true:
 - [x] Obsidian Vault binding and repository-fallback protection are implemented.
 - [x] yt-dlp is detected rather than silently bundled or installed.
 - [x] Cookie contents are excluded from logs, notes, examples, and Git by design.
-- [x] Hermes, WorkBuddy, and Codex share the same core workflow and content rules.
+- [x] ChatGPT, Codex, Hermes, and WorkBuddy share the same core workflow and content rules.
 - [x] Chinese README and beginner documentation are present.
 - [x] English README is present as a public project overview.
 - [x] Repository license wording is consistent with `LICENSE`.
 - [x] Ruff passes in the existing project virtual environment.
 - [x] Public pytest suite passes.
-- [x] Source, Hermes, and WorkBuddy compatibility scripts compile successfully.
+- [x] Source, shared launchers, Hermes, and WorkBuddy compatibility scripts compile successfully.
+- [x] ChatGPT and Codex Skill packages are built separately; each archive contains exactly one root `SKILL.md` and no local credentials or machine configuration.
 - [x] Fresh-install / clean-room walkthrough rerun after the 2026-08-22 dense-note extraction and compact-template corrections; see `docs/reports/2026-08-23-v1.0-cleanroom-acceptance.md`.
 - [x] `pyproject.toml` version is changed from the current development version to `1.0.0` immediately before release.
 - [x] Changelog contains the final `1.0.0` release entry/date.
@@ -76,9 +77,10 @@ Do not add features during this sequence.
 5. Run:
 
 ```powershell
-python -m compileall -q src hermes-skills/bili-learning-automation/scripts
+python -m compileall -q src scripts hermes-skills/bili-learning-automation/scripts workbuddy-skills/bili-learning-automation/scripts
 python -m ruff check .
 python -m pytest -q
+python .\scripts\build_agent_skill_packages.py
 git diff --check
 ```
 

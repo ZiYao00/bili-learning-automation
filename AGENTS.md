@@ -1,6 +1,6 @@
 # B站视频转笔记
 
-本项目服务 Codex、Hermes 与 WorkBuddy。三者共用同一套环境门禁、来源采集、Job lifecycle、taxonomy、确定性笔记骨架、校验、发布、导航和清理逻辑。
+本项目服务 ChatGPT、Codex、Hermes 与 WorkBuddy。四个薄适配层共用同一套环境门禁、来源采集、Job lifecycle、taxonomy、确定性笔记骨架、校验、发布、导航和清理逻辑。
 
 ## 安装验收、首次使用与环境门禁
 
@@ -53,6 +53,7 @@
 - 不覆盖已有笔记，不把 Cookie、runtime 路径、日志或内部状态写进正式笔记。
 - 视频简介抓取失败不能当作视频没有简介。
 - finalizer 返回 `note_ready` 即表示业务完成；临时数据采用 retire/维护语义，`temporary_data_retired` 或 `cleanup_warning` 不得覆盖已成功的发布结果。
+- 学习后整理默认关闭。只有用户明确要求并确认 `single / latest / all` 范围后才读取 `docs\NOTE-ORGANIZATION.md`。整理阶段完整阅读笔记后再判断长期价值：知识型/混合型继续 `archive`，只改文件名与路径；纯资源型才使用 `resource` 压缩进 `05-资源` 集合页。不得把该判断提前到生成阶段，也不得自动整理。
 
 ## 共享 Obsidian 样式依赖
 
@@ -60,6 +61,6 @@
 
 修改笔记版式或 Frontmatter 前，先读取 `config\obsidian-style.json`。本项目只使用 `learning-lab.css` Core 与 `video-note.css` Extension；不得在此仓库复制、重建、fork 或独立修改共享 CSS，也不得把受 Git 跟踪的项目目录 junction 到共享仓库。需要改共享视觉系统时，修改共享仓库，再同步到 Obsidian Vault。
 
-Hermes 与 WorkBuddy 的 `SKILL.md` 只是入口适配层，不应复制或改写核心规则。
+ChatGPT、Codex、Hermes 与 WorkBuddy 的 `SKILL.md` 只是入口适配层，不应复制或改写核心规则。ChatGPT 与 Codex 使用共享 `scripts\run_bili_learning.py`，不得借用其它宿主的兼容入口。
 
 准备 v1.0 提交、推送或 Release 时，先阅读 `docs/RELEASE-CHECKLIST.md`。不要把 `ComfyUI-Learning-Lab` 的独立工作区混入本仓库提交。

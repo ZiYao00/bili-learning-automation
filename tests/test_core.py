@@ -37,6 +37,7 @@ from bili_learning.doctor import doctor_report, onboarding_report
 from bili_learning.frontmatter import parse_frontmatter, parse_frontmatter_list
 from bili_learning.input_resolver import extract_user_supplied_source, resolve_input
 from bili_learning.lifecycle import finalize_note, prepare_description_note, prepare_note, prepare_transcript_note
+from bili_learning.note_library import find_notes_by_bvid
 from bili_learning.note_template import (
     metadata_line,
     note_filename,
@@ -44,7 +45,7 @@ from bili_learning.note_template import (
     render_note_skeleton,
     render_video_materials,
 )
-from bili_learning.organizer import find_duplicate_bvid_notes, organize_note
+from bili_learning.organizer import find_duplicate_bvid_notes, organize_note, organize_resource_note
 from bili_learning.publisher import publish_validated_draft
 from bili_learning.resource_access import detect_resource_access_notices
 from bili_learning.runtime import (
@@ -2152,6 +2153,73 @@ def test_organize_note_rejects_more_than_two_destination_levels(tmp_path: Path, 
         )
 
     assert source.exists()
+
+
+def test_organize_resource_note_compacts_into_collection_and_keeps_recovery_backup(tmp_path: Path, taxonomy: dict) -> None:
+    settings = _settings(tmp_path, taxonomy)
+    source = settings.notes_root / "00-待整理" / "纯资源分享.md"
+    source.parent.mkdir(parents=True)
+    source.write_text(
+        '---\nauthor: "UP"\npublished: "2026-08-28"\nduration: "00:40"\nsource: "https://www.bilibili.com/video/BV1RESOURCE01/"\ntags:\n  - "Agent"\ncssclasses:\n  - "learning-page"\n  - "video-note"\n---\n\n'
+        '# 纯资源分享\n\n<iframe src="https://player.bilibili.com/player.html?bvid=BV1RESOURCE01"></iframe>\n',
+        encoding="utf-8",
+    )
+    card = settings.runtime_root / "resource-cards" / "card.md"
+    card.parent.mkdir(parents=True)
+    card.write_text(
+        "## VideoShotCraft\n\n- **功能**：AI Agent 镜头编排与剪映工程导出。\n- **获取**：https://github.com/example/video-shotcraft\n- **状态**：待测试\n",
+        encoding="utf-8",
+    )
+
+    result = organize_resource_note(
+        settings,
+        source,
+        "AI工具与项目",
+        card_path=card,
+        confirmed_scope="single",
+    )
+
+    collection = settings.notes_root / "05-资源" / "AI工具与项目.md"
+    text = collection.read_text(encoding="utf-8")
+    assert result["collection_path"] == collection
+    assert result["updated_existing_card"] is False
+    assert not source.exists()
+    assert not card.exists()
+    assert Path(result["backup_path"]).is_file()
+    assert "<!-- BILI_RESOURCE_COLLECTION -->" in text
+    assert "## VideoShotCraft" in text
+    assert "BV1RESOURCE01" in text
+    assert find_notes_by_bvid(settings, "BV1RESOURCE01") == []
+    assert "05-资源]]（1）" in (settings.notes_root / "99-导航" / "首页.md").read_text(encoding="utf-8")
+
+
+def test_organize_resource_note_updates_same_bvid_card_without_duplication(tmp_path: Path, taxonomy: dict) -> None:
+    settings = _settings(tmp_path, taxonomy)
+    inbox = settings.notes_root / "00-待整理"
+    inbox.mkdir(parents=True)
+
+    def compact(body: str) -> dict[str, object]:
+        source = inbox / "resource.md"
+        source.write_text(
+            '---\nauthor: "UP"\npublished: "2026-08-28"\nduration: "00:40"\nsource: "https://www.bilibili.com/video/BV1RESOURCE02/"\ntags:\n  - "Agent"\ncssclasses:\n  - "learning-page"\n  - "video-note"\n---\n\n'
+            '# 资源更新\n\n<iframe src="https://player.bilibili.com/player.html?bvid=BV1RESOURCE02"></iframe>\n',
+            encoding="utf-8",
+        )
+        card = settings.runtime_root / "resource-cards" / "card.md"
+        card.parent.mkdir(parents=True, exist_ok=True)
+        card.write_text(body, encoding="utf-8")
+        return organize_resource_note(settings, source, "Skills", card_path=card, confirmed_scope="single")
+
+    first = compact("## AI电影 Skills\n\n- **状态**：待下载\n")
+    second = compact("## AI电影 Skills\n\n- **状态**：已下载\n")
+    collection = settings.notes_root / "05-资源" / "Skills.md"
+    text = collection.read_text(encoding="utf-8")
+
+    assert first["updated_existing_card"] is False
+    assert second["updated_existing_card"] is True
+    assert text.count("## AI电影 Skills") == 1
+    assert "已下载" in text
+    assert "待下载" not in text
 
 
 def test_navigation_uses_meta_marker_to_distinguish_same_title_notes(tmp_path: Path, taxonomy: dict) -> None:

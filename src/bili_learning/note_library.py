@@ -8,6 +8,8 @@ from pathlib import Path
 
 from .config import Settings
 
+RESOURCE_COLLECTION_MARKER = "<!-- BILI_RESOURCE_COLLECTION -->"
+
 _BVID_PATTERNS = (
     r"player\.html\?bvid=(BV[0-9A-Za-z]+)",
     r"bilibili\.com/video/(BV[0-9A-Za-z]+)",
@@ -65,6 +67,10 @@ def find_notes_by_bvid(settings: Settings, bvid: str) -> list[ExistingNote]:
             text = resolved.read_text(encoding="utf-8-sig")
         except (OSError, UnicodeError):
             continue
+        # Resource collections deliberately aggregate many videos into one page.
+        # They are not valid update targets for the normal one-video/one-note lifecycle.
+        if RESOURCE_COLLECTION_MARKER in text:
+            continue
         if extract_bvid(text) != bvid:
             continue
         modified = datetime.fromtimestamp(resolved.stat().st_mtime, tz=timezone.utc).isoformat()
@@ -85,6 +91,8 @@ def validate_update_target(settings: Settings, bvid: str, target: Path) -> Path:
     if resolved.suffix.lower() != ".md":
         raise ValueError("更新目标必须是 Markdown 笔记")
     text = resolved.read_text(encoding="utf-8-sig")
+    if RESOURCE_COLLECTION_MARKER in text:
+        raise ValueError("资源集合页不能作为普通 BVID 更新目标；请重新生成后在整理阶段更新资源卡")
     if extract_bvid(text) != bvid:
         raise ValueError("更新目标与当前 BVID 不一致")
     return _logical_path(settings, resolved)

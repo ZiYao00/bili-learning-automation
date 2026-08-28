@@ -16,7 +16,7 @@ from .config import (
 from .doctor import doctor_report, onboarding_report, run_doctor
 from .lifecycle import FAILSAFE_SECONDS, finalize_note, prepare_description_note, prepare_note, prepare_transcript_note
 from .navigation import build_navigation
-from .organizer import find_duplicate_bvid_notes, organize_note
+from .organizer import find_duplicate_bvid_notes, organize_note, organize_resource_note
 
 
 def find_project_root() -> Path:
@@ -83,10 +83,22 @@ def main() -> None:
     finalize_parser = subparsers.add_parser("finalize", help="校验 runtime 草稿并发布笔记")
     finalize_parser.add_argument("--job", type=Path, required=True)
     finalize_parser.add_argument("--note", type=Path, required=True)
-    organize_parser = subparsers.add_parser("organize", help="学习后归档已有笔记；只改文件名和路径，不改正文")
-    organize_parser.add_argument("--note", type=Path, required=True, help="待归档笔记路径")
-    organize_parser.add_argument("--filename", required=True, help="新的简短文件名；可省略 .md")
-    organize_parser.add_argument("--destination", required=True, help="notes_root 下的目标相对目录，推荐“领域/对象”")
+    organize_parser = subparsers.add_parser("organize", help="学习后整理已有笔记；默认归档不改正文，纯资源可压缩进资源集合页")
+    organize_parser.add_argument("--note", type=Path, required=True, help="待整理笔记路径")
+    organize_parser.add_argument(
+        "--mode",
+        choices=("archive", "resource"),
+        default="archive",
+        help="archive=只改文件名和路径；resource=将纯资源笔记压缩并合并进资源集合页",
+    )
+    organize_parser.add_argument("--filename", help="archive 模式的新简短文件名；可省略 .md")
+    organize_parser.add_argument("--destination", help="archive 模式下 notes_root 的目标相对目录，推荐“领域/对象”")
+    organize_parser.add_argument("--collection", help="resource 模式的资源集合页名称，例如“Skills”或“网站与灵感”")
+    organize_parser.add_argument(
+        "--card-file",
+        type=Path,
+        help="resource 模式的资源卡 Markdown 草稿；必须位于 runtime/resource-cards，Agent 完整读完原笔记后生成",
+    )
     organize_parser.add_argument(
         "--confirmed-scope",
         choices=("single", "latest", "all"),
@@ -199,29 +211,57 @@ def main() -> None:
         raise SystemExit(code)
     if args.command == "organize":
         try:
-            bvid, duplicates = find_duplicate_bvid_notes(settings, args.note)
-            note_path = organize_note(
-                settings,
-                args.note,
-                args.filename,
-                destination=args.destination,
-                confirmed_scope=args.confirmed_scope,
-            )
-            resolved_root = settings.notes_root.resolve()
-            relative_note = note_path.resolve().relative_to(resolved_root)
-            logical_note = settings.notes_root / relative_note
-            logical_duplicates = [
-                str(settings.notes_root / path.resolve().relative_to(resolved_root)) for path in duplicates
-            ]
-            payload = {
-                "schema_version": 1,
-                "status": "organized",
-                "scope": args.confirmed_scope,
-                "bvid": bvid,
-                "note_path": str(logical_note),
-                "resolved_note_path": str(note_path.resolve()),
-                "duplicate_bvid_notes": logical_duplicates,
-            }
+            if args.mode == "resource":
+                if args.collection is None or args.card_file is None:
+                    raise ValueError("resource 模式必须同时提供 --collection 与 --card-file")
+                result = organize_resource_note(
+                    settings,
+                    args.note,
+                    args.collection,
+                    card_path=args.card_file,
+                    confirmed_scope=args.confirmed_scope,
+                )
+                collection_path = Path(result["collection_path"])
+                resolved_root = settings.notes_root.resolve()
+                relative_note = collection_path.resolve().relative_to(resolved_root)
+                logical_note = settings.notes_root / relative_note
+                payload = {
+                    "schema_version": 1,
+                    "status": "resource_compacted",
+                    "scope": args.confirmed_scope,
+                    "bvid": result["bvid"],
+                    "collection_path": str(logical_note),
+                    "resolved_collection_path": str(collection_path.resolve()),
+                    "updated_existing_card": result["updated_existing_card"],
+                    "backup_path": str(result["backup_path"]),
+                    "card_cleanup_warning": result["card_cleanup_warning"],
+                }
+            else:
+                if args.filename is None or args.destination is None:
+                    raise ValueError("archive 模式必须同时提供 --filename 与 --destination")
+                bvid, duplicates = find_duplicate_bvid_notes(settings, args.note)
+                note_path = organize_note(
+                    settings,
+                    args.note,
+                    args.filename,
+                    destination=args.destination,
+                    confirmed_scope=args.confirmed_scope,
+                )
+                resolved_root = settings.notes_root.resolve()
+                relative_note = note_path.resolve().relative_to(resolved_root)
+                logical_note = settings.notes_root / relative_note
+                logical_duplicates = [
+                    str(settings.notes_root / path.resolve().relative_to(resolved_root)) for path in duplicates
+                ]
+                payload = {
+                    "schema_version": 1,
+                    "status": "organized",
+                    "scope": args.confirmed_scope,
+                    "bvid": bvid,
+                    "note_path": str(logical_note),
+                    "resolved_note_path": str(note_path.resolve()),
+                    "duplicate_bvid_notes": logical_duplicates,
+                }
             print(json.dumps(payload, ensure_ascii=False, indent=2))
         except Exception as error:
             print(json.dumps({"schema_version": 1, "status": "failed", "message": str(error)}, ensure_ascii=False, indent=2))

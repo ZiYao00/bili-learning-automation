@@ -20,7 +20,7 @@
 - 获取、保存并配置 Netscape 格式的 Bilibili Cookie；
 - 运行 onboarding / doctor；
 - 安装 Obsidian CSS；
-- 选择 Hermes / WorkBuddy / Codex；
+- 选择 ChatGPT / Codex / Hermes / WorkBuddy；
 - 完成第一次 B站链接转笔记；
 - 确认输出位置和常见状态。
 
@@ -46,6 +46,26 @@
 - 如何验证加载路径；
 - 项目更新后如何 reload；
 - Hermes 仍使用旧 Skill 时怎么检查。
+
+### [ChatGPT Skill 安装教程](CHATGPT-SKILL-INSTALL.md)
+
+只处理 ChatGPT Work 接入问题：
+
+- 为什么必须使用独立 ChatGPT ZIP；
+- 如何连接本地工作区桥接；
+- 如何卸载旧的 Hermes / WorkBuddy 重复条目；
+- 如何区分 Skill、桥接和运行环境状态；
+- 为什么不能上传整个本地仓库。
+
+### [Codex Skill 安装教程](CODEX-SKILL-INSTALL.md)
+
+只处理 Codex 接入问题：
+
+- 仓库级 Skill 自动发现；
+- 用户级 Junction；
+- 独立 ZIP 安装；
+- 项目定位和 onboarding 验收；
+- 更新仓库后的同步方式。
 
 ### [WorkBuddy Skill 安装教程](WORKBUDDY-SKILL-INSTALL.md)
 
@@ -120,7 +140,7 @@ input
 
 ### [Agent 接入协议](AGENT-INTEGRATION.md)
 
-用于 Hermes / WorkBuddy / Codex 之外的新 Agent 接入，也用于维护现有适配层。
+用于 ChatGPT / Codex / Hermes / WorkBuddy 之外的新 Agent 接入，也用于维护现有适配层。
 
 包含：
 
@@ -169,13 +189,13 @@ input
 遇到未知问题时，先运行：
 
 ```powershell
-python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py
+python .\scripts\run_bili_learning.py doctor
 ```
 
 需要把诊断结果交给 Agent 分析时使用：
 
 ```powershell
-python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py --json
+python .\scripts\run_bili_learning.py doctor --json
 ```
 
 ### [安全说明](../SECURITY.md)

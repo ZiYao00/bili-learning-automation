@@ -57,7 +57,7 @@ A normal Windows setup needs:
 | yt-dlp | Collects subtitles, description, and metadata |
 | Bilibili Cookie file | Provides an authenticated Bilibili browser session; required by the normal collection flow |
 | Obsidian Vault | Stores generated learning notes |
-| Hermes / WorkBuddy / Codex | Reads the transcript and writes the learning content |
+| ChatGPT / Codex / Hermes / WorkBuddy | Reads source materials and writes the learning content; ChatGPT requires a local workspace bridge |
 
 The repository does not bundle or auto-install `yt-dlp.exe`.
 
@@ -109,16 +109,16 @@ The detailed beginner tutorial covers browser export, format validation, `--cook
 
 ### 3.4 First-run environment check
 
-After connecting Hermes, WorkBuddy, or Codex, the Agent should run onboarding before the first real collection and only ask the user for values that cannot be detected automatically. You can run the same check manually:
+After connecting ChatGPT, Codex, Hermes, or WorkBuddy, the Agent should run onboarding before the first real collection and only ask for values that cannot be detected automatically. ChatGPT also requires an authorized local workspace bridge. Use the shared manual entry point:
 
 ```powershell
-python .\hermes-skills\bili-learning-automation\scripts\onboarding_bilibili_learning.py
+python .\scripts\run_bili_learning.py onboarding
 ```
 
 `action_required` returns only the missing user-facing setup items such as the Vault, Cookie file path, or yt-dlp. Missing CSS is a non-blocking warning. For the full diagnostic report, run:
 
 ```powershell
-python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py
+python .\scripts\run_bili_learning.py doctor
 ```
 
 Doctor checks Python, yt-dlp, Cookie-file presence, the Vault, CSS, taxonomy, write permissions, and required project files. It **does not read Cookie contents and does not access Bilibili**.
@@ -146,9 +146,10 @@ Then enable both snippets in Obsidian.
 
 | Agent | Typical use | Documentation |
 | --- | --- | --- |
+| ChatGPT Work | Use the local project through a workspace bridge | [ChatGPT Skill installation](docs/CHATGPT-SKILL-INSTALL.md) |
+| Codex | Local note generation, development, and testing | [Codex Skill installation](docs/CODEX-SKILL-INSTALL.md) |
 | Hermes | Send a Bilibili link from a phone / private chat | [Hermes installation](docs/HERMES-SKILL-INSTALL.md) |
 | WorkBuddy | Send a link inside a WorkBuddy session | [WorkBuddy installation](docs/WORKBUDDY-SKILL-INSTALL.md) |
-| Codex | Development, testing, direct project operation | Read `AGENTS.md` first |
 
 ---
 
@@ -316,6 +317,8 @@ Detailed documentation is currently maintained in Chinese.
 
 - [Quick Start](docs/QUICKSTART.md)
 - [Bilibili Cookie setup and security](docs/BILIBILI-COOKIE.md) (Chinese)
+- [ChatGPT Skill Installation](docs/CHATGPT-SKILL-INSTALL.md)
+- [Codex Skill Installation](docs/CODEX-SKILL-INSTALL.md)
 - [Hermes Skill Installation](docs/HERMES-SKILL-INSTALL.md)
 - [WorkBuddy Skill Installation](docs/WORKBUDDY-SKILL-INSTALL.md)
 - [Obsidian Styling](docs/OBSIDIAN-STYLING.md)

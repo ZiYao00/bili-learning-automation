@@ -10,7 +10,8 @@
   "organization": {
     "enabled_by_default": false,
     "scope_confirmation_required": true,
-    "max_depth": 2
+    "max_depth": 2,
+    "resource_root": "05-资源"
   },
   "models": [
     {"canonical": "MiniMax-H3", "aliases": ["MiniMax-H3", "MiniMaxH3", "Minimax H3", "H3"]},

@@ -1,0 +1,6 @@
+interface:
+  display_name: "B站视频转笔记 · ChatGPT"
+  short_description: "通过本地工作区桥接生成 Obsidian B站学习笔记。"
+  default_prompt: "Use $bili-learning-automation-chatgpt to check the local workspace bridge and turn this Bilibili link into an Obsidian learning note."
+policy:
+  allow_implicit_invocation: true

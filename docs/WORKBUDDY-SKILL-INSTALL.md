@@ -39,6 +39,10 @@ WorkBuddy Skill 目录：
 
 这样以后更新仓库，不需要再次复制 WorkBuddy Skill。
 
+### 独立 ZIP（静态副本）
+
+Release 还提供 `bili-learning-automation-workbuddy.zip`。它只包含一个同名 `SKILL.md`，不包含 Python 核心、Cookie、笔记或本机配置；解压到 WorkBuddy 的 Skill 根目录后，运行时仍需让 WorkBuddy 确认用户指定的完整项目根目录。它适合不能使用 Junction 的环境，但仓库更新后需要重新下载并替换该静态副本。
+
 ## 3. Windows 安装
 
 先在 PowerShell 进入你实际克隆的项目目录：

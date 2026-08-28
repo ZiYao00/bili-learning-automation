@@ -57,7 +57,7 @@ B站链接 / BV号
 | yt-dlp | 获取字幕、简介和元数据 |
 | Bilibili Cookie 文件 | 提供已登录 Bilibili 的会话凭据；当前正常采集必需 |
 | Obsidian Vault | 保存生成的学习笔记 |
-| Hermes / WorkBuddy / Codex | 读取 transcript 并整理正文 |
+| ChatGPT / Codex / Hermes / WorkBuddy | 读取来源材料并整理正文；ChatGPT 需连接本地工作区桥接 |
 
 项目不会内置或自动安装 `yt-dlp.exe`。Windows 可使用：
 
@@ -128,16 +128,16 @@ bilibili_cookies.txt
 
 ### 3.4 首次环境检查
 
-接入 Hermes / WorkBuddy / Codex 后，Agent 应在第一次正式采集前自动执行 onboarding，只向用户询问无法自动确定的缺失项。手动检查可运行：
+接入 ChatGPT / Codex / Hermes / WorkBuddy 后，Agent 应在第一次正式采集前自动执行 onboarding，只向用户询问无法自动确定的缺失项。ChatGPT 需要先连接本地工作区桥接。统一手动入口为：
 
 ```powershell
-python .\hermes-skills\bili-learning-automation\scripts\onboarding_bilibili_learning.py
+python .\scripts\run_bili_learning.py onboarding
 ```
 
-`action_required` 会返回需要处理的 Vault、Cookie、yt-dlp 等配置；CSS 缺失只作为非阻塞提醒。完整诊断仍可运行：
+`action_required` 会返回需要处理的 Vault、Cookie、yt-dlp 等配置；CSS 缺失只作为非阻塞提醒。完整诊断可运行：
 
 ```powershell
-python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py
+python .\scripts\run_bili_learning.py doctor
 ```
 
 Doctor 会检查：
@@ -178,9 +178,10 @@ video-note.css
 
 | Agent | 使用方式 | 教程 |
 | --- | --- | --- |
+| ChatGPT Work | 通过本地工作区桥接访问项目并生成笔记 | [ChatGPT Skill 安装教程](docs/CHATGPT-SKILL-INSTALL.md) |
+| Codex | 在本地项目中直接生成、测试或维护 | [Codex Skill 安装教程](docs/CODEX-SKILL-INSTALL.md) |
 | Hermes | 手机 / 私聊发送 B站链接，电脑处理 | [Hermes Skill 安装教程](docs/HERMES-SKILL-INSTALL.md) |
 | WorkBuddy | 在 WorkBuddy 会话中发送链接 | [WorkBuddy Skill 安装教程](docs/WORKBUDDY-SKILL-INSTALL.md) |
-| Codex | 在项目目录中直接执行、测试或维护 | 先阅读 `AGENTS.md` |
 
 ---
 
@@ -292,7 +293,7 @@ Fact Ledger
 
 ## 7. Agent 与模型说明
 
-本项目**不绑定特定 LLM**。Hermes、WorkBuddy 和 Codex 是不同入口，来源采集、Source Mode、source manifest、taxonomy、内容标准、validator 和 finalizer 共用同一套核心逻辑。
+本项目**不绑定特定 LLM**。ChatGPT、Codex、Hermes 和 WorkBuddy 是不同薄入口，来源采集、Source Mode、source manifest、taxonomy、内容标准、validator 和 finalizer 共用同一套核心逻辑。
 
 不同模型可能在以下方面表现不同：
 

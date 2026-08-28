@@ -93,6 +93,9 @@ def validate_taxonomy(config: dict[str, Any]) -> None:
         max_depth = organization.get("max_depth", 2)
         if not isinstance(max_depth, int) or isinstance(max_depth, bool) or max_depth < 1 or max_depth > 2:
             raise ValueError("taxonomy.organization.max_depth 必须是 1 或 2")
+        resource_root = organization.get("resource_root")
+        if resource_root is not None and (not isinstance(resource_root, str) or not resource_root.strip()):
+            raise ValueError("taxonomy.organization.resource_root 必须是非空字符串")
 
     route_ids: set[str] = set()
     for route in [config["fallback"], *config["routes"]]:

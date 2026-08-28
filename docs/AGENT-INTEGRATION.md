@@ -1,12 +1,12 @@
 # 智能体接入协议
 
-本项目当前优先服务 Codex、Hermes 与 WorkBuddy。核心脚本、Source Mode、内容质量标准、taxonomy 与 finalizer 是唯一事实来源；适配层只负责各平台的入口、当前消息意图路由、授权、调用和最终回复。未来其他智能体应复用核心协议，不复制来源采集、Job 或写作规则。
+本项目当前优先服务 ChatGPT、Codex、Hermes 与 WorkBuddy。核心脚本、Source Mode、内容质量标准、taxonomy 与 finalizer 是唯一事实来源；适配层只负责各平台的入口、当前消息意图路由、授权、调用和最终回复。未来其他智能体应复用核心协议，不复制来源采集、Job 或写作规则。
 
 ## 输入与授权
 
 - 只接受可解析的 Bilibili 复制链接、受支持短链接或 BV 号。
 - 无法解析 BV 号时要求用户重新发送“复制链接”，不得猜测。
-- 适配层必须确认调用者已获授权；Hermes 的额外规则是只接受 owner 私聊，WorkBuddy 的额外规则是只接受用户在会话中主动提供链接/BV 号且意图明确。
+- 适配层必须确认调用者已获授权；ChatGPT 必须具备已授权的本地工作区桥接，Hermes 只接受 owner 私聊，WorkBuddy 只接受用户在会话中主动提供链接/BV 号且意图明确。
 
 ## 必须执行的流程
 
@@ -26,13 +26,14 @@
 
 学习后整理与“转成笔记”是两套独立流程，**默认不执行**。任何适配层都不得在 finalizer 完成后自动改名、移动或归档笔记。
 
-只有用户明确要求整理时才进入整理流程。如果用户尚未说明范围，适配层必须先询问“只整理最近一篇，还是全部待整理笔记？”，并等待明确的 `latest` / `all` 选择；用户已经明确给出范围时不重复询问。
+只有用户明确要求整理时才进入整理流程。如果用户尚未说明范围，适配层再询问指定一篇、最近一篇或全部待整理笔记，并等待明确的 `single / latest / all` 选择；用户已经明确给出范围时不重复询问。
 
-范围确认后，适配层必须完整阅读目标笔记并显式给出短标题、唯一主分类、Tags 与一句简介，然后调用核心 `organize`。`--category` 必须来自 `taxonomy.organization.categories`，`--tag` 至少一个，`--confirmed-scope` 必须与用户选择一致。不得根据旧文件名或旧 Tags 直接批量猜分类，也不得绕过 organizer 手工移动文件。
+范围确认后，适配层必须完整阅读目标笔记，再判断长期价值。不要在生成阶段提前写入 `knowledge / resource / mixed` 分类，也不得根据旧文件名或旧 Tags 机械批量判断。
 
-视频生成分类优先按模型生态：MiniMax H3、Wan 系列、Seedance 等各自集中管理；`01-视频生成/90-进阶专题` 只用于真正跨模型、原理性、选型或对比内容。显存优化、首尾帧、数字人等技术维度优先使用 Tags，不继续增加模型目录下的多层分类。
+- 知识型 / 混合型：调用默认 `archive`，提供 `--filename` 与 `--destination`。核心只移动/改名并重建导航，不改正文、H1、Summary、Frontmatter 或 Tags。
+- 纯资源型：仅在整理阶段生成短资源卡。适配层先把卡片写到 `<runtime_root>/resource-cards/`，再调用 `--mode resource --collection <集合页> --card-file <card>`。核心将卡片合并进 `05-资源` 集合页，备份原独立笔记后再移除该独立笔记，并重建导航。
 
-Organizer 在改写短标题时会保留原视频标题，并统一更新 Tags、移动文件和重建导航。
+`--confirmed-scope` 必须与用户选择一致。不得绕过 Organizer 手工移动、重命名或删除正式笔记。纯资源的判断参考 `docs/NOTE-ORGANIZATION.md`，最重要的问题是：去掉资源链接后，这篇内容是否仍有长期学习价值。
 
 ## 数据契约
 
@@ -129,16 +130,18 @@ subtitle / ASR 来源可能存在自动转写噪声。遇到不确定专名时�
 只有用户明确要求“整理笔记”后，智能体才可调用统一核心入口：
 
 ```powershell
-bili-learning organize --note '<现有笔记路径>' --title '<学习后短标题>' --intro '<一句简介摘要>'
+bili-learning organize --note '<现有笔记路径>' --filename '<短文件名>' --destination '<领域/对象>' --confirmed-scope '<single|latest|all>'
 ```
 
-- `--title` 与 `--intro` 只能基于现有笔记、UP 主简介和用户的学习判断；不得捏造参数或资源。
-- 省略 `--category` 时，核心按现有 tags 推断 taxonomy 建议目录。
-- 核心负责原子创建、迁移和导航刷新；适配层不得自行移动或重命名文件。
+- 知识型 / 混合型使用上面的默认 `archive`；核心只改文件名和路径，不改正文、H1、Summary、Frontmatter 或 Tags。
+- 纯资源型先在 `<runtime_root>/resource-cards/` 写短资源卡，再调用 `organize --mode resource --note '<现有笔记路径>' --collection '<集合页>' --card-file '<card.md>' --confirmed-scope '<single|latest|all>'`，合并进 `05-资源`。
+- 核心负责路径验证、安全写入、原笔记备份（纯资源模式）和导航刷新；适配层不得自行移动、重命名或删除正式笔记。生成阶段与 finalizer 不承担资源类型判断。
 
 ## 适配层边界
 
-- Hermes：微信私聊授权、链接接收、Hermes 安装、调用核心脚本和最终回复。
-- Codex：在项目目录中读取 `AGENTS.md`、本协议和共享标准，直接使用核心流程；目前不要求独立 Codex Skill。
-- WorkBuddy：适配层位于 `workbuddy-skills\bili-learning-automation\`，通过 junction 安装到 `%USERPROFILE%\.workbuddy\skills\`；负责会话触发、意图确认、调用核心脚本和最终回复，与 Hermes 共用同一套脚本入口。
-- 未来其他平台：只新增薄适配层，不复制核心 Python 逻辑、内容标准、taxonomy 或 finalizer。
+- ChatGPT：适配层位于 `chatgpt-skills\bili-learning-automation-chatgpt\`，独立打包并安装到 ChatGPT；必须通过已授权的本地工作区桥接访问项目。
+- Hermes：仓库适配层位于 `hermes-skills\bili-learning-automation\`；独立包位于 `hermes-skills\bili-learning-automation-hermes\`。前者适合 Junction 与完整本机启动脚本，后者只包含可移植指令，需先确认用户指定的项目根目录。
+- Codex：适配层位于 `.agents\skills\bili-learning-automation-codex\`，可由仓库自动发现，也可独立安装；进入项目后先读取根目录 `AGENTS.md`。
+- WorkBuddy：仓库适配层位于 `workbuddy-skills\bili-learning-automation\`；独立包位于 `workbuddy-skills\bili-learning-automation-workbuddy\`。前者适合 Junction 与宿主 bridge，后者只包含可移植指令，需先确认用户指定的项目根目录。
+- ChatGPT、Codex 和两个独立包统一调用 `scripts\run_bili_learning.py`；仓库内 Hermes / WorkBuddy 仍保留宿主兼容入口，但所有入口最终复用同一核心 CLI。
+- 未来其他平台：只新增唯一命名的薄适配层，不复制核心 Python 逻辑、内容标准、taxonomy 或 finalizer。

@@ -2,7 +2,7 @@
 
 ## 环境
 
-项目核心 package 位于 `src/bili_learning`，Hermes 下的正式脚本保留为兼容入口。
+项目核心 package 位于 `src/bili_learning`。ChatGPT 与 Codex 通过共享启动器调用核心 CLI；Hermes / WorkBuddy 的宿主脚本保留为兼容入口。
 
 ```powershell
 py -3 -m venv .venv
@@ -16,9 +16,10 @@ python -m pip install -e ".[dev]"
 ## 本地验证
 
 ```powershell
-python -m compileall -q src hermes-skills/bili-learning-automation/scripts workbuddy-skills/bili-learning-automation/scripts
+python -m compileall -q src scripts hermes-skills/bili-learning-automation/scripts workbuddy-skills/bili-learning-automation/scripts
 python -m ruff check .
 python -m pytest -q
+python .\scripts\build_agent_skill_packages.py
 ```
 
 测试不得依赖真实 Cookie、真实 Bilibili 登录态或私人 Obsidian 笔记。
@@ -43,7 +44,7 @@ python -m pytest -q
 - `doctor_bilibili_learning.py`
 - `configure_bilibili_learning.py`
 
-不要在没有迁移 Hermes 调用方的情况下删除或改名这些入口。
+ChatGPT 与 Codex 使用共享 `scripts/run_bili_learning.py`。不要在没有迁移调用方的情况下删除或改名共享启动器或上述 Hermes 兼容入口。
 
 ## Obsidian 样式维护
 
@@ -78,9 +79,10 @@ Benchmark 重点比较：
 准备 commit / push 前，先复核当前 diff，确认没有把 Cookie、`.runtime`、私人笔记、测试抓取材料、本机绝对路径或其它机器特征提交进去；同时确认 Git author / committer 邮箱是维护者愿意公开的地址。然后运行：
 
 ```powershell
-python -m compileall -q src hermes-skills/bili-learning-automation/scripts workbuddy-skills/bili-learning-automation/scripts
+python -m compileall -q src scripts hermes-skills/bili-learning-automation/scripts workbuddy-skills/bili-learning-automation/scripts
 python -m ruff check .
 python -m pytest -q
+python .\scripts\build_agent_skill_packages.py
 git diff --check
 ```
 

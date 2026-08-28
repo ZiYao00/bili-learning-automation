@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-08-28
+
+### Added
+
+- 新增独立 `bili-learning-automation-chatgpt`、`bili-learning-automation-codex`、`bili-learning-automation-hermes` 与 `bili-learning-automation-workbuddy` 薄适配层；四者使用不同 Skill 名称和安装包，避免不同宿主把同名入口识别为重复技能。
+- 新增共享 `scripts/run_bili_learning.py`，让 ChatGPT 与 Codex 直接调用核心 CLI，不再借用其它宿主的兼容脚本。
+- 新增白名单打包脚本与测试，分别生成 ChatGPT / Codex / Hermes / WorkBuddy ZIP，并强制每包只有一个根目录 `SKILL.md`，拒绝 Cookie、本机配置、嵌套 Skill 和 Python 缓存。
+- 学习后 Organizer 新增显式 `resource` 分支：只在用户主动整理时，把纯资源分享压缩成短资源卡并聚合到 `05-资源` 集合页；普通 `archive` 仍保持 Markdown 正文完全不改写。资源压缩前会把原独立笔记备份到 runtime，资源集合页不会参与普通 BVID 重复更新判断。
+
+### Documentation
+
+- 新增 ChatGPT 与 Codex 安装教程，并为 Hermes 与 WorkBuddy 补充独立 ZIP 说明，明确本地桥接、仓库级 Skill、Junction、ZIP 更新和“安装成功不等于运行环境 ready”的验收边界。
+- README、Quickstart、文档中心、Agent 接入协议和发布检查同步为四个独立薄入口。
+
 ## [1.2.0] - 2026-08-28
 
 ### Added
