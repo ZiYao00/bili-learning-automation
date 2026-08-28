@@ -36,7 +36,7 @@ from bili_learning.config import (
 from bili_learning.doctor import doctor_report, onboarding_report
 from bili_learning.frontmatter import parse_frontmatter, parse_frontmatter_list
 from bili_learning.input_resolver import extract_user_supplied_source, resolve_input
-from bili_learning.lifecycle import finalize_note, prepare_note
+from bili_learning.lifecycle import finalize_note, prepare_description_note, prepare_note, prepare_transcript_note
 from bili_learning.note_template import (
     metadata_line,
     note_filename,
@@ -55,8 +55,9 @@ from bili_learning.runtime import (
     file_lock,
     safe_job_path,
 )
+from bili_learning.source import SOURCE_MODE_ASR, SOURCE_MODE_DESCRIPTION, SOURCE_MODE_SUBTITLE, SourceMaterial
 from bili_learning.taxonomy import classify
-from bili_learning.transcript import prepare_agent_transcript
+from bili_learning.transcript import prepare_agent_source, prepare_agent_text_transcript, prepare_agent_transcript
 from bili_learning.validator import validate_note
 from bili_learning.workflow import validate_agent_workflow, write_agent_work_templates
 
@@ -181,9 +182,10 @@ def test_prepare_agent_transcript_chunks_long_srt_without_losing_order(tmp_path:
 
     result = prepare_agent_transcript(subtitle, work, direct_max_chars=80, chunk_target_chars=180)
 
-    assert result["mode"] == "chunked"
+    assert result["source_mode"] == SOURCE_MODE_SUBTITLE
+    assert result["package_mode"] == "chunked"
     assert result["chunk_count"] > 1
-    assert sum(chunk["cue_count"] for chunk in result["chunks"]) == 6
+    assert sum(chunk["segment_count"] for chunk in result["chunks"]) == 6
     combined = "".join(Path(chunk["path"]).read_text(encoding="utf-8") for chunk in result["chunks"])
     positions = [combined.index(f"知识点{index}-") for index in range(1, 7)]
     assert positions == sorted(positions)
@@ -191,6 +193,7 @@ def test_prepare_agent_transcript_chunks_long_srt_without_losing_order(tmp_path:
     assert manifest["rules"]["semantic_summary"] is False
     assert manifest["rules"]["text_order_preserved"] is True
     assert manifest["rules"]["cue_boundaries_preserved"] is True
+    assert manifest["timestamps_available"] is True
 
 
 def test_prepare_agent_transcript_merges_a_tiny_tail_chunk(tmp_path: Path) -> None:
@@ -204,38 +207,73 @@ def test_prepare_agent_transcript_merges_a_tiny_tail_chunk(tmp_path: Path) -> No
 
     result = prepare_agent_transcript(subtitle, tmp_path / "agent-work")
 
-    assert result["mode"] == "chunked"
+    assert result["package_mode"] == "chunked"
     assert result["chunk_count"] == 2
-    assert sum(chunk["cue_count"] for chunk in result["chunks"]) == 3
+    assert sum(chunk["segment_count"] for chunk in result["chunks"]) == 3
     combined = "".join(Path(chunk["path"]).read_text(encoding="utf-8") for chunk in result["chunks"])
     assert "尾巴" in combined
 
 
-def test_agent_handoff_protects_dense_note_fact_relationships(tmp_path: Path) -> None:
+def test_prepare_agent_text_transcript_chunks_long_plain_text_without_fake_timestamps(tmp_path: Path) -> None:
+    transcript = tmp_path / "asr.txt"
+    transcript.write_text(("第一句。" * 7000) + "最后一句。", encoding="utf-8")
+
+    result = prepare_agent_text_transcript(transcript, tmp_path / "agent-work")
+
+    assert result["source_mode"] == SOURCE_MODE_ASR
+    assert result["timestamps_available"] is False
+    assert result["chunk_count"] > 1
+    manifest = json.loads(Path(result["manifest_path"]).read_text(encoding="utf-8"))
+    assert manifest["rules"]["timestamps_fabricated"] is False
+    combined = "".join(Path(chunk["path"]).read_text(encoding="utf-8") for chunk in result["chunks"])
+    assert "最后一句。" in combined
+    assert "[00:00:00]" not in combined
+
+
+def test_prepare_agent_description_source_has_no_fake_transcript_chunks(tmp_path: Path) -> None:
+    result = prepare_agent_source(
+        SourceMaterial(SOURCE_MODE_DESCRIPTION),
+        "纯资源分享简介",
+        tmp_path / "agent-work",
+    )
+
+    assert result["source_mode"] == SOURCE_MODE_DESCRIPTION
+    assert result["source_location"] == "job.description"
+    assert result["package_mode"] == "none"
+    assert result["chunk_count"] == 0
+    assert result["chunks"] == []
+    assert result["timestamps_available"] is False
+    assert Path(result["manifest_path"]).is_file()
+
+
+def test_agent_handoff_routes_strict_workflow_through_source_manifest(tmp_path: Path) -> None:
     job_dir = tmp_path / "job"
     job_dir.mkdir()
     handoff = write_handoff(job_dir, {})
     text = handoff.read_text(encoding="utf-8")
+
+    assert "source_manifest_path" in text
     assert "fact_ledger_path" in text
     assert "semantic_draft_path" in text
     assert "layout_plan_path" in text
     assert "Fact Ledger" in text
-    assert "章节数量只改变事实如何分组" in text
-    assert "Layout Pass" in text
-    assert "一个最高优先级 Summary" in text
-    assert "重新按 manifest 顺序抽查/复读原 transcript" in text
-    assert "配置、耗时与结果" in text
+    assert "Semantic Draft" in text
+    assert "Layout Plan" in text
+    assert "当前 Job 允许的来源" in text
+    assert "finalizer" in text
 
 
-def test_agent_handoff_light_mode_is_short_and_direct(tmp_path: Path) -> None:
+def test_agent_handoff_light_mode_is_short_and_source_aware(tmp_path: Path) -> None:
     job_dir = tmp_path / "light-job"
     job_dir.mkdir()
     handoff = write_handoff(job_dir, {"workflow_mode": "light"})
     text = handoff.read_text(encoding="utf-8")
 
     assert "LIGHT-WORKFLOW.md" in text
+    assert "source_manifest_path" in text
     assert "直接在 `draft_path`" in text
-    assert "内容写完整后" in text
+    assert "内容完成后" in text
+    assert "description_only" in text
     assert "Fact Ledger、Semantic Draft 或 Layout Plan" in text
     assert "fact_ledger_path" not in text
     assert "workflow_status" not in text
@@ -384,12 +422,39 @@ def test_resource_access_detects_explicit_conditions_without_inventing_materials
         "3\n00:00:05,000 --> 00:00:06,000\n评论区回复H3领取资料\n",
         encoding="utf-8",
     )
-    notices = detect_resource_access_notices("", subtitle)
+    notices = detect_resource_access_notices("", SourceMaterial(SOURCE_MODE_SUBTITLE, subtitle))
     conditions = {notice["condition"] for notice in notices}
     assert "三连" in conditions
     assert "充电" in conditions
     assert "评论/关键词" in conditions
     assert all(notice["source"] == "subtitle" for notice in notices)
+
+
+def test_resource_access_preserves_asr_provenance(tmp_path: Path) -> None:
+    transcript = tmp_path / "asr.txt"
+    transcript.write_text("三连后领取工作流。", encoding="utf-8")
+
+    notices = detect_resource_access_notices("", SourceMaterial(SOURCE_MODE_ASR, transcript))
+
+    assert notices and notices[0]["source"] == "asr"
+    rendered = render_video_materials(
+        {
+            "bvid": "BV1EXAMPLE",
+            "description": "",
+            "description_status": "confirmed_empty",
+            "resource_access_notices": notices,
+        }
+    )
+    assert "来源：ASR 转写" in rendered
+
+
+def test_resource_access_description_only_uses_description_provenance() -> None:
+    notices = detect_resource_access_notices(
+        "三连后领取工作流",
+        SourceMaterial(SOURCE_MODE_DESCRIPTION),
+    )
+
+    assert notices and all(notice["source"] == "description" for notice in notices)
 
 
 def test_resource_access_prefers_description_and_deduplicates_matching_subtitle(tmp_path: Path) -> None:
@@ -398,7 +463,10 @@ def test_resource_access_prefers_description_and_deduplicates_matching_subtitle(
         "1\n00:00:01,000 --> 00:00:02,000\n三连后领取提示词模板\n",
         encoding="utf-8",
     )
-    notices = detect_resource_access_notices("三连后领取提示词模板", subtitle)
+    notices = detect_resource_access_notices(
+        "三连后领取提示词模板",
+        SourceMaterial(SOURCE_MODE_SUBTITLE, subtitle),
+    )
     matching = [notice for notice in notices if notice["resource"] == "提示词模板"]
     assert len(matching) == 1
     assert matching[0]["source"] == "description"
@@ -412,7 +480,7 @@ def test_resource_access_does_not_join_generic_engagement_with_unrelated_templat
         "3\n00:00:20,000 --> 00:00:21,000\n关注我们，这个工作流可以直接下载\n",
         encoding="utf-8",
     )
-    assert detect_resource_access_notices("", subtitle) == []
+    assert detect_resource_access_notices("", SourceMaterial(SOURCE_MODE_SUBTITLE, subtitle)) == []
 
 
 def test_note_skeleton_places_materials_before_knowledge_body() -> None:
@@ -1003,7 +1071,7 @@ def test_create_job_writes_runtime_draft_without_publishing_note(tmp_path: Path,
             "upload_date": "20260811",
             "duration": 425,
         },
-        subtitle,
+        SourceMaterial(SOURCE_MODE_SUBTITLE, subtitle),
         job_dir,
     )
     note_path = Path(payload["note_path"])
@@ -1024,9 +1092,9 @@ def test_create_job_writes_runtime_draft_without_publishing_note(tmp_path: Path,
     assert not (agent_work_dir / "fact-ledger.md").exists()
     assert not (agent_work_dir / "semantic-draft.md").exists()
     assert not (agent_work_dir / "layout-plan.md").exists()
-    manifest_path = Path(payload["transcript_manifest_path"])
+    manifest_path = Path(payload["source_manifest_path"])
     assert manifest_path.parent == agent_work_dir
-    assert payload["transcript_mode"] == "direct"
+    assert payload["source_package_mode"] == "direct"
     assert payload["transcript_chunk_count"] == 1
     assert manifest_path.is_file()
     assert json.loads(analysis_path.read_text(encoding="utf-8"))["source_assessment"]["status"] == "pending"
@@ -1060,7 +1128,7 @@ def test_create_job_strict_mode_writes_stage_files(tmp_path: Path, taxonomy: dic
             "upload_date": "20260811",
             "duration": 425,
         },
-        subtitle,
+        SourceMaterial(SOURCE_MODE_SUBTITLE, subtitle),
         job_dir,
     )
 
@@ -1360,7 +1428,7 @@ def test_prepare_allows_a_new_note_for_an_existing_source(
     payload, code = prepare_note(tmp_path, "BV1TXua68EYi")
     assert code == 0 and payload["status"] == "materials_ready"
     assert Path(payload["note_path"]).name == "H3 分段工作流.md"
-    assert payload["transcript_mode"] == "direct"
+    assert payload["source_package_mode"] == "direct"
     assert payload["transcript_chunk_count"] == 1
     assert Path(payload["transcript_manifest_path"]).is_file()
     assert payload["workflow_mode"] == "light"
@@ -1384,7 +1452,13 @@ def _write_e2e_config(project_root: Path, taxonomy: dict) -> None:
     )
 
 
-def _fake_ytdlp(_settings: Settings, job_dir: Path, canonical_url: str) -> None:
+def _fake_ytdlp(
+    _settings: Settings,
+    job_dir: Path,
+    canonical_url: str,
+    *,
+    include_subtitles: bool = True,
+) -> None:
     bvid = canonical_url.rstrip("/").rsplit("/", 1)[-1]
     info = {
         "title": "H3 分段工作流",
@@ -1396,7 +1470,139 @@ def _fake_ytdlp(_settings: Settings, job_dir: Path, canonical_url: str) -> None:
     }
     (job_dir / f"{bvid}.info.json").write_text(json.dumps(info), encoding="utf-8")
     (job_dir / f"{bvid}.description").write_text("原始简介", encoding="utf-8")
-    (job_dir / f"{bvid}.ai-zh.srt").write_text("1\n00:00:00,000 --> 00:00:01,000\n字幕\n", encoding="utf-8")
+    if include_subtitles:
+        (job_dir / f"{bvid}.ai-zh.srt").write_text("1\n00:00:00,000 --> 00:00:01,000\n字幕\n", encoding="utf-8")
+
+
+def test_prepare_transcript_builds_standard_job_and_finalizes(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_e2e_config(tmp_path, taxonomy)
+    transcript = tmp_path / "sensevoice.txt"
+    transcript.write_text("这是 ASR 转写。三连后领取工作流。", encoding="utf-8")
+    monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", _fake_ytdlp)
+    monkeypatch.setattr("bili_learning.lifecycle._schedule_failsafe_cleanup", lambda *args: None)
+
+    prepared, code = prepare_transcript_note(tmp_path, "BV1TXua68EYi", transcript)
+
+    assert code == 0 and prepared["status"] == "materials_ready"
+    assert prepared["asr_fallback_used"] is True
+    assert prepared["transcript_source_type"] == "asr_text"
+    assert "subtitle_path" not in prepared
+    runtime_source = Path(prepared["transcript_source_path"])
+    assert runtime_source.name == "asr-transcript.txt"
+    assert runtime_source.read_text(encoding="utf-8") == transcript.read_text(encoding="utf-8")
+    manifest = json.loads(Path(prepared["transcript_manifest_path"]).read_text(encoding="utf-8"))
+    assert manifest["source_type"] == "asr_text"
+    assert manifest["timestamps_available"] is False
+
+    draft = Path(prepared["draft_path"])
+    draft.write_text(_complete_ai_regions(draft.read_text(encoding="utf-8")), encoding="utf-8")
+    _write_passed_analysis(Path(prepared["analysis_path"]))
+    completed, finalize_code = finalize_note(tmp_path, Path(prepared["job_dir"]), draft)
+    assert finalize_code == 0 and completed["status"] == "note_ready"
+    assert Path(prepared["note_path"]).is_file()
+
+
+def test_prepare_transcript_recovers_complete_job_after_external_transcript_disappears(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_e2e_config(tmp_path, taxonomy)
+    transcript = tmp_path / "sensevoice.txt"
+    transcript.write_text("可恢复的 ASR 文本。", encoding="utf-8")
+    monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", _fake_ytdlp)
+    monkeypatch.setattr("bili_learning.lifecycle._schedule_failsafe_cleanup", lambda *args: None)
+
+    prepared, code = prepare_transcript_note(tmp_path, "BV1TXua68EYi", transcript)
+    assert code == 0 and prepared["status"] == "materials_ready"
+    transcript.unlink()
+    monkeypatch.setattr("bili_learning.runtime._process_is_alive", lambda _pid: False)
+
+    def fail_if_recollected(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        raise AssertionError("recoverable ASR job must not run yt-dlp again")
+
+    monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", fail_if_recollected)
+    recovered, recover_code = prepare_transcript_note(tmp_path, "BV1TXua68EYi", transcript)
+
+    assert recover_code == 0
+    assert recovered["status"] == "materials_ready"
+    assert recovered["recovered"] is True
+    assert recovered["asr_fallback_used"] is True
+    assert recovered["job_dir"] == prepared["job_dir"]
+    assert Path(recovered["transcript_source_path"]).is_file()
+
+
+def test_prepare_description_builds_standard_resource_job_and_finalizes(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_e2e_config(tmp_path, taxonomy)
+    include_subtitles_calls: list[bool] = []
+
+    def fake_ytdlp(
+        settings: Settings,
+        job_dir: Path,
+        canonical_url: str,
+        *,
+        include_subtitles: bool = True,
+    ) -> None:
+        include_subtitles_calls.append(include_subtitles)
+        _fake_ytdlp(settings, job_dir, canonical_url, include_subtitles=include_subtitles)
+
+    monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", fake_ytdlp)
+    monkeypatch.setattr("bili_learning.lifecycle._schedule_failsafe_cleanup", lambda *args: None)
+
+    prepared, code = prepare_description_note(
+        tmp_path,
+        "纯资源分享，只整理简介，不用字幕：BV1TXua68EYi",
+    )
+
+    assert code == 0 and prepared["status"] == "materials_ready"
+    assert include_subtitles_calls == [False]
+    assert prepared["source_mode"] == SOURCE_MODE_DESCRIPTION
+    assert prepared["source_path"] is None
+    assert prepared["source_package_mode"] == "none"
+    assert prepared["source_chunk_count"] == 0
+    assert prepared["source_timestamps_available"] is False
+    assert "subtitle_path" not in prepared
+    manifest = json.loads(Path(prepared["source_manifest_path"]).read_text(encoding="utf-8"))
+    assert manifest["source_mode"] == SOURCE_MODE_DESCRIPTION
+    assert manifest["source_location"] == "job.description"
+    assert manifest["chunks"] == []
+    handoff = Path(prepared["handoff_path"]).read_text(encoding="utf-8")
+    assert "纯资源分享" in handoff
+    assert "不要推断视频口播" in handoff
+
+    draft = Path(prepared["draft_path"])
+    draft.write_text(_complete_ai_regions(draft.read_text(encoding="utf-8")), encoding="utf-8")
+    _write_passed_analysis(Path(prepared["analysis_path"]))
+    completed, finalize_code = finalize_note(tmp_path, Path(prepared["job_dir"]), draft)
+    assert finalize_code == 0 and completed["status"] == "note_ready"
+    assert Path(prepared["note_path"]).is_file()
+
+
+def test_prepare_description_recovers_without_a_source_file(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_e2e_config(tmp_path, taxonomy)
+    monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", _fake_ytdlp)
+    monkeypatch.setattr("bili_learning.lifecycle._schedule_failsafe_cleanup", lambda *args: None)
+
+    prepared, code = prepare_description_note(tmp_path, "纯资源分享：BV1TXua68EYi")
+    assert code == 0 and prepared["status"] == "materials_ready"
+    monkeypatch.setattr("bili_learning.runtime._process_is_alive", lambda _pid: False)
+
+    def fail_if_recollected(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        raise AssertionError("recoverable description-only job must not run yt-dlp again")
+
+    monkeypatch.setattr("bili_learning.lifecycle.run_ytdlp", fail_if_recollected)
+    recovered, recover_code = prepare_description_note(tmp_path, "纯资源分享：BV1TXua68EYi")
+
+    assert recover_code == 0
+    assert recovered["status"] == "materials_ready"
+    assert recovered["recovered"] is True
+    assert recovered["source_mode"] == SOURCE_MODE_DESCRIPTION
+    assert recovered["source_path"] is None
+    assert recovered["job_dir"] == prepared["job_dir"]
 
 
 def test_e2e_draft_publish_navigation_and_repeated_video(
@@ -1648,6 +1854,9 @@ def test_agent_skills_require_organize_scope_confirmation() -> None:
         assert "--destination" in text
         assert "不得修改笔记内容" in text
         assert "--confirmed-scope" in text
+        assert "prepare-transcript" in text
+        assert "不得把纯文本伪造成 SRT" in text
+        assert "不得制造时间戳" in text
 
 
 def test_organize_note_only_renames_moves_and_rebuilds_navigation(tmp_path: Path, taxonomy: dict) -> None:
@@ -1873,6 +2082,40 @@ def test_ytdlp_command_never_downloads_media(
     assert "--write-auto-subs" in command
     assert command[command.index("--sub-format") + 1] == "srt"
     assert captured["timeout"] == 180
+
+
+def test_ytdlp_metadata_only_mode_skips_subtitle_requests(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    settings = _settings(tmp_path, taxonomy)
+    job_dir = settings.runtime_root / "metadata-job"
+    job_dir.mkdir(parents=True)
+    captured: dict[str, object] = {}
+
+    class Completed:
+        returncode = 0
+
+    def fake_run(command, **_kwargs):  # type: ignore[no-untyped-def]
+        captured["command"] = command
+        return Completed()
+
+    monkeypatch.setattr("bili_learning.collector.subprocess.run", fake_run)
+    run_ytdlp(
+        settings,
+        job_dir,
+        "https://www.bilibili.com/video/BV1TXua68EYi/",
+        include_subtitles=False,
+    )
+
+    command = captured["command"]
+    assert isinstance(command, list)
+    assert "--skip-download" in command
+    assert "--write-info-json" in command
+    assert "--write-description" in command
+    assert "--write-subs" not in command
+    assert "--write-auto-subs" not in command
+    assert "--sub-langs" not in command
+    assert "--sub-format" not in command
 
 
 def test_select_subtitle_only_accepts_supported_srt_languages(tmp_path: Path) -> None:

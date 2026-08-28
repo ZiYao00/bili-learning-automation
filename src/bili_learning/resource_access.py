@@ -4,6 +4,8 @@ import html
 import re
 from pathlib import Path
 
+from .source import SOURCE_MODE_ASR, SOURCE_MODE_SUBTITLE, SourceMaterial
+
 _RESOURCE_TERMS = (
     "提示词模板",
     "工程文件",
@@ -132,20 +134,26 @@ def _subtitle_cues(subtitle_path: Path) -> list[str]:
     return cues
 
 
-def detect_resource_access_notices(description: str, subtitle_path: Path) -> list[dict[str, str]]:
+def detect_resource_access_notices(
+    description: str,
+    source: SourceMaterial | Path,
+    *,
+    transcript_source: str | None = None,
+) -> list[dict[str, str]]:
     """Detect explicit source-backed conditions for receiving extra materials.
 
-    Detection is intentionally conservative: a candidate must mention a resource,
-    an access condition/method and a concrete acquisition action in a small source
-    window. The returned source text is preserved for deterministic rendering; the
-    agent must never infer the missing material itself.
+    Passing a plain Path is retained as a schema-v1 compatibility form.
     """
+
+    if isinstance(source, Path):
+        mode = SOURCE_MODE_ASR if transcript_source == "asr" else SOURCE_MODE_SUBTITLE
+        source = SourceMaterial(mode, source)
 
     notices: list[dict[str, str]] = []
     seen: set[tuple[str, str]] = set()
 
-    def add(candidate: str, source: str) -> bool:
-        notice = _notice_from_text(candidate, source)
+    def add(candidate: str, provenance: str) -> bool:
+        notice = _notice_from_text(candidate, provenance)
         if not notice:
             return False
         key = (notice["condition"], notice["resource"])
@@ -155,16 +163,18 @@ def detect_resource_access_notices(description: str, subtitle_path: Path) -> lis
         notices.append(notice)
         return True
 
-    def add_sequence(lines: list[str], source: str) -> None:
+    def add_sequence(lines: list[str], provenance: str) -> None:
         matched: set[int] = set()
         for index, line in enumerate(lines):
-            if add(line, source):
+            if add(line, provenance):
                 matched.add(index)
         for index in range(len(lines) - 1):
             if index in matched or index + 1 in matched:
                 continue
-            add(f"{lines[index]} {lines[index + 1]}", source)
+            add(f"{lines[index]} {lines[index + 1]}", provenance)
 
     add_sequence(_description_lines(description), "description")
-    add_sequence(_subtitle_cues(subtitle_path), "subtitle")
+    if source.path is not None:
+        provenance = "asr" if source.mode == SOURCE_MODE_ASR else "subtitle"
+        add_sequence(_subtitle_cues(source.path), provenance)
     return notices[:6]

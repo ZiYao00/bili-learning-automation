@@ -19,7 +19,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     if args and args[0].startswith("--cleanup-job"):
         args = ["prepare", "--cleanup-runner", str(Path(__file__).resolve()), *args]
-    elif args and args[0] == "prepare":
-        args = ["prepare", "--cleanup-runner", str(Path(__file__).resolve()), *args[1:]]
+    elif args and args[0] in {"prepare", "prepare-transcript", "prepare-description"}:
+        args = [args[0], "--cleanup-runner", str(Path(__file__).resolve()), *args[1:]]
     sys.argv = ["bili-learning", "--project-root", str(PROJECT_ROOT), *args]
     main()

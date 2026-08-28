@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Added
+
+- 新增统一 Source Mode 契约：`subtitle_srt`、`asr_text`、`description_only` 三种来源共用同一个 Job lifecycle、source manifest、handoff、finalizer、恢复与 retire 逻辑。
+- 新增 `prepare-transcript`，把用户明确授权后由独立 ASR 工具取得的无时间戳纯文本接回标准 Job；不自动下载音频、不自动调用 ASR，也不伪造 SRT / 时间戳。
+- 新增 `prepare-description`，仅在用户当前消息明确要求“纯资源分享 / 只整理简介 / 不用字幕”时，只采集 metadata 与 UP 主简介并创建标准短记 Job；不请求字幕，也不推断视频口播或画面事实。
+
+### Changed
+
+- `prepare`、`prepare-transcript` 与 `prepare-description` 现在只保留清晰的外部入口，内部统一调用 `_prepare_materials`；ASR 与 description-only 的 metadata 采集不再附带字幕请求。
+- Hermes / WorkBuddy Skill 收敛为三路显式意图路由和统一 `materials_ready → handoff → finalize` 主干，不复制核心实现，也不允许根据标题、历史 memory 自动跳过字幕。
+
+### Fixed
+
+- 无字幕 ASR 旁路不再要求 Agent 手工组装 `job.json` / draft / manifest；纯资源分享也不再通过直接修改已发布笔记绕过 finalizer。
+- 完整 Job 的恢复现在校验请求的 `source_mode`；description-only 可在没有独立 source 文件的情况下恢复，ASR Job 使用 runtime 内副本恢复。
+- 保留 schema-v1 的 `transcript_*` 响应别名，已安装适配层与旧 Job 可以在迁移期间继续工作；新代码使用 `source_*` 契约。
+
 ## [1.1.0] - 2026-08-27
 
 ### Added

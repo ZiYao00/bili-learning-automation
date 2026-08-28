@@ -2,9 +2,9 @@
 
 [简体中文](README.md) | [English](README.en.md)
 
-`bili-learning-automation` 用于把 Bilibili 视频的字幕、UP 主简介和元数据整理为 Obsidian 学习笔记。
+`bili-learning-automation` 用于把 Bilibili 视频的字幕、明确授权后的 ASR 纯文本，或明确指定的 UP 主简介资源信息整理为 Obsidian 笔记。
 
-默认流程使用 `yt-dlp --skip-download`，**不下载视频或音频**。Agent 负责阅读字幕和整理知识，程序负责元数据、文件路径、校验、发布，以及 runtime 任务的恢复、并发保护与 retire 生命周期。
+默认 `prepare` 使用字幕优先，并通过 `yt-dlp --skip-download` **不下载视频或音频**。用户明确授权 ASR 时用 `prepare-transcript` 回流纯文本；用户当前消息明确要求“纯资源分享 / 只整理简介 / 不用字幕”时用 `prepare-description`。三个入口共用同一 Job、校验、发布、恢复、并发保护与 retire 生命周期。
 
 > 第一次使用：直接阅读 **[新手快速上手](docs/QUICKSTART.md)**。
 > 不知道该看哪份文档：打开 **[文档中心](docs/README.md)**。
@@ -17,11 +17,11 @@
 
 ```text
 B站链接 / BV号
-→ 获取中文字幕、UP 主简介和元数据
-→ 生成 transcript；长字幕自动分块
+→ 按当前消息明确意图选择 subtitle_srt / asr_text / description_only
+→ 生成统一 source manifest；subtitle / ASR 按需分块，description-only 不伪造 chunk
 → Agent 判断现有来源是否足够
 → 整理“先看结论 + 知识正文”
-→ 回看字幕做覆盖复核
+→ 回看当前 Job 允许的来源做覆盖复核
 → finalizer 校验
 → 发布到 Obsidian 的 00-待整理
 → runtime Job 退出活动区并 retire
@@ -37,10 +37,11 @@ B站链接 / BV号
 - UP 主简介中的 GitHub、模型、工作流等资源；
 - 来源明确说明的限制、风险和选择条件。
 
-正文事实默认只来自：
+正文事实只来自当前 Job 允许的来源：
 
-- 当前视频字幕；
-- UP 主原始简介。
+- `subtitle_srt`：当前视频字幕、UP 主原始简介和明确用户补充来源；
+- `asr_text`：用户明确授权后的 ASR 纯文本、UP 主原始简介和明确用户补充来源；
+- `description_only`：标题、metadata、UP 主原始简介和明确用户补充来源，不推断视频口播或画面事实。
 
 如果字幕缺失严重、重要信息只能依赖画面判断，或现有文字不足以形成可信笔记，Agent 可以停止任务并返回 `source_insufficient`，不会使用模型常识补齐具体事实。
 
@@ -199,6 +200,16 @@ BVxxxxxxxxxx
 
 也支持受支持的 Bilibili 复制文本和 `b23.tv` 短链。
 
+来源路由只看当前消息的明确意图：
+
+```text
+转换这条链接                          → 默认字幕优先
+纯资源分享，只整理简介，不用字幕      → description_only
+（默认流程无字幕后）ASR，下载音频转文字 → asr_text
+```
+
+项目不会仅凭标题、历史 memory 或“看起来像资源分享”自动跳过字幕。
+
 正常情况下，用户不需要手工：
 
 - 下载字幕；
@@ -235,7 +246,7 @@ UP 主资源 / 资料获取条件 / 视频简介 / UP 主原文
 
 知识正文没有固定章节数量。Agent 根据当前视频实际内容决定使用标题、表格、步骤、列表和 Callout。
 
-视频字幕可能来自音频自动转写。遇到无法确认的模型名、插件名等专有名词时，当前内容标准要求保留不确定性，不允许把模型记忆静默改写成来源事实。
+subtitle / ASR 来源可能包含自动转写噪声；遇到无法确认的模型名、插件名等专有名词时要保留不确定性，不允许把模型记忆静默改写成来源事实。description-only 没有音频来源，不得据此反推视频口播。
 
 ---
 
@@ -244,11 +255,11 @@ UP 主资源 / 资料获取条件 / 视频简介 / UP 主原文
 ### `light`：默认
 
 ```text
-完整读取 transcript
+按 source manifest 读取当前允许来源
 → 来源充分性判断
-→ 直接完成正文
+→ 直接完成正文（description-only 保持纯资源短记）
 → 独立排版优化
-→ 回看 transcript 做覆盖复核
+→ 回看当前允许来源做覆盖复核
 → finalizer
 ```
 
@@ -279,7 +290,7 @@ Fact Ledger
 
 ## 7. Agent 与模型说明
 
-本项目**不绑定特定 LLM**。Hermes、WorkBuddy 和 Codex 是不同入口，采集、transcript、taxonomy、内容标准、validator 和 finalizer 共用同一套核心逻辑。
+本项目**不绑定特定 LLM**。Hermes、WorkBuddy 和 Codex 是不同入口，来源采集、Source Mode、source manifest、taxonomy、内容标准、validator 和 finalizer 共用同一套核心逻辑。
 
 不同模型可能在以下方面表现不同：
 
@@ -298,10 +309,10 @@ Fact Ledger
 | 状态 | 含义 | 处理方式 |
 | --- | --- | --- |
 | `onboarding_required` | 首次环境仍缺少 Vault / Cookie / yt-dlp 等必需配置 | 按 `actions` 处理后重新检查并重试原链接 |
-| `materials_ready` | 字幕、简介和元数据已经准备完成 | Agent 继续处理；若同时有 `recovered: true`，表示核心已恢复旧 Job，不会重复采集 |
+| `materials_ready` | 当前 `source_mode` 的标准 Job 已准备完成 | Agent 按 `source_manifest_path` 和 handoff 继续；`recovered: true` 表示核心已恢复同一来源模式的旧 Job |
 | `in_progress` | 同一 BV 仍有真实活动任务 | 不要重复采集或手工处理 runtime |
 | `subtitle_unavailable` | 没有取得可用中文字幕 | 本次停止 |
-| `source_insufficient` | 现有字幕 / 简介不足以形成可信笔记 | 更换资料更完整的视频 |
+| `source_insufficient` | 当前来源模式不足以形成可信笔记 | 默认/ASR 可换更完整来源；description-only 应补充简介资料或改走字幕流程 |
 | `note_ready` | Finalizer 校验通过并已发布 | 业务完成；runtime retire/维护状态不改变发布结果 |
 | `note_invalid` | 草稿未通过最终校验 | 按错误信息修复，不绕过 finalizer |
 | `failed` | 配置、采集或运行失败 | 先运行 doctor，再查故障排查 |

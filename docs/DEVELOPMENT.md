@@ -2,7 +2,7 @@
 
 ## 环境
 
-项目核心 package 位于 `src/bili_learning`，Hermes 下的三个正式脚本保留为兼容入口。
+项目核心 package 位于 `src/bili_learning`，Hermes 下的正式脚本保留为兼容入口。
 
 ```powershell
 py -3 -m venv .venv
@@ -16,7 +16,7 @@ python -m pip install -e ".[dev]"
 ## 本地验证
 
 ```powershell
-python -m compileall -q src hermes-skills/bili-learning-automation/scripts
+python -m compileall -q src hermes-skills/bili-learning-automation/scripts workbuddy-skills/bili-learning-automation/scripts
 python -m ruff check .
 python -m pytest -q
 ```
@@ -26,6 +26,7 @@ python -m pytest -q
 ## 设计原则
 
 - 确定性数据由 Python 生成，不让 LLM 重写元数据。
+- `subtitle_srt`、`asr_text`、`description_only` 只在 SourceMaterial 层分流；三个外部入口必须共用 `_prepare_materials`、Job、handoff、finalizer、恢复与 retire，不为新来源复制 lifecycle。
 - taxonomy 是分类规则与 repository fallback 的配置源；正式 Obsidian 笔记位置优先使用本机 `vault_root + notes_subdir`，旧 `notes_root` 仅用于兼容。
 - 每次成功转换生成一篇笔记；同名文件使用序号防覆盖，BVID 不作为文件级唯一性约束。
 - 公开 CI 不访问真实 Bilibili 账号。
@@ -35,6 +36,8 @@ python -m pytest -q
 ## 兼容入口
 
 - `prepare_ytdlp_bilibili_note.py`
+- `prepare_transcript_bilibili_note.py`
+- `prepare_description_bilibili_note.py`
 - `finalize_ytdlp_bilibili_note.py`
 - `build_bilibili_navigation.py`
 - `doctor_bilibili_learning.py`
@@ -75,7 +78,7 @@ Benchmark 重点比较：
 准备 commit / push 前，先复核当前 diff，确认没有把 Cookie、`.runtime`、私人笔记、测试抓取材料、本机绝对路径或其它机器特征提交进去；同时确认 Git author / committer 邮箱是维护者愿意公开的地址。然后运行：
 
 ```powershell
-python -m compileall -q src hermes-skills/bili-learning-automation/scripts
+python -m compileall -q src hermes-skills/bili-learning-automation/scripts workbuddy-skills/bili-learning-automation/scripts
 python -m ruff check .
 python -m pytest -q
 git diff --check

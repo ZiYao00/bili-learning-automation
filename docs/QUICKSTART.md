@@ -8,12 +8,12 @@
 
 ```text
 发送 B站链接 / BV号
-→ 自动获取字幕、简介和元数据
-→ 智能体整理为学习笔记
+→ 按当前消息明确意图选择字幕 / ASR / 纯简介资源来源
+→ 智能体按标准 Job 整理笔记
 → 写入 Obsidian
 ```
 
-默认流程**不会下载视频或音频**，主要使用 Bilibili 字幕、视频简介和元数据生成学习笔记。
+默认流程字幕优先且**不会下载视频或音频**。只有用户明确要求 ASR 才下载临时音轨转写；只有当前消息明确要求“纯资源分享 / 只整理简介 / 不用字幕”才跳过字幕请求。三个入口共用同一 Job lifecycle。
 
 ---
 
@@ -254,7 +254,7 @@ WorkBuddy 适配层位于：
 workbuddy-skills/bili-learning-automation/
 ```
 
-它只是入口适配层，实际仍调用同一套核心 collector、transcript、finalizer 和笔记标准。
+它只是入口适配层，实际仍调用同一套 Source Mode、`_prepare_materials`、Job、source manifest、finalizer 和笔记标准。
 
 第一次安装见 [WorkBuddy Skill 安装教程](WORKBUDDY-SKILL-INSTALL.md)。
 
@@ -286,18 +286,26 @@ BVxxxxxxxxxx
 
 以及受支持的 Bilibili 复制文本和 `b23.tv` 短链。
 
-正常情况下，你不需要再输入命令、指定文件名或手动处理字幕。
+来源模式只根据当前消息明确选择：
+
+```text
+转换这条链接                          → 默认 subtitle_srt
+纯资源分享，只整理简介，不用字幕      → description_only
+（默认流程无字幕后）ASR，下载音频转文字 → asr_text
+```
+
+不得只凭标题、视频类型猜测或历史 memory 自动跳过字幕。正常情况下，你不需要输入底层命令、指定文件名或手工处理 runtime。
 
 智能体会自动完成：
 
 ```text
-识别链接
-→ yt-dlp 获取字幕 / 简介 / 元数据
-→ 生成 transcript
-→ 判断资料是否足够
-→ 完整读字幕并写“先看结论 + 知识正文”
+识别链接和当前消息的明确来源意图
+→ 按 source_mode 采集 metadata / 简介 / 字幕或接入 ASR 纯文本
+→ 生成统一 source manifest（description-only 不伪造 chunk）
+→ 判断当前允许来源是否足够
+→ 写“先看结论 + 正文”；description-only 保持纯资源分享短记
 → 内容完成后做一次版式优化
-→ 回看字幕完成覆盖复核
+→ 回看当前允许来源完成覆盖复核
 → finalizer 校验
 → 写入 Obsidian
 → runtime Job 退出活动区并 retire
@@ -318,13 +326,13 @@ BVxxxxxxxxxx
 程序会自动生成：
 
 ```text
-transcript-manifest.json
-transcript/transcript-01.txt
-transcript/transcript-02.txt
+source-manifest.json
+source/source-01.txt
+source/source-02.txt
 ...
 ```
 
-短字幕通常直接读取一个 chunk；长字幕会按完整字幕 cue 自动切块。极小尾块会自动并入前一块，避免智能体为了几十个字符再多执行一次读取。
+subtitle / ASR 模式会生成 source chunks：短文本通常一个，长文本按 cue 或确定性文本段自动切块，极小尾块自动合并。description-only 只生成 manifest，`chunks` 为空，因为正文来源直接位于 Job 的标题、metadata、简介和用户补充材料中。
 
 这些文件属于 runtime 数据。任务结束后，finalizer / failsafe 会把 Job 从活动区 retire 到 `.runtime/bilibili-learning/retired/`；物理删除属于后续维护，不是笔记成功的前提。用户不需要手工删除。
 
@@ -401,10 +409,10 @@ bili-learning organize `
 | 状态 | 含义 | 用户通常怎么做 |
 | --- | --- | --- |
 | `onboarding_required` | 首次环境仍缺少 Vault / Cookie / yt-dlp 等必需配置 | 按返回的 `actions` 处理，再重新检查并重试原链接 |
-| `materials_ready` | 字幕、简介等材料已经准备好 | 等智能体继续写笔记；若同时返回 `recovered: true`，表示核心已恢复旧 Job，不会重新采集 |
+| `materials_ready` | 当前 `source_mode` 的标准 Job 已准备好 | 按 `source_manifest_path` 和 handoff 继续；`recovered: true` 表示核心已恢复同一来源模式的旧 Job |
 | `in_progress` | 同一 BV 号仍有真实活动任务 | 不要重复启动，也不要手工处理 reservation / lock |
 | `subtitle_unavailable` | 没有取得可用中文字幕 | 本次不会生成笔记，也不会下载音视频 |
-| `source_insufficient` | 字幕 / 简介不足以写可靠笔记 | 换资料更完整的视频 |
+| `source_insufficient` | 当前来源模式不足以写可靠笔记 | 默认/ASR 可换更完整文字；description-only 应补充简介资料或改走字幕流程 |
 | `note_ready` | finalizer 已校验并正式发布 | 完成；runtime retire/维护状态不改变发布结果 |
 | `note_invalid` | 草稿没有通过最终校验 | 查看错误，不要绕过 finalizer |
 | `failed` | 采集、配置或运行过程失败 | 先运行 doctor，再看故障排查 |

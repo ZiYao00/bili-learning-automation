@@ -1,6 +1,6 @@
 # B站视频转笔记
 
-本项目服务 Codex、Hermes 与 WorkBuddy。三者共用同一套采集、taxonomy、确定性笔记骨架、校验、发布和清理逻辑。
+本项目服务 Codex、Hermes 与 WorkBuddy。三者共用同一套环境门禁、来源采集、Job lifecycle、taxonomy、确定性笔记骨架、校验、发布、导航和清理逻辑。
 
 ## 安装验收、首次使用与环境门禁
 
@@ -18,16 +18,18 @@
 - `warnings` 中的 CSS 缺失不阻塞笔记生成，但首次出现时应告知：共享真源是 `obsidian-learning-snippets`，需要 `learning-lab.css + video-note.css`，程序不会静默复制或覆盖；安装后还要在 Obsidian“设置 → 外观 → CSS 代码片段”中启用。
 - 配置后重新运行 onboarding；只有 `ready` 才进入采集或把环境描述为“可直接使用”。`prepare` 自身也有同一门禁，若返回 `onboarding_required`，按其 `actions / warnings` 处理后重试原链接。
 
-## 先读取任务模式
+## 先选择来源，再读取任务模式
 
-生成或修改 `notes\bilibili` 中的笔记前，先读取 collector 返回的 `handoff_path` 与 `job.json`，再根据 `workflow_mode` 选择说明：
+不得根据标题、历史 memory 或模型猜测自动跳过字幕。默认“转换链接”使用 `prepare / subtitle_srt`；当前消息明确要求“纯资源分享 / 只整理简介 / 不用字幕 / 跳过字幕”才使用 `prepare-description / description_only`；默认入口返回 `subtitle_unavailable` 后，只有用户明确要求 ASR 才使用独立 ASR 工具与 `prepare-transcript / asr_text`。
+
+三个入口共用同一个 Job lifecycle。生成笔记前读取 collector 返回的 `handoff_path`、`job.json`、`analysis_path` 与 `source_manifest_path`，再根据 `workflow_mode` 选择说明。旧 Job 的 `transcript_manifest_path` 仅作为 schema-v1 兼容别名。
 
 ### `light`（当前默认实验模式）
 
 只需读取：
 
 - `docs\standards\LIGHT-WORKFLOW.md`
-- 当前 `transcript_manifest_path` 及全部 transcript chunk
+- 当前 `source_manifest_path` 及 manifest 中实际存在的全部 source chunk
 
 不要主动加载或执行 `KNOWLEDGE-DENSE-WORKFLOW.md`，也不要创建 Fact Ledger、Semantic Draft 或 Layout Plan。先完整写内容，再在同一笔记上独立做一次排版优化；只有进入排版阶段后，才可按需读取 `docs\OBSIDIAN-STYLING.md` 和示例文档中的相关局部片段。
 
@@ -45,7 +47,7 @@
 ## 所有模式共同遵守
 
 - Python 负责 Frontmatter、H1、标题元信息、播放器与来源区、UP 主资源、原始简介、iframe、tags、`learning-page + video-note`、文件名、路径和 marker；Agent 只填写两个 AI 区域与 runtime `analysis.json`。
-- 正文事实只来自当前字幕和 UP 主简介。来源不足时停止，不用模型常识补具体参数、资源或结论。
+- 正文事实只来自当前 Job 允许的来源：SRT 字幕、明确授权后的 ASR 纯文本，或明确要求 `description_only` 时的标题 / metadata / UP 主简介 / 用户补充来源。`description_only` 不得推断视频口播、画面参数或未提供的资源本体。来源不足时停止，不用模型常识补具体参数、资源或结论。
 - 不覆盖已有笔记，不把 Cookie、runtime 路径、日志或内部状态写进正式笔记。
 - 视频简介抓取失败不能当作视频没有简介。
 - finalizer 返回 `note_ready` 即表示业务完成；临时数据采用 retire/维护语义，`temporary_data_retired` 或 `cleanup_warning` 不得覆盖已成功的发布结果。

@@ -1,6 +1,6 @@
 # 智能体接入协议
 
-本项目当前优先服务 Codex、Hermes 与 WorkBuddy。核心脚本、字幕采集、内容质量标准、taxonomy 与 finalizer 是唯一事实来源；适配层只负责各平台的入口、授权、调用和最终回复。未来其他智能体如需接入，应复用核心协议而不是复制一套新的写作规则。
+本项目当前优先服务 Codex、Hermes 与 WorkBuddy。核心脚本、Source Mode、内容质量标准、taxonomy 与 finalizer 是唯一事实来源；适配层只负责各平台的入口、当前消息意图路由、授权、调用和最终回复。未来其他智能体应复用核心协议，不复制来源采集、Job 或写作规则。
 
 ## 输入与授权
 
@@ -10,13 +10,13 @@
 
 ## 必须执行的流程
 
-1. 先通过统一 onboarding 门禁确认环境；再把原始消息交给 collector，并按返回的 `status` 分支。`onboarding_required` 时按 `actions / warnings` 处理；`in_progress` 表示仍有真实活动任务，不重复采集；`materials_ready` 正常继续。若同时返回 `recovered: true`，表示共享核心已恢复此前完整 Job，不要再次调用 yt-dlp，也不要在适配层自行判断 stale / PID。
-2. 读取 `handoff_path`、`job.json`、`analysis_path`、`workflow_mode` 与 `transcript_manifest_path`。按 manifest 顺序完整读取全部 transcript chunk，不自行重新切分或跳读。
-3. 先判断字幕与简介是否足以支撑可信笔记，并填写 `analysis.json`。来源不足时停止，不用模型常识补具体参数、资源或结论。
+1. 先通过统一 onboarding 门禁确认环境，再按当前消息的明确意图选择入口：默认 `prepare / subtitle_srt`；明确“纯资源分享 / 只整理简介 / 不用字幕”使用 `prepare-description / description_only`；默认入口返回 `subtitle_unavailable` 后，只有用户明确授权 ASR 才先取得纯文本并调用 `prepare-transcript / asr_text`。不得根据标题、历史 memory 或模型猜测自动改变来源模式。三个入口共用同一 Job lifecycle。
+2. 读取 `handoff_path`、`job.json`、`analysis_path`、`workflow_mode` 与 `source_manifest_path`。按 manifest 完整读取实际存在的 source chunks，不自行切分或跳读。`description_only` 的 manifest 没有伪造 chunk；此时只读取 Job 中的标题、metadata、UP 主简介和明确用户补充来源。旧 Job 仍兼容 `transcript_manifest_path`。
+3. 判断当前 `source_mode` 允许的来源是否足以支撑可信笔记，并填写 `analysis.json`。`description_only` 不得推断视频口播、画面参数或未提供的资源内容；任何模式来源不足时都停止，不用模型常识补事实。
 4. 按 `workflow_mode` 执行：
    - `light`：读取 `docs\standards\LIGHT-WORKFLOW.md`，直接完成正文；先写完整内容，再做一次独立排版优化，不创建 Fact Ledger、Semantic Draft 或 Layout Plan。
    - `strict`：按 `fact_ledger_path → semantic_draft_path → layout_plan_path → draft_path` 执行，完整规则见 `CODEX-VIDEO-NOTE-GUIDE.md` 与 `KNOWLEDGE-DENSE-WORKFLOW.md`。
-5. 最终排版后回看 transcript，修正明显遗漏和无来源内容；严格模式还要对照 Fact Ledger 与 Semantic Draft。完成后更新 `coverage_review`。
+5. 最终排版后回看当前 Job 允许的来源，修正明显遗漏和无来源内容；strict 模式还要对照 Fact Ledger 与 Semantic Draft。完成后更新 `coverage_review`。
 6. 无论成功、失败或中断，都由 finalizer 接管 runtime 生命周期。`note_ready` 即表示业务完成；`temporary_data_retired` / `cleanup_warning` 只描述 Job retire 或维护状态，不得把已经发布成功的笔记改判为失败。
 
 `onboarding_required`、`in_progress`、`subtitle_unavailable`、`source_insufficient`、`failed` 和 `note_invalid` 都不是完成状态。
@@ -35,25 +35,25 @@ Organizer 在改写短标题时会保留原视频标题，并统一更新 Tags�
 
 ## 数据契约
 
-- 新生成的 `job.json` 使用 `schema_version: 1`，并包含 `workflow_mode: light | strict`；当前默认值为 `light`。
-- collector 与 finalizer 的 JSON 响应包含 `schema_version: 1`、`status` 和可读 `message`（如适用）；`materials_ready` 还会返回 `workflow_mode`，恢复旧 Job 时额外返回 `recovered: true`。智能体必须以结构化状态判断分支，不解析底层锁或 PID 来自行接管任务。
+- 新生成的 `job.json` 继续使用 `schema_version: 1`，包含 `source_mode: subtitle_srt | asr_text | description_only`、`source_manifest_path`、source package 状态与 `workflow_mode: light | strict`。旧 `transcript_*` 字段作为迁移期兼容别名保留，新适配层使用 `source_*`。
+- collector 与 finalizer 的 JSON 响应包含 `schema_version: 1`、`status` 和可读 `message`（如适用）；`materials_ready` 返回 `source_mode`、`source_manifest_path`、source package 状态与 `workflow_mode`，恢复时额外返回 `recovered: true`。智能体必须以结构化状态判断分支，不解析底层锁或 PID。
 - Frontmatter 的 `author`、`published`、`duration`、`source`、tags 与 `cssclasses`，以及标题下方“作者 · 日期 · 时长 · BVID”元信息行由程序生成，智能体不得自行改写；视频笔记固定使用 `learning-page + video-note` 以接入共享 Obsidian 视觉系统。
 - `analysis.json` 是 runtime-only 质量报告，不进入最终 Obsidian 笔记。它用于记录来源充分性、知识索引和覆盖复核状态。
 - 只有 `strict` 模式会在 `agent_work_dir` 创建 `fact-ledger.md`、`semantic-draft.md` 与 `layout-plan.md`，并返回对应路径；`light` 模式不创建这些文件。
 
 ## 不可突破的数据边界
 
-- 默认流程只采集 metadata、UP 主原始简介和 `ai-zh`/`zh.*` 的 SRT 字幕；不得下载音视频、启动 Chrome/CDP 或回退到 ASR。
+- 默认 `prepare` 使用 subtitle-first，但仍通过 `--skip-download` 不下载媒体；`prepare-transcript` 与 `prepare-description` 只采集 metadata / 简介，不请求字幕。ASR 只在 `subtitle_unavailable` 后得到用户明确授权时运行；description-only 只在当前消息明确要求纯资源分享时运行。
 - `confirmed_empty` 仅代表 info-json 明确给出空字符串且（如存在）简介 sidecar 与其一致；字段缺失、`null`、类型异常或两者不一致都必须失败。
 - Cookie 内容不得读取、打印、上传、编辑、提交或写入笔记；collector 仅可把配置的 Cookie 文件路径传给 yt-dlp。
-- 原始字幕、元数据、简介、`analysis.json`、日志和智能体临时工作文件只允许存在于 `.runtime/bilibili-learning` 的单个活动 Job；finalizer / failsafe 负责把 Job 退出活动区并 retire 到 `retired/`。物理删除属于独立维护，不是笔记成功前提。
-- 智能体只可编辑既定的 `analysis.json`、草稿中的两个 AI 区域，以及当前模式明确提供的 runtime 工作文件。原始 SRT 会被转换为 `transcript-manifest.json` 与一个或多个 transcript chunk；转换只移除 SRT 序号、毫秒精度与空行，保留字幕文字、顺序和 cue 边界，不做摘要或语义过滤。`light` 模式直接读取 transcript 并写笔记；`strict` 模式才使用 `fact-ledger.md`、`semantic-draft.md`、`layout-plan.md`。`agent_work_dir` 不得存放最终笔记或持久资料；任务结束后随 Job 一并 retire。
+- metadata、简介、source manifest、`analysis.json`、日志和智能体临时工作文件只允许存在于单个 runtime Job。SRT / ASR 模式包含 source 文件与 chunks；ASR 先复制为 runtime `asr-transcript.txt`；description-only 不伪造 source 文件或 chunks。finalizer / failsafe 负责 retire。
+- 智能体只可编辑 `analysis.json`、草稿中的两个 AI 区域及当前模式明确提供的 runtime 工作文件。SRT 保留文字、顺序和 cue 边界；ASR 按标点/换行确定性分段且不生成虚假时间戳；description-only 的 manifest 只有来源契约而没有伪造 chunk。三种模式均不做摘要或语义过滤。
 - 智能体不得手工删除 job、reservation 或锁文件。锁、reservation、恢复与 retire 都由共享核心管理；`note_ready` 已成立时，即使返回 `temporary_data_retired: false` 或 `cleanup_warning`，也只能作为维护警告报告，不能把已成功发布的笔记改判为失败。
 - 不得覆盖已有笔记；同一 BVID 仅在**活动任务期间**由 reservation 防止并发处理，任务完成后允许再次转换。草稿只存在于 runtime，只有 finalizer 校验通过后才原子发布到 `note_path`。
 
 ## 来源充分性判断
 
-字幕是视频内容的文字投影，不等于视频本身。智能体必须先判断当前字幕与简介是否足以支撑可信学习笔记。
+当前 Job 允许的来源不等于视频本身。智能体必须先判断所选 `source_mode` 能否支撑可信笔记：subtitle / ASR 要评估文字连续性与专名质量；description-only 只能评估标题、metadata、UP 主简介和用户补充来源，不能把未采集的视频内容当作已知事实。
 
 判断应结合上下文，不要用单一字符数或固定时长阈值代替思考。重点观察：
 
@@ -61,13 +61,14 @@ Organizer 在改写短标题时会保留原视频标题，并统一更新 Tags�
 - 专有名词、模型名、节点名、参数是否严重损坏到无法恢复语义；
 - 视频简介宣称的重要主题是否在字幕里实际出现；
 - 是否大量依赖“这里、如图、这个参数、按这样连接”等画面信息，导致字幕无法说明关键事实；
-- 是否能仅凭字幕与简介明确辨认主要结论、方法、参数、限制、比较和重要资源。
+- 是否能仅凭字幕与简介明确辨认主要结论、方法、参数、限制、比较和重要资源；
+- `description_only` 是否确实能形成有价值的纯资源分享短记；若简介也没有可确认内容，应判定来源不足，而不是猜测视频内容。
 
 如果不足，设置 `source_assessment.status = "insufficient"`，说明原因，`coverage_review.status = "not_applicable"`，不要编造正文，也不要把任务包装成完成。
 
 ## 内容提取与整理原则
 
-正文事实只能来自当前视频字幕和 UP 主原始简介；不得利用模型常识补全视频没有提供的具体参数、资源地址或结论。若简介或字幕明确说明“三连 / 充电 / 评论关键词 / 私信 / 进群”等条件后才能领取模板、工作流或其他资料，核心会将其记录为 `resource_access_notices` 并在播放器下方的来源区展示。资料本体没有出现在当前来源时，智能体只能说明获取条件，不得自行生成、还原或猜测该资料内容。
+正文事实只能来自当前 `source_mode` 允许的来源。subtitle / ASR 可使用对应文字与 UP 主简介；description-only 只能使用标题、metadata、UP 主简介和明确用户补充来源。不得利用模型常识补具体参数、资源地址或结论。若允许来源明确说明“三连 / 充电 / 评论关键词 / 私信 / 进群”等资料获取条件，核心会记录 `resource_access_notices`；资料本体未出现时只能说明条件，不得生成、还原或猜测。
 
 对学习价值高的信息应优先保护，不能仅为了缩短篇幅而删除：
 
@@ -83,7 +84,7 @@ Organizer 在改写短标题时会保留原视频标题，并统一更新 Tags�
 
 这不是机械保留规则。广告价格、活动口播或与学习目标无关的数字是否保留，应由智能体根据长期参考价值判断。
 
-视频字幕可能来自音频自动转写。遇到不确定专名时：来源可确认就使用可确认写法；高度疑似但无法确认就保留“字幕原音 / 名称未确认 / 待核实”等检索线索；完全无法判断时保留仍可确认的用途、关系、参数或实测结果并省略具体拼写。不得把低置信名称静默升级成确定事实，也不得仅因名称受损就删除与之关联的高价值知识。
+subtitle / ASR 来源可能存在自动转写噪声。遇到不确定专名时：可确认就使用可确认写法；高度疑似但无法确认就保留“转写原音 / 名称未确认 / 待核实”等线索；完全无法判断时保留仍可确认的用途、关系、参数或实测结果并省略具体拼写。不得把低置信名称静默升级成确定事实。description-only 没有音频来源，不得用此规则反推视频口播。
 
 长字幕或知识密集内容允许按 transcript chunk / 自然主题分段提取，但必须遵循 Fact Ledger → Semantic Draft → Layout Pass → Source Recheck。Fact Ledger 先保全原子事实；Semantic Draft 再自然聚类成文；Layout Pass 只转换表达形式。具体成员及其来源、继承、步数、适用条件、冲突和兼容关系不能被压成一个类别名或名称列表；来源明确讲解的运行路线、版本/插件安装条件、组件职责，以及“配置 → 耗时 / 质量变化 / 失败表现”的实测证据，也不能只剩一句泛化结论。正文在事实、参数、比较和实测证据已经完整保留后，可以额外提炼由当前来源共同支持的能力边界、因果关系或选择原则；这种提炼只能作为增量解释，不能替代支撑证据、删减原始条件或引入来源之外的新知识。不要把固定 Map-Reduce 流程强加给所有短视频。
 
@@ -100,7 +101,7 @@ Organizer 在改写短标题时会保留原视频标题，并统一更新 Tags�
 
 ## 覆盖复核
 
-程序可以检查结构和流程状态，但不能可靠判断“知识有没有漏”。因此最终排版后必须由智能体完成语义复核，而且复核必须重新回到原 transcript，并同时对照 Fact Ledger、Semantic Draft 与最终正文；不能只拿自己生成的 `knowledge_outline` 检查自己。
+程序可以检查结构和流程状态，但不能可靠判断“知识有没有漏”。因此最终排版后必须由智能体重新回到当前 Job 允许的来源完成语义复核；strict 模式同时对照 Fact Ledger、Semantic Draft 与最终正文，不能只拿自己生成的 `knowledge_outline` 检查自己。
 
 至少检查：
 
@@ -112,7 +113,7 @@ Organizer 在改写短标题时会保留原视频标题，并统一更新 Tags�
 - H2 数量减少时，参数、成员、关系和实测证据是否也被同步压掉；
 - Layout Pass 前后的高价值事实是否一一对应，是否为了卡片数量或页面简洁重新摘要；
 - 是否为了简短而丢掉高价值具体信息；
-- 是否出现字幕/简介没有支持的新事实。
+- 是否出现当前 `source_mode` 允许来源没有支持的新事实；description-only 尤其检查是否误写了视频口播、画面参数或未提供资源本体。
 
 复核通过后设置 `coverage_review.status = "passed"` 并简要记录复核结果。Finalizer 只验证该流程确实完成，不用确定性算法假装评估语义完整度。
 

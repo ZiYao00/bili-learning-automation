@@ -211,7 +211,8 @@ def render_resource_access_notices(notices: list[dict[str, str]]) -> str:
     for notice in notices:
         condition = html.escape(str(notice.get("condition") or "需按 UP 主说明操作"))
         resource = html.escape(str(notice.get("resource") or "附加资料"))
-        source = "视频简介" if notice.get("source") == "description" else "字幕"
+        source_kind = notice.get("source")
+        source = "视频简介" if source_kind == "description" else ("ASR 转写" if source_kind == "asr" else "字幕")
         source_text = html.escape(str(notice.get("text") or "").strip())
         lines.extend(
             [

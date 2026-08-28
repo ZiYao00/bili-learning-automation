@@ -5,14 +5,15 @@
 ```text
 已授权智能体入口中的复制链接 / BV 号 / 受支持短链
 → input_resolver 规范化 BVID 与 canonical URL
-→ yt-dlp 仅采集元数据、UP 主简介、ai-zh/zh 字幕
+→ 适配层只根据当前消息的明确意图选择 source_mode：默认 `subtitle_srt`；明确授权 ASR 后使用 `asr_text`；明确“纯资源分享 / 只整理简介 / 不用字幕”使用 `description_only`
+→ `prepare` / `prepare-transcript` / `prepare-description` 统一进入 `_prepare_materials`，由 `SourceMaterial + source manifest` 生成标准 Job；默认不下载媒体，ASR 文本不伪造时间戳
 → taxonomy 生成 tags 与后续整理建议；原视频标题的新笔记进入 00-待整理
-→ Python 在 runtime 写入确定性 Markdown 草稿、analysis.json 与 transcript
+→ Python 在 runtime 写入确定性 Markdown 草稿、analysis.json 与统一 source package
 → workflow_mode 路由：light 直接写作；strict 额外创建三份阶段工作文件
 → 接入智能体（Codex / Hermes / WorkBuddy）判断来源充分性
 → light 直接完成正文；strict 依次完成 Fact Ledger / Semantic Draft / Layout Pass
 → 两种模式都在内容完成后独立做一次版式优化
-→ 智能体回看 transcript 完成 coverage review
+→ 智能体回看当前 Job 允许的来源完成 coverage review
 → finalizer 校验质量流程状态、真实元数据与结构后原子发布
 → navigation 原子刷新
 → runtime Job 退出活动区并 retire；物理清理不属于业务成功前提
@@ -20,7 +21,7 @@
 
 ## 代码分层
 
-- `src/bili_learning/`：可测试的核心逻辑和 agent-neutral CLI（`prepare`、`finalize`、`organize`、`doctor`、`configure-obsidian`、`build-nav`）；`workflow.py` 只为 `strict` 模式创建并校验三份 runtime 工作文件。
+- `src/bili_learning/`：可测试的核心逻辑和 agent-neutral CLI。`prepare`、`prepare-transcript`、`prepare-description` 只是清晰的外部入口，内部共用 `_prepare_materials`；`source.py` 定义三种 Source Mode，`transcript.py` 生成统一 source manifest；`workflow.py` 只为 `strict` 模式创建并校验三份 runtime 工作文件。
 - `docs/AGENT-INTEGRATION.md`：所有智能体共用的接入协议。
 - `hermes-skills/bili-learning-automation/SKILL.md`：Hermes/微信专属适配约束。
 - `hermes-skills/bili-learning-automation/scripts/`：只定位项目根目录并转发到核心 CLI 的兼容入口。
@@ -43,27 +44,28 @@
 - `learning-page + video-note` cssclasses；
 - 阅读顺序（Summary → Player / Source → AI Body）；
 - 输出路径；
+- `source_mode`、source manifest、来源采集与模式一致的 Job recovery；
 - `workflow_mode` 路由；`strict` 模式下额外生成 Fact Ledger / Semantic Draft / Layout Plan 脚手架及其路径；
 - 导航。
 
 taxonomy 的 route.path 不直接决定新文件的路径。新笔记统一先进入 fallback.path（默认 `00-待整理`）；route.path 仅随 job 保留为建议分类，并通过 tags 帮助 `organize` 在学习后归档。收集阶段 H1 直接使用原视频标题，不进行主题提炼。
 
-接入智能体只负责字幕理解与语义内容：
+接入智能体只负责当前 Job 允许来源的理解与语义内容：
 
-- 判断字幕与简介是否足以支撑可信学习笔记；
-- `light` 模式完整读取 transcript 后直接完成“先看结论 + 动态知识正文”，不创建阶段工作文件；
+- 判断 `subtitle_srt`、`asr_text` 或 `description_only` 当前允许的来源是否足以支撑可信笔记；description-only 不得推断视频口播或画面事实；
+- `light` 模式按 source manifest 完整读取实际存在的 source chunks 后直接写作；description-only 没有伪造 chunk，只读取 Job 中的标题、metadata、简介和用户补充来源；
 - `strict` 模式按 Fact Ledger → Semantic Draft → Layout Plan 执行；
 - 两种模式都先把内容写完整，再独立做一次版式优化；
 - 写短的“先看结论”；
 - 根据视频真实信息结构组织动态知识正文；
-- 最终排版后重新回到 transcript 完成覆盖复核；严格模式额外对照三份阶段工作文件。
+- 最终排版后重新回到当前 Job 允许的来源完成覆盖复核；严格模式额外对照三份阶段工作文件。
 
 章节、表格和步骤形式由内容决定；确定性骨架仍由程序控制，避免 LLM 重写元数据、简介或路径。
 
 ## 数据边界
 
 - 长期产物：私人 Markdown 笔记与导航页，默认不入 Git。
-- runtime 产物：`.runtime/bilibili-learning` 的活动 Job 始终包含 transcript、analysis 与草稿；`strict` 模式额外包含 Fact Ledger、Semantic Draft 与 Layout Plan。任务完成后 Job 从活动区 retire 到 `retired/`；物理删除属于独立维护，不参与笔记成功判定。
+- runtime 产物：`.runtime/bilibili-learning` 的活动 Job 始终包含 source manifest、analysis 与草稿；subtitle / ASR 还包含 source chunks，ASR 会保存 runtime 内纯文本副本，description-only 不伪造独立 source 文件或 chunk。`strict` 模式额外包含 Fact Ledger、Semantic Draft 与 Layout Plan。任务完成后 Job retire 到 `retired/`。
 - 敏感数据：`key/` 中的 Cookie 文件；程序只把路径传给 yt-dlp，不读取内容。
 - 历史资料：`archive/`、`materials/` 及本机 legacy 依赖，不属于公开源码主链路。
 
@@ -75,7 +77,7 @@ taxonomy 的 route.path 不直接决定新文件的路径。新笔记统一先�
 
 - 文件名使用原视频标题，同名时在 `note-names.lock` OS 文件锁保护下使用递增序号，避免覆盖。已完成视频允许再次转换并生成新笔记。
 - 同一 BVID 仅在活动 collector、智能体写作与 finalizer 期间使用 reservation 防止并发；reservation 使用 `active / released` 状态文件，并由 OS 文件锁保护 claim / bind / release 的原子性。任务完成后切换为 `released`，允许再次转换。
-- 如果 reservation 持有进程已经结束，而绑定 Job 的 `job.json`、草稿、`analysis.json`、transcript manifest 与字幕仍完整，核心会直接恢复已有 Job、必要时重建 `agent_handoff.md`，返回 `materials_ready + recovered: true`，不会重新调用 yt-dlp。
+- 如果 reservation 持有进程已经结束，而绑定 Job 的 `job.json`、草稿、`analysis.json`、source manifest 及该模式必需的 source 文件 / chunks 仍完整，核心只在请求的 `source_mode` 与旧 Job 一致时恢复并返回 `materials_ready + recovered: true`；description-only 不要求独立 source 文件。
 - `note-names.lock`、navigation lock 与 reservation lock 使用 OS 原生文件锁；锁文件本身可以长期存在，进程退出时由操作系统释放锁，不依赖 `unlink()` 或 stale-lock 删除。
 - Finalizer 始终校验真实元数据、路径、固定结构、AI 区域与 `analysis.json`。`strict` 模式还会校验三份阶段工作文件；`light` 模式不要求这些文件。旧 job 不含 `workflow_mode` 时保持兼容。无效草稿不会进入笔记库；`BILI_AI_*` marker 发布时会移除。
 - `note_ready` 是业务完成状态。Job retire 或后续维护失败只通过 `temporary_data_retired` / `cleanup_warning` 反映，不把已经发布成功的笔记改判为失败。

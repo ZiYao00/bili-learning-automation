@@ -204,9 +204,19 @@ zh.*
 
 如果视频本身没有可用字幕，本次不生成笔记是正常行为。
 
-### 已确认视频完全无字幕：手动 ASR 旁路
+### 用户明确只要“纯资源分享 / 只整理简介”
 
-只有在人工确认视频确实没有可提取字幕时，才考虑项目级辅助脚本：
+这不是 `subtitle_unavailable` 的自动回退。只有用户当前消息明确要求“不用字幕 / 跳过字幕 / 只整理简介”时，才使用：
+
+```powershell
+bili-learning prepare-description "https://www.bilibili.com/video/BV..."
+```
+
+该入口只采集 metadata 与 UP 主简介，不请求字幕、不下载媒体、不调用 ASR。它创建 `source_mode = description_only` 的标准 Job，并继续走 handoff / finalizer；不得根据视频标题或历史偏好自动选择，也不得直接修改已发布笔记。简介不足时应返回来源不足，而不是推断视频口播或画面内容。
+
+### 已确认视频完全无字幕：显式 ASR 旁路
+
+只有在人工确认视频确实没有可提取字幕，且用户明确要求继续 ASR 时，才考虑项目级辅助脚本：
 
 ```powershell
 python .\scripts\bili_asr_fallback.py "https://www.bilibili.com/video/BV..." `
@@ -223,7 +233,15 @@ B站链接 → yt-dlp 临时下载低码率音轨 → SiliconFlow STT → transc
 
 音频默认存放在系统临时目录并在脚本结束后自动清理；只有显式传入 `--keep-audio` 才会保留。输出文本和可选保留音频如果目标文件已存在都会停止，不会覆盖。当前 SiliconFlow STT 单文件限制为不超过 50MB、时长不超过 1 小时，脚本会在上传前检查这两个条件。
 
-输出是无伪造时间戳的纯文本 transcript。它适合作为人工异常处理的事实来源；不要把整段文本伪装成单条 SRT，也不要把这条旁路描述成正常 Skill 已自动完成。
+输出是无伪造时间戳的纯文本 transcript。不要把整段文本伪装成单条 SRT，也不要制造时间戳。
+
+如果目标是继续生成正式笔记，不再手工组装 `job.json` / draft。把已经取得的纯文本交给共享核心：
+
+```powershell
+bili-learning prepare-transcript "https://www.bilibili.com/video/BV..." --transcript "$env:TEMP\BV-transcript.txt"
+```
+
+该命令只负责重新取得 metadata / UP 主简介、把纯文本复制进 runtime，并通过与 `prepare`、`prepare-description` 相同的 `_prepare_materials` lifecycle 生成标准 source manifest / draft / analysis / handoff。它本身不会下载音频或调用 ASR。完整 ASR Job 可按 `source_mode = asr_text` 恢复，不依赖外部临时 transcript 长期存在。
 
 ---
 

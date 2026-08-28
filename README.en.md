@@ -2,9 +2,9 @@
 
 [简体中文](README.md) | [English](README.en.md)
 
-`bili-learning-automation` converts Bilibili subtitles, the uploader's original description, and video metadata into Obsidian learning notes.
+`bili-learning-automation` converts Bilibili subtitles, explicitly authorized ASR text, or explicitly requested description-only resource information into Obsidian notes.
 
-The default pipeline uses `yt-dlp --skip-download`, so **video and audio are not downloaded**. An Agent reads the transcript and writes the learning content, while the program manages deterministic metadata, paths, validation, publication, concurrency protection, job recovery, and the runtime retire lifecycle.
+The default `prepare` route is subtitle-first and uses `yt-dlp --skip-download`, so **video and audio are not downloaded**. `prepare-transcript` imports explicitly authorized ASR text, while `prepare-description` is used only when the current request explicitly asks for a pure resource / description-only note. All three routes share one Job lifecycle, validation, publication, recovery, concurrency protection, and retire flow.
 
 > First installation: start with **[Quick Start](docs/QUICKSTART.md)**.
 > The detailed operating documentation is currently maintained in Chinese and is Windows-first.
@@ -17,11 +17,11 @@ Normal flow:
 
 ```text
 Bilibili URL / BV ID
-→ collect Chinese subtitles, uploader description, metadata
-→ prepare transcript; chunk long subtitles when needed
-→ Agent checks whether the current source is sufficient
-→ write key takeaways + learning content
-→ re-check transcript coverage
+→ choose subtitle_srt / asr_text / description_only from the current explicit request
+→ create one source manifest; subtitle / ASR may be chunked, description-only has no fabricated chunks
+→ Agent checks whether the allowed source is sufficient
+→ write key takeaways + note content
+→ re-check coverage against the allowed source
 → finalizer validates the draft
 → publish to Obsidian / 00-待整理
 → retire the runtime job from the active task area
@@ -37,10 +37,11 @@ The note format is intended to retain useful source information such as:
 - GitHub repositories, models, workflows, and other uploader resources;
 - limitations, risks, and selection conditions stated by the source.
 
-Factual content in the generated learning body is normally limited to:
+Factual content is limited to the source mode selected for the current Job:
 
-- the current video's subtitles;
-- the uploader's original description.
+- `subtitle_srt`: current subtitles, uploader description, and explicitly supplied user material;
+- `asr_text`: explicitly authorized ASR text, uploader description, and explicitly supplied user material;
+- `description_only`: title, metadata, uploader description, and explicitly supplied user material, without inferring speech or visual facts from the uncollected video.
 
 If those materials are too incomplete to support a reliable note, the Agent may return `source_insufficient` instead of filling specific facts from model knowledge.
 
@@ -167,6 +168,16 @@ BVxxxxxxxxxx
 
 Supported copied Bilibili text and supported `b23.tv` short links can also be used.
 
+Routing depends only on the current explicit request:
+
+```text
+Convert this link                              → default subtitle-first route
+Pure resource note; description only; no subs  → description_only
+(after subtitle_unavailable) run ASR and continue → asr_text
+```
+
+The project does not skip subtitles merely because the title looks like a preview/resource post, and it does not use historical memory to select a source mode.
+
 Normally you do not need to manually:
 
 - download subtitles;
@@ -203,7 +214,7 @@ Learning content
 
 The learning body does not use a fixed chapter count. The Agent chooses headings, tables, steps, lists, and callouts according to the current source.
 
-Bilibili subtitles may be speech-to-text output. If a model name, plugin name, or another proper noun cannot be confirmed, the content rules preserve uncertainty rather than silently turning model memory into a source fact.
+Subtitle / ASR sources may contain speech-to-text noise. If a model name, plugin name, or another proper noun cannot be confirmed, preserve uncertainty rather than turning model memory into a source fact. Description-only has no audio source and must not be used to infer speech.
 
 ---
 
@@ -212,11 +223,11 @@ Bilibili subtitles may be speech-to-text output. If a model name, plugin name, o
 ### `light` - default
 
 ```text
-read complete transcript
+read the current allowed source through the source manifest
 → source-sufficiency check
-→ write the note directly
+→ write the note directly (description-only remains a concise resource note)
 → separate layout pass
-→ transcript coverage re-check
+→ coverage re-check against the allowed source
 → finalizer
 ```
 
@@ -242,7 +253,7 @@ Most users should keep `light`.
 
 ## 7. Agents and models
 
-The project is **not tied to a specific LLM**. Hermes, WorkBuddy, and Codex are different entry points; collector, transcript preparation, taxonomy, content rules, validation, and finalization are shared.
+The project is **not tied to a specific LLM**. Hermes, WorkBuddy, and Codex are different entry points; source collection, Source Mode, source manifests, taxonomy, content rules, validation, and finalization are shared.
 
 Model differences can affect:
 
@@ -261,10 +272,10 @@ The project uses fixed-video quality regressions, but the README does not mainta
 | Status | Meaning | Normal action |
 | --- | --- | --- |
 | `onboarding_required` | First-run setup still lacks a required Vault / Cookie / yt-dlp item | Handle the returned `actions`, re-check, and retry the original link |
-| `materials_ready` | Subtitles, description, and metadata are ready | Agent continues; `recovered: true` means the core resumed a complete prior job without re-collecting |
+| `materials_ready` | A standard Job for the selected `source_mode` is ready | Continue through `source_manifest_path` and the handoff; `recovered: true` means the core resumed a complete Job for the same source mode |
 | `in_progress` | Another task is still genuinely active for the same BVID | Do not start a duplicate collection or manually alter runtime state |
 | `subtitle_unavailable` | No usable Chinese subtitle was obtained | Stop this conversion |
-| `source_insufficient` | Current source is insufficient for a reliable note | Use a source with better text coverage |
+| `source_insufficient` | The selected source mode is insufficient for a reliable note | Use fuller subtitle/ASR text, or add description material / switch away from description-only |
 | `note_ready` | Finalizer passed and the note was published | Business flow is complete; runtime retire/maintenance state does not change the publish result |
 | `note_invalid` | Draft failed final validation | Fix the reported issue; do not bypass finalizer |
 | `failed` | Configuration, collection, or runtime failure | Run doctor, then use Troubleshooting |

@@ -14,7 +14,7 @@ from .config import (
     load_settings,
 )
 from .doctor import doctor_report, onboarding_report, run_doctor
-from .lifecycle import FAILSAFE_SECONDS, finalize_note, prepare_note
+from .lifecycle import FAILSAFE_SECONDS, finalize_note, prepare_description_note, prepare_note, prepare_transcript_note
 from .navigation import build_navigation
 from .organizer import find_duplicate_bvid_notes, organize_note
 
@@ -60,6 +60,13 @@ def main() -> None:
     prepare_parser.add_argument("--cleanup-job", type=Path)
     prepare_parser.add_argument("--after-seconds", type=int, default=FAILSAFE_SECONDS)
     prepare_parser.add_argument("--cleanup-runner", type=Path, help=argparse.SUPPRESS)
+    transcript_parser = subparsers.add_parser("prepare-transcript", help="把已授权取得的纯文本 transcript 接入标准 Job")
+    transcript_parser.add_argument("message", help="Bilibili 复制链接、短链或 BV 号")
+    transcript_parser.add_argument("--transcript", type=Path, required=True, help="已有的无时间戳纯文本 transcript")
+    transcript_parser.add_argument("--cleanup-runner", type=Path, help=argparse.SUPPRESS)
+    description_parser = subparsers.add_parser("prepare-description", help="只采集元数据和 UP 主简介，创建纯资源分享 Job")
+    description_parser.add_argument("message", help="Bilibili 复制链接、短链或 BV 号")
+    description_parser.add_argument("--cleanup-runner", type=Path, help=argparse.SUPPRESS)
     finalize_parser = subparsers.add_parser("finalize", help="校验 runtime 草稿并发布笔记")
     finalize_parser.add_argument("--job", type=Path, required=True)
     finalize_parser.add_argument("--note", type=Path, required=True)
@@ -146,6 +153,23 @@ def main() -> None:
             dry_run=args.dry_run,
             cleanup_job_path=args.cleanup_job,
             after_seconds=args.after_seconds,
+            cleanup_runner=args.cleanup_runner,
+        )
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        raise SystemExit(code)
+    if args.command == "prepare-transcript":
+        payload, code = prepare_transcript_note(
+            project_root,
+            args.message,
+            args.transcript,
+            cleanup_runner=args.cleanup_runner,
+        )
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        raise SystemExit(code)
+    if args.command == "prepare-description":
+        payload, code = prepare_description_note(
+            project_root,
+            args.message,
             cleanup_runner=args.cleanup_runner,
         )
         print(json.dumps(payload, ensure_ascii=False, indent=2))
