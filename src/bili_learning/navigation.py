@@ -71,6 +71,12 @@ def _build_navigation(settings: Settings) -> None:
         category: Path = entry["category"]
         top = category.parts[0] if category.parts else "00-待整理"
         by_top[top].append(entry)
+
+        object_name = category.parts[1] if len(category.parts) >= 2 else ""
+        if object_name in model_names:
+            by_model[object_name].append(entry)
+            continue
+
         for tag in entry["tags"]:
             if tag in model_names:
                 by_model[tag].append(entry)

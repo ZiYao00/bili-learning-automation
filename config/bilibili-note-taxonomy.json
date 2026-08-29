@@ -5,7 +5,7 @@
   "fallback": {
     "path": ["00-待整理"],
     "task": "待整理",
-    "tags": ["待整理"]
+    "tags": []
   },
   "organization": {
     "enabled_by_default": false,
@@ -25,26 +25,32 @@
     {"canonical": "Qwen-Image", "aliases": ["Qwen-Image", "Qwen Image"]},
     {"canonical": "Z-Image", "aliases": ["Z-Image", "Z Image"]},
     {"canonical": "Flux", "aliases": ["Flux"]},
+    {"canonical": "Anima", "aliases": ["Anima"]},
     {"canonical": "Qwen3.8", "aliases": ["Qwen3.8", "Qwen 3.8"]}
   ],
   "routes": [
     {"id": "benchmark", "path": ["98-测试"], "any_patterns": ["【workbuddy】", "Benchmark", "A/B"], "task": "同源测试", "title": "同源测试", "tags": ["Benchmark"]},
     {"id": "scail_2", "path": ["01-视频", "SCAIL-2"], "any_patterns": ["SCAIL-2", "SCAIL 2", "SCAIL"], "task": "动作迁移", "title": "SCAIL-2 动作迁移", "tags": ["视频生成", "Wan2.1", "动作迁移"]},
     {"id": "wan_animate_2", "path": ["01-视频", "Wan-Animate-2"], "any_patterns": ["Wan-Animate-2", "Wan Animate 2", "Wan-Animate2", "Animate2", "Animate 2"], "task": "角色动画", "title": "Wan-Animate-2 角色动画", "tags": ["视频生成", "角色动画"]},
+    {"id": "qwen_38", "path": ["03-LLM", "Qwen3.8"], "any_patterns": ["Qwen3.8", "Qwen 3.8"], "task": "Qwen3.8 大模型应用", "title": "Qwen3.8", "tags": ["LLM", "大模型应用"]},
     {"id": "minimax_h3", "path": ["01-视频", "MiniMax-H3"], "any_patterns": ["MiniMax H3", "MiniMax-H3", "MiniMaxH3", "Minimax H3", "H3"], "task": "MiniMax H3", "title": "MiniMax H3", "tags": ["视频生成"]},
     {"id": "wan_series", "path": ["01-视频", "Wan"], "any_patterns": ["Wan2.1", "Wan 2.1", "Wan2.2", "Wan 2.2", "Wan"], "task": "Wan 系列", "title": "Wan 系列", "tags": ["视频生成", "Wan系列"]},
     {"id": "seedance", "path": ["01-视频", "Seedance"], "any_patterns": ["Seedance"], "task": "Seedance", "title": "Seedance", "tags": ["视频生成"]},
+    {"id": "video_upscale", "path": ["01-视频", "放大"], "all_patterns": ["视频"], "any_patterns": ["超分", "放大", "高清", "FlashVSR", "SeedVR", "VSR"], "task": "视频放大", "title": "视频放大", "tags": ["视频生成", "放大"]},
     {"id": "video_advanced", "path": ["01-视频", "综合"], "all_patterns": ["视频"], "any_patterns": ["模型对比", "通用优化", "原理", "选型", "注意力对比"], "task": "视频生成专题", "title": "视频生成专题", "tags": ["视频生成"]},
     {"id": "krea2", "path": ["02-图像", "Krea2"], "any_patterns": ["Krea2", "Krea-2", "Krea 2"], "task": "Krea2", "title": "Krea2", "tags": ["图像生成", "Krea2"]},
     {"id": "klein", "path": ["02-图像", "Klein"], "any_patterns": ["Klein-9B", "Klein 9B", "Klein"], "task": "Klein", "title": "Klein", "tags": ["图像生成", "Klein-9B"]},
     {"id": "qwen_image", "path": ["02-图像", "Qwen-Image"], "any_patterns": ["Qwen-Image", "Qwen Image"], "task": "Qwen-Image", "title": "Qwen-Image", "tags": ["图像生成", "Qwen-Image"]},
     {"id": "z_image", "path": ["02-图像", "Z-Image"], "any_patterns": ["Z-Image", "Z Image"], "task": "Z-Image", "title": "Z-Image", "tags": ["图像生成", "Z-Image"]},
     {"id": "flux", "path": ["02-图像", "Flux"], "any_patterns": ["Flux"], "task": "Flux", "title": "Flux", "tags": ["图像生成", "Flux"]},
+    {"id": "anima", "path": ["02-图像", "Anima"], "any_patterns": ["Anima"], "task": "Anima", "title": "Anima", "tags": ["图像生成", "Anima"]},
+    {"id": "ecommerce_design", "path": ["02-图像", "电商设计"], "any_patterns": ["电商", "POD", "商品图", "详情页", "上样"], "task": "电商设计", "title": "电商设计", "tags": ["图像生成", "电商设计"]},
     {"id": "image_kaomoji", "path": ["02-图像", "提示词"], "any_patterns": ["颜文字", "kaomoji"], "task": "提示词", "title": "提示词", "tags": ["图像生成", "提示词", "颜文字"]},
-    {"id": "image_enhance", "path": ["02-图像", "放大修复"], "any_patterns": ["放大", "高清", "8K", "分块放大", "超分"], "task": "放大修复", "title": "放大修复", "tags": ["图像生成", "放大修复"]},
+    {"id": "image_enhance", "path": ["02-图像", "放大"], "any_patterns": ["图像放大", "图片放大", "高清放大", "8K", "分块放大", "超分"], "task": "图像放大", "title": "图像放大", "tags": ["图像生成", "放大"]},
     {"id": "image_to_image", "path": ["02-图像", "图像编辑"], "any_patterns": ["图生图", "洗图", "图像编辑"], "task": "图像编辑", "title": "图像编辑", "tags": ["图像生成", "图生图"]},
     {"id": "image_control", "path": ["02-图像", "控制与一致性"], "any_patterns": ["一致性", "ControlNet", "控制"], "task": "控制与一致性", "title": "控制与一致性", "tags": ["图像生成", "控制与一致性"]},
-    {"id": "local_model", "path": ["03-LLM", "本地模型"], "any_patterns": ["Qwen3.8", "LM Studio", "llama.cpp", "本地模型", "本地推理"], "task": "本地模型", "title": "本地模型", "tags": ["LLM", "本地模型"]},
+    {"id": "llm_application", "path": ["03-LLM", "大模型应用"], "any_patterns": ["反推", "视觉理解", "图像理解", "视频理解", "提示词扩写", "大语言模型", "LLM应用", "大模型应用"], "task": "大模型应用", "title": "大模型应用", "tags": ["LLM", "大模型应用"]},
+    {"id": "local_model", "path": ["03-LLM", "本地模型"], "any_patterns": ["LM Studio", "llama.cpp", "本地模型", "本地推理"], "task": "本地模型", "title": "本地模型", "tags": ["LLM", "本地模型"]},
     {"id": "coding_agent", "path": ["03-LLM", "Agent"], "any_patterns": ["Codex", "Claude Code", "Agent", "Skill", "MCP"], "task": "Coding 与 Agent", "title": "Coding 与 Agent", "tags": ["LLM", "Agent"]},
     {"id": "prompt_system", "path": ["03-LLM", "提示词"], "any_patterns": ["系统指令", "System Prompt", "Prompt 工程"], "task": "提示词与系统指令", "title": "提示词与系统指令", "tags": ["LLM", "提示词"]},
     {"id": "writing", "path": ["04-写作", "AI写作"], "any_patterns": ["网文", "小说", "写作"], "task": "AI写作", "title": "AI写作", "tags": ["AI写作"]}
