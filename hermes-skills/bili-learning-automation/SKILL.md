@@ -65,6 +65,10 @@ description: Turn a Bilibili copied link, supported short link, or BV id receive
 
    无论写作成功或失败，都由 finalizer 处理 runtime 生命周期；不要手工删除中间文件或锁。`note_ready` 即业务完成；`publish_state = already_published` 是安全重试。`temporary_data_retired` / `cleanup_warning` 不得覆盖已成功发布的结果。
 
+5. **核查已发布笔记**
+
+   owner 要求检查“刚生成 / 最近 / 指定标题或 BV”的笔记时，优先使用当前 Job、finalizer 返回的正式笔记路径；没有现成路径时，只在已配置的 Obsidian Vault 与 taxonomy `notes_root` 范围内按标题、BV 或最近修改时间定位。不要从磁盘根目录或无关项目目录开始扩大搜索；配置范围内仍找不到时，先报告未命中并让 owner 提供路径。
+
 ## 学习后整理
 
 整理功能默认关闭，仅在 owner 明确要求时执行。指定一篇用 `single`，最近一篇用 `latest`，全部待整理笔记用 `all`；范围不明确再询问。先完整阅读目标笔记，并按 `docs/NOTE-ORGANIZATION.md` 判断长期价值：知识型/混合型继续普通归档；只有纯资源型才在整理阶段压缩进 `05-资源` 集合页。不得把 `knowledge / resource / mixed` 判断提前到生成阶段，也不得在 finalize 后自动整理。

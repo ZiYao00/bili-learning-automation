@@ -34,6 +34,19 @@ _SECTION_HEADINGS = {
     "本地工作流区域",
 }
 _SECTION_RESOURCE_TERMS = ("工作流", "模型", "提示词", "整合包", "下载", "插件", "资源", "资料", "网盘")
+_GENERIC_RESOURCE_LABELS = {
+    "链接",
+    "地址",
+    "网址",
+    "下载",
+    "下载地址",
+    "体验地址",
+    "在线地址",
+    "访问地址",
+    "项目地址",
+    "资源地址",
+}
+_RESOURCE_ITEM_PREFIX_RE = re.compile(r"^\s*(?:\d{1,3}\s*[|｜.、)\]：:\-]\s*|[①-⑳]\s*|[-*•·]\s+)")
 
 
 def strip_ai_markers(text: str) -> str:
@@ -112,9 +125,39 @@ def _display_resource_label(label: str, section: str, url: str) -> str:
     return _append_platform(label, platform)
 
 
+def _context_resource_label(raw_line: str) -> str:
+    """Extract a useful resource name from the line immediately before a generic URL line."""
+    cleaned = _normalize_heading(raw_line)
+    if not cleaned or _is_section_like(raw_line):
+        return ""
+
+    cleaned = _RESOURCE_ITEM_PREFIX_RE.sub("", cleaned).strip()
+    left, separator, right = cleaned.partition("：")
+    if not separator:
+        left, separator, right = cleaned.partition(":")
+    if separator:
+        left = _resource_label(left)
+        if left in _GENERIC_RESOURCE_LABELS or left in _SECTION_HEADINGS:
+            return ""
+        if left:
+            return left
+        cleaned = _resource_label(right)
+
+    if (
+        cleaned
+        and cleaned not in _GENERIC_RESOURCE_LABELS
+        and cleaned not in _SECTION_HEADINGS
+        and len(cleaned) <= 80
+        and not re.search(r"[。！？!?]", cleaned)
+    ):
+        return cleaned
+    return ""
+
+
 def _description_resources(description: str) -> list[tuple[str, str]]:
     candidates: list[tuple[str, str]] = []
     previous_label = ""
+    previous_context_label = ""
     section = ""
     for raw_line in html.unescape(description).splitlines():
         urls = _URL_PATTERN.findall(raw_line)
@@ -123,14 +166,20 @@ def _description_resources(description: str) -> list[tuple[str, str]]:
         if not urls:
             if heading:
                 previous_label = heading
+                previous_context_label = _context_resource_label(raw_line)
                 if raw_line.strip().endswith(("：", ":")) or _DECORATED_HEADING_RE.match(raw_line.strip()):
                     section = heading
             continue
         for index, url in enumerate(urls, start=1):
-            resource_name = label if label else previous_label
+            resource_name = label
+            if label in _GENERIC_RESOURCE_LABELS and previous_context_label:
+                resource_name = previous_context_label
+            elif not label:
+                resource_name = previous_label
             resource_name = resource_name or f"UP 主资源 {len(candidates) + index}"
             candidates.append((_display_resource_label(resource_name, section, url), url))
         previous_label = ""
+        previous_context_label = ""
 
     resources: list[tuple[str, str]] = []
     index_by_url: dict[str, int] = {}
