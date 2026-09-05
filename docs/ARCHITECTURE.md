@@ -69,7 +69,7 @@ taxonomy 的 route.path 不直接决定新文件的路径。新笔记统一先�
 
 - 长期产物：私人 Markdown 笔记与导航页，默认不入 Git。
 - runtime 产物：`.runtime/bilibili-learning` 的活动 Job 始终包含 source manifest、analysis 与草稿；subtitle / ASR 还包含 source chunks，ASR 会保存 runtime 内纯文本副本，description-only 不伪造独立 source 文件或 chunk。`strict` 模式额外包含 Fact Ledger、Semantic Draft 与 Layout Plan。任务完成后 Job retire 到 `retired/`。
-- 敏感数据：`key/` 中的 Cookie 文件。正常字幕/简介采集仍把文件路径交给 yt-dlp；命中置顶评论白名单时，`pinned_comment.py` 会在本机读取 Netscape Cookie 并构造一次只读评论请求。Cookie 值不得打印、写入 Job/笔记、上传或提交。
+- 敏感数据：`key/` 中的 Cookie 文件和被 Git 忽略的 `config/pinned-comment-whitelist.local.json`。正常字幕/简介采集仍把文件路径交给 yt-dlp；仅当用户主动配置的本地置顶评论白名单命中时，`pinned_comment.py` 才会在本机读取 Netscape Cookie 并构造一次只读评论请求。Cookie 值不得打印、写入 Job/笔记、上传或提交。
 - 历史资料：`archive/`、`materials/` 及本机 legacy 依赖，不属于公开源码主链路。
 
 ## 配置边界

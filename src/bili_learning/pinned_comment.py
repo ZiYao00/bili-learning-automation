@@ -17,7 +17,7 @@ from .source import SourceMaterial
 COMMENT_ENDPOINT = "https://api.bilibili.com/x/v2/reply"
 COMMENT_TIMEOUT_SECONDS = 6.0
 MAX_COMMENT_RESPONSE_BYTES = 1024 * 1024
-PINNED_COMMENT_WHITELIST = Path("config/pinned-comment-whitelist.json")
+PINNED_COMMENT_WHITELIST = Path("config/pinned-comment-whitelist.local.json")
 
 _BV_ALPHABET = "FcwAPNKTMug3GV5Lj7EJnHpWsx4tb8haYeviqBz6rkCy12mUSDQX9RdoZf"
 _BV_XOR_CODE = 23442827791579
@@ -82,7 +82,7 @@ def should_lookup_pinned_comment(description: str, source: SourceMaterial) -> bo
 
 
 def is_pinned_comment_whitelisted(project_root: Path, info: dict[str, Any]) -> bool:
-    """Match a public uploader identity against the tracked comment-resource whitelist."""
+    """Match an uploader identity against the user's local comment-resource whitelist."""
 
     path = project_root / PINNED_COMMENT_WHITELIST
     try:

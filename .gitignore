@@ -4,6 +4,7 @@ key/
 .env.*
 !*.example
 config/local.json
+config/pinned-comment-whitelist.local.json
 
 # Private learning content and generated navigation
 notes/**

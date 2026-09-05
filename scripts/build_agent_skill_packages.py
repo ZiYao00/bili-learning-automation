@@ -20,6 +20,7 @@ FORBIDDEN_FILE_NAMES = {
     "cookie.txt",
     "cookies.txt",
     "local.json",
+    "pinned-comment-whitelist.local.json",
     "bilibili_cookies.txt",
 }
 

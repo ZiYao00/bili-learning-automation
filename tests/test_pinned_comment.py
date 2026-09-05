@@ -5,6 +5,7 @@ from pathlib import Path
 
 from bili_learning.note_template import render_video_materials
 from bili_learning.pinned_comment import (
+    PINNED_COMMENT_WHITELIST,
     bvid_to_aid,
     fetch_uploader_pinned_comment,
     is_pinned_comment_whitelisted,
@@ -37,11 +38,24 @@ def test_comment_lookup_only_triggers_for_explicit_comment_resource_reference() 
     assert not should_lookup_pinned_comment("本期介绍一个新的工作流", source)
 
 
-def test_t8star_aix_is_in_pinned_comment_whitelist() -> None:
-    project_root = Path(__file__).resolve().parents[1]
-    assert is_pinned_comment_whitelisted(project_root, {"uploader": "T8star-Aix"})
-    assert is_pinned_comment_whitelisted(project_root, {"uploader_id": "385085361"})
-    assert not is_pinned_comment_whitelisted(project_root, {"uploader": "another-uploader", "uploader_id": "1"})
+def test_pinned_comment_whitelist_is_local_and_opt_in(tmp_path: Path) -> None:
+    assert not is_pinned_comment_whitelisted(tmp_path, {"uploader_id": "example-uploader-id"})
+
+    whitelist_path = tmp_path / PINNED_COMMENT_WHITELIST
+    whitelist_path.parent.mkdir()
+    whitelist_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "uploaders": [{"name": "Example uploader", "uploader_ids": ["example-uploader-id"]}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert is_pinned_comment_whitelisted(tmp_path, {"uploader": "example uploader"})
+    assert is_pinned_comment_whitelisted(tmp_path, {"uploader_id": "example-uploader-id"})
+    assert not is_pinned_comment_whitelisted(tmp_path, {"uploader": "another-uploader", "uploader_id": "1"})
 
 
 def test_fetch_supports_current_direct_top_field() -> None:

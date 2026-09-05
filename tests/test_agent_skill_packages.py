@@ -135,5 +135,12 @@ def test_build_creates_four_isolated_skill_archives(tmp_path: Path) -> None:
             assert not any(
                 forbidden in name.lower()
                 for name in names
-                for forbidden in ("/key/", "cookies.txt", "config/local.json", "/.runtime/", "/notes/")
+                for forbidden in (
+                    "/key/",
+                    "cookies.txt",
+                    "config/local.json",
+                    "pinned-comment-whitelist.local.json",
+                    "/.runtime/",
+                    "/notes/",
+                )
             )

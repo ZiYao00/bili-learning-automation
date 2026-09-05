@@ -2,7 +2,7 @@
 
 > 文档类型：**新手教程 / 凭据配置说明**。如果你第一次使用 `bili-learning-automation`，而 Agent 提示 `cookie_file_required`，从这里开始。
 
-本项目默认通过 `yt-dlp` 获取 Bilibili 的字幕、UP 主简介和元数据。部分内容需要登录态，因此通常需要一份由你自己的浏览器登录会话导出的 **Bilibili Cookie 文件**。此外，当视频命中 `config/pinned-comment-whitelist.json` 时，核心会在本机使用同一 Netscape Cookie 做一次只读的 UP 主置顶一级评论查询；Cookie 值不会写入 Job、笔记或日志。
+本项目默认通过 `yt-dlp` 获取 Bilibili 的字幕、UP 主简介和元数据。部分内容需要登录态，因此通常需要一份由你自己的浏览器登录会话导出的 **Bilibili Cookie 文件**。此外，只有用户在被 Git 忽略的 `config/pinned-comment-whitelist.local.json` 中主动配置并命中 UP 主时，核心才会在本机使用同一 Netscape Cookie 做一次只读的 UP 主置顶一级评论查询；Cookie 值不会写入 Job、笔记或日志。
 
 Cookie 可以理解为“浏览器已经登录 Bilibili 的凭据”。它不是普通配置文本，泄露后可能导致账号风险，因此必须像密码一样保护。
 

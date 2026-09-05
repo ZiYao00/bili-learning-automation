@@ -33,7 +33,7 @@ python .\scripts\build_agent_skill_packages.py --check
 - taxonomy 是分类规则与 repository fallback 的配置源；正式 Obsidian 笔记位置优先使用本机 `vault_root + notes_subdir`，旧 `notes_root` 仅用于兼容。
 - 相同 BVID 默认先返回 `existing_note_found`，由用户选择 update / rerun / cancel；只有明确 rerun 才创建同标题序号笔记，update 保留原路径并使用 SHA-256 冲突保护。
 - 公开 CI 不访问真实 Bilibili 账号。
-- Cookie 是本地凭据：正常采集只把文件路径交给 yt-dlp；命中置顶评论白名单时，核心可以在本机读取 Netscape Cookie 构造一次只读请求，但不得把值暴露给 Agent、日志、Job、笔记或 Git。
+- Cookie 和 `config/pinned-comment-whitelist.local.json` 都是本机私有配置：正常采集只把 Cookie 文件路径交给 yt-dlp；仅命中用户主动配置的本地置顶评论白名单时，核心才可以读取 Netscape Cookie 构造一次只读请求，不得把名单或 Cookie 值暴露给 Agent、日志、Job、笔记或 Git。
 - cleanup 只能作用于 `.runtime/bilibili-learning` 下的 job。
 
 ## 兼容入口

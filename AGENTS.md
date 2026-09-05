@@ -49,7 +49,7 @@
 ## 所有模式共同遵守
 
 - Python 负责 Frontmatter、H1、标题元信息、播放器与来源区、UP 主资源、原始简介、iframe、tags、`learning-page + video-note`、文件名、路径和 marker；Agent 只填写两个 AI 区域与 runtime `analysis.json`。
-- 正文事实只来自当前 Job 允许的来源：SRT 字幕、明确授权后的 ASR 纯文本、确定性采集到的 UP 主简介 / UP 主置顶一级评论、以及明确标注的用户补充来源；`description_only` 仍不得推断视频口播、画面参数或未提供的资源本体。置顶评论默认只在来源明确指向评论区资源时做一次匿名只读补充；命中 `config/pinned-comment-whitelist.json` 的公开 UP 主身份时，允许使用项目现有 Netscape Cookie 做且只做一次只读查询。两种模式都不翻页、不抓普通评论或楼中楼、不重试，失败或不存在不得阻塞任务；抓到置顶也不等于内容必然与当前视频主题相关，Agent 仍需按当前视频来源判断相关性。来源不足时停止，不用模型常识补具体参数、资源或结论。
+- 正文事实只来自当前 Job 允许的来源：SRT 字幕、明确授权后的 ASR 纯文本、确定性采集到的 UP 主简介 / UP 主置顶一级评论、以及明确标注的用户补充来源；`description_only` 仍不得推断视频口播、画面参数或未提供的资源本体。置顶评论默认只在来源明确指向评论区资源时做一次匿名只读补充；仅当用户在被 Git 忽略的 `config/pinned-comment-whitelist.local.json` 中主动配置并命中 UP 主身份时，才允许使用项目现有 Netscape Cookie 做且只做一次只读查询。不得回退读取公开模板或预置任何 UP 主。两种模式都不翻页、不抓普通评论或楼中楼、不重试，失败或不存在不得阻塞任务；抓到置顶也不等于内容必然与当前视频主题相关，Agent 仍需按当前视频来源判断相关性。来源不足时停止，不用模型常识补具体参数、资源或结论。
 - 不覆盖已有笔记，不把 Cookie、runtime 路径、日志或内部状态写进正式笔记。
 - 视频简介抓取失败不能当作视频没有简介。
 - finalizer 返回 `note_ready` 即表示业务完成；临时数据采用 retire/维护语义，`temporary_data_retired` 或 `cleanup_warning` 不得覆盖已成功的发布结果。

@@ -110,11 +110,17 @@ Netscape 格式 Bilibili Cookie 文件路径。当前正常采集流程要求该
 
 第一次不知道怎样导出、怎样确认 Netscape 格式，或遇到 Windows Chrome `Failed to decrypt with DPAPI` 时，阅读 [Bilibili Cookie 获取与安全配置](BILIBILI-COOKIE.md)。
 
-### `pinned-comment-whitelist.json`
+### `pinned-comment-whitelist.local.json`
 
-`config/pinned-comment-whitelist.json` 是**可提交的公开项目配置**，用于列出“即使简介/字幕未明确指向评论区，也允许额外检查一次 UP 主置顶一级评论”的公开 UP 主身份。优先使用稳定的 UP UID，名称只作为兼容匹配；不要在这里放 Cookie、账号凭据或私人标识。
+`config/pinned-comment-whitelist.local.json` 是**仅限本机的私有配置**，已被 Git 忽略且不会进入 Skill ZIP。它用于让用户主动列出“即使简介/字幕未明确指向评论区，也允许额外检查一次 UP 主置顶一级评论”的 UP 主身份。仓库只跟踪空白的 `config/pinned-comment-whitelist.example.json`，不预置任何具体 UP 主。
 
-普通视频仍只在当前来源明确提示评论区资源时执行一次匿名只读查询；白名单命中时允许使用项目现有 Netscape Cookie 做且只做一次只读查询。两种路径都不翻页、不抓普通评论/楼中楼、不重试，失败或无置顶评论不阻塞笔记生成。
+如确有需要，先复制模板，再仅在本机填写你认可的公开 UID；优先使用稳定 UID，名称只作为兼容匹配：
+
+```powershell
+Copy-Item .\config\pinned-comment-whitelist.example.json .\config\pinned-comment-whitelist.local.json
+```
+
+未创建本地文件时，白名单路径完全关闭。普通视频仍只在当前来源明确提示评论区资源时执行一次匿名只读查询；本地白名单命中时才允许使用项目现有 Netscape Cookie 做且只做一次只读查询。两种路径都不翻页、不抓普通评论/楼中楼、不重试，失败或无置顶评论不阻塞笔记生成。
 
 ### `workflow_mode`
 

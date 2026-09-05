@@ -47,7 +47,7 @@
 
 - 默认 `prepare` 使用 subtitle-first，但仍通过 `--skip-download` 不下载媒体；`prepare-transcript` 与 `prepare-description` 只采集 metadata / 简介，不请求字幕。ASR 只在 `subtitle_unavailable` 后得到用户明确授权时运行；description-only 只在当前消息明确要求纯资源分享时运行。
 - `confirmed_empty` 仅代表 info-json 明确给出空字符串且（如存在）简介 sidecar 与其一致；字段缺失、`null`、类型异常或两者不一致都必须失败。
-- Cookie 内容不得向 Agent 暴露、打印、上传、编辑、提交或写入笔记。正常字幕/简介采集只把配置的 Cookie 文件路径传给 yt-dlp；命中 `config/pinned-comment-whitelist.json` 时，核心可在本机读取 Netscape Cookie 并构造一次只读置顶评论请求，但不得把 Cookie 值写入 Job、日志或正式笔记。
+- Cookie 内容不得向 Agent 暴露、打印、上传、编辑、提交或写入笔记。正常字幕/简介采集只把配置的 Cookie 文件路径传给 yt-dlp；仅当用户在被 Git 忽略的 `config/pinned-comment-whitelist.local.json` 中主动配置并命中 UP 主时，核心才可在本机读取 Netscape Cookie 并构造一次只读置顶评论请求；不得回退读取公开模板，也不得把 Cookie 值写入 Job、日志或正式笔记。
 - metadata、简介、source manifest、`analysis.json`、日志和智能体临时工作文件只允许存在于单个 runtime Job。SRT / ASR 模式包含 source 文件与 chunks；ASR 先复制为 runtime `asr-transcript.txt`；description-only 不伪造 source 文件或 chunks。finalizer / failsafe 负责 retire。
 - 智能体只可编辑 `analysis.json`、草稿中的两个 AI 区域及当前模式明确提供的 runtime 工作文件。SRT 保留文字、顺序和 cue 边界；ASR 按标点/换行确定性分段且不生成虚假时间戳；description-only 的 manifest 只有来源契约而没有伪造 chunk。三种模式均不做摘要或语义过滤。
 - 智能体不得手工删除 job、reservation 或锁文件。锁、reservation、恢复与 retire 都由共享核心管理；`note_ready` 已成立时，即使返回 `temporary_data_retired: false` 或 `cleanup_warning`，也只能作为维护警告报告，不能把已成功发布的笔记改判为失败。
