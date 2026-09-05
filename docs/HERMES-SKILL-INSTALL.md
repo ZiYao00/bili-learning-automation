@@ -8,11 +8,19 @@
 
 ## 1. 先理解安装方式
 
-项目里的 Hermes Skill 源码只有一份：
+项目里唯一需要人工维护的 Skill 真源是：
+
+```text
+<project-root>\skill\bili-learning-automation
+```
+
+为兼容现有 Hermes Junction，构建脚本会把它自动同步到：
 
 ```text
 <project-root>\hermes-skills\bili-learning-automation
 ```
+
+后者是安装出口，不再是独立源码；不要直接编辑其中的 `SKILL.md`。
 
 Hermes 默认从这里加载用户 Skill：
 
@@ -28,7 +36,7 @@ Hermes 默认从这里加载用户 Skill：
 <project-root>\hermes-skills\bili-learning-automation
 ```
 
-这样以后 `git pull` 或本地更新项目后，Hermes 看到的就是同一份源码，不会出现“仓库已经更新，但 Hermes 还在用旧副本”的问题。
+这样以后 `git pull` 后，Hermes 会直接看到仓库中已经由构建脚本同步好的安装出口，不会出现“仓库已经更新，但 Hermes 还在用旧静态副本”的问题。维护者如果本地修改了统一 `skill/bili-learning-automation/SKILL.md`，提交前应先运行 `python .\scripts\build_agent_skill_packages.py` 同步这个出口。
 
 ### 独立 ZIP（静态副本）
 

@@ -49,7 +49,7 @@
 ## 所有模式共同遵守
 
 - Python 负责 Frontmatter、H1、标题元信息、播放器与来源区、UP 主资源、原始简介、iframe、tags、`learning-page + video-note`、文件名、路径和 marker；Agent 只填写两个 AI 区域与 runtime `analysis.json`。
-- 正文事实只来自当前 Job 允许的来源：SRT 字幕、明确授权后的 ASR 纯文本，或明确要求 `description_only` 时的标题 / metadata / UP 主简介 / 用户补充来源。`description_only` 不得推断视频口播、画面参数或未提供的资源本体。来源不足时停止，不用模型常识补具体参数、资源或结论。
+- 正文事实只来自当前 Job 允许的来源：SRT 字幕、明确授权后的 ASR 纯文本、确定性采集到的 UP 主简介 / UP 主置顶一级评论、以及明确标注的用户补充来源；`description_only` 仍不得推断视频口播、画面参数或未提供的资源本体。置顶评论默认只在来源明确指向评论区资源时做一次匿名只读补充；命中 `config/pinned-comment-whitelist.json` 的公开 UP 主身份时，允许使用项目现有 Netscape Cookie 做且只做一次只读查询。两种模式都不翻页、不抓普通评论或楼中楼、不重试，失败或不存在不得阻塞任务；抓到置顶也不等于内容必然与当前视频主题相关，Agent 仍需按当前视频来源判断相关性。来源不足时停止，不用模型常识补具体参数、资源或结论。
 - 不覆盖已有笔记，不把 Cookie、runtime 路径、日志或内部状态写进正式笔记。
 - 视频简介抓取失败不能当作视频没有简介。
 - finalizer 返回 `note_ready` 即表示业务完成；临时数据采用 retire/维护语义，`temporary_data_retired` 或 `cleanup_warning` 不得覆盖已成功的发布结果。
@@ -61,6 +61,6 @@
 
 修改笔记版式或 Frontmatter 前，先读取 `config\obsidian-style.json`。本项目只使用 `learning-lab.css` Core 与 `video-note.css` Extension；不得在此仓库复制、重建、fork 或独立修改共享 CSS，也不得把受 Git 跟踪的项目目录 junction 到共享仓库。需要改共享视觉系统时，修改共享仓库，再同步到 Obsidian Vault。
 
-ChatGPT、Codex、Hermes 与 WorkBuddy 的 `SKILL.md` 只是入口适配层，不应复制或改写核心规则。ChatGPT 与 Codex 使用共享 `scripts\run_bili_learning.py`，不得借用其它宿主的兼容入口。
+唯一需要人工维护的 Skill 真源是 `skill\bili-learning-automation\SKILL.md`。ChatGPT、Codex、Hermes 与 WorkBuddy 的安装出口 `SKILL.md` 都由 `scripts\build_agent_skill_packages.py` 自动生成，禁止直接编辑；宿主差异只允许保留在构建脚本中的最小权限/安装壳，不得复制核心流程。ChatGPT 与 Codex 使用共享 `scripts\run_bili_learning.py`，Hermes / WorkBuddy 的 bridge 只处理宿主路径与进程兼容，所有业务规则仍复用共享核心。
 
-准备 v1.0 提交、推送或 Release 时，先阅读 `docs/RELEASE-CHECKLIST.md`。不要把 `ComfyUI-Learning-Lab` 的独立工作区混入本仓库提交。
+准备正式提交、推送或 Release 时，先阅读 `docs/RELEASE-CHECKLIST.md`。不要把 `ComfyUI-Learning-Lab` 的独立工作区混入本仓库提交。

@@ -1,0 +1,6 @@
+interface:
+  display_name: "B站视频转笔记"
+  short_description: "通过本地 bili-learning-automation 项目生成 Obsidian B站学习笔记。"
+  default_prompt: "Use $bili-learning-automation to check the local project and turn this Bilibili link into an Obsidian learning note."
+policy:
+  allow_implicit_invocation: true

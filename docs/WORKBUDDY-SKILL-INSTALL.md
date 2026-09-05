@@ -1,25 +1,24 @@
 # WorkBuddy Skill 安装教程
 
-这份文档用于把项目自带的 **WorkBuddy 薄适配层**安装到本机 WorkBuddy，并保持它与仓库源码同步。
+这份文档用于把统一 `bili-learning-automation` Skill 的 **WorkBuddy 安装出口**安装到本机 WorkBuddy，并保持它与仓库中的统一 Skill 真源同步。
 
 如果 yt-dlp、Cookie、Obsidian 还没有配置，请先看 [新手快速上手](QUICKSTART.md)；如果卡在 Cookie 获取，直接看 [Bilibili Cookie 获取与安全配置](BILIBILI-COOKIE.md)。
 
-## 1. WorkBuddy 适配层在哪里
+## 1. 统一 Skill 真源与 WorkBuddy 安装出口
 
-源码目录：
+唯一需要人工编辑的 Skill 真源：
+
+```text
+<project-root>\skill\bili-learning-automation
+```
+
+构建脚本会把它同步到现有 WorkBuddy Junction 安装出口：
 
 ```text
 <project-root>\workbuddy-skills\bili-learning-automation
 ```
 
-它只负责：
-
-- WorkBuddy 会话触发；
-- 调用 `scripts/bridge.py`；
-- 处理 WorkBuddy 特有的 Bash / `PYTHONPATH` 差异；
-- 把状态翻译成用户可理解的回复。
-
-真正的 collector、transcript、taxonomy、finalizer、配置解析与笔记标准仍由共享核心负责。
+这个出口中的 `SKILL.md` 是生成文件，不再维护第二套流程；同目录 `scripts/bridge.py` / `bridge.ps1` 只处理 WorkBuddy 特有的 Bash、PowerShell、`PYTHONPATH` 和路径兼容。真正的 collector、transcript、taxonomy、finalizer、配置解析与笔记标准仍由共享核心负责。
 
 ## 2. 推荐使用 Junction 安装
 
@@ -37,7 +36,7 @@ WorkBuddy Skill 目录：
 <project-root>\workbuddy-skills\bili-learning-automation
 ```
 
-这样以后更新仓库，不需要再次复制 WorkBuddy Skill。
+这样以后 `git pull` 后不需要再次复制 WorkBuddy Skill；仓库中的 Junction 安装出口已经由构建脚本从统一 Skill 真源同步。维护者本地修改统一 `skill/bili-learning-automation/SKILL.md` 后，提交前先运行 `python .\scripts\build_agent_skill_packages.py`。
 
 ### 独立 ZIP（静态副本）
 

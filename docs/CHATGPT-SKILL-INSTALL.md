@@ -1,6 +1,6 @@
 # ChatGPT Skill 安装教程
 
-这份文档用于把项目的 ChatGPT 专用薄适配层安装到 ChatGPT Work。它不会把 Hermes、WorkBuddy 或 Codex Skill 一起装入，也不会把本机核心代码、Cookie 和私人笔记上传到 ChatGPT。
+这份文档用于把统一 `bili-learning-automation` Skill 的 ChatGPT 安装出口装入 ChatGPT Work。ChatGPT、Codex、Hermes、WorkBuddy 共用一份人工维护的 Skill 真源，但仍生成彼此隔离的安装包；本机核心代码、Cookie 和私人笔记不会进入 ChatGPT ZIP。
 
 ## 1. 先理解运行边界
 
@@ -16,21 +16,21 @@ ChatGPT 网页或桌面端的远程沙箱不能直接访问本机 Windows 盘符
 
 如果没有本地桥接，Skill 可以安装成功，但不能把本机 B站资料写入 Obsidian。
 
-## 2. 专用 Skill 源码
+## 2. 统一 Skill 真源与 ChatGPT 安装出口
 
-ChatGPT 适配层只有一份：
-
-```text
-<repo-root>\chatgpt-skills\bili-learning-automation-chatgpt
-```
-
-该目录包含且只包含一个 `SKILL.md`，名称为：
+唯一需要人工编辑的 Skill 真源是：
 
 ```text
-bili-learning-automation-chatgpt
+<repo-root>\skill\bili-learning-automation
 ```
 
-Hermes、WorkBuddy 和 Codex 的 Skill 不会进入 ChatGPT ZIP。
+统一真源的 Skill 名称是 `bili-learning-automation`。构建脚本会从它生成兼容现有安装的 ChatGPT 出口：
+
+```text
+<repo-root>\chatgpt-skills\bili-learning-automation-chatgpt\SKILL.md
+```
+
+该生成文件的安装名称仍是 `bili-learning-automation-chatgpt`，并带有 ChatGPT 本地工作区桥接边界。不要直接编辑它；Hermes、WorkBuddy 和 Codex 的安装文件也不会进入 ChatGPT ZIP。
 
 ## 3. 生成独立 ZIP
 
@@ -112,10 +112,12 @@ python scripts/run_bili_learning.py <command> [args]
 
 ## 8. 更新
 
-ChatGPT 通过 ZIP 安装的是副本，不会随着仓库 `git pull` 自动更新。项目更新后：
+ChatGPT 通过 ZIP 安装的是 Skill 指令副本，但实际业务规则主要来自本地项目的 Python Core、根目录 `AGENTS.md` 和当前 Job handoff。因此普通的 collector / 评论策略 / 资源解析 / finalizer / taxonomy 更新，只要统一 Skill 入口契约没有变化，**不需要重新安装 ChatGPT Skill**；更新本地仓库即可。
 
-1. 重新运行打包脚本；
-2. 检查生成结果；
+只有 `skill/bili-learning-automation/SKILL.md`、宿主权限边界或 ChatGPT `agents/openai.yaml` 生成元数据发生变化时，才需要：
+
+1. 运行 `python .\scripts\build_agent_skill_packages.py`；
+2. 运行 `python .\scripts\build_agent_skill_packages.py --check`；
 3. 在 ChatGPT 中更新或重新安装新的 ChatGPT ZIP；
 4. 新建对话重新做一次安装与 onboarding 验收。
 

@@ -15,7 +15,7 @@ AI_MARKERS = {
     "body": ("<!-- BILI_AI_BODY_START -->", "<!-- BILI_AI_BODY_END -->"),
 }
 
-_URL_PATTERN = re.compile(r"https?://[^\s<>()]+")
+_URL_PATTERN = re.compile(r"https?://[^\s<>()，。；！？、]+")
 _SEPARATOR_RE = re.compile(r"^[\s\-_=~*#·•—–]{5,}$")
 _DECORATED_HEADING_RE = re.compile(r"^[\s\-_=~*#·•—–]{2,}(.+?)[\s\-_=~*#·•—–]{2,}$")
 _SECTION_HEADINGS = {
@@ -45,6 +45,11 @@ _GENERIC_RESOURCE_LABELS = {
     "访问地址",
     "项目地址",
     "资源地址",
+    "节点",
+    "插件",
+    "仓库",
+    "项目",
+    "GitHub",
 }
 _RESOURCE_ITEM_PREFIX_RE = re.compile(r"^\s*(?:\d{1,3}\s*[|｜.、)\]：:\-]\s*|[①-⑳]\s*|[-*•·]\s+)")
 
@@ -98,6 +103,17 @@ def _resource_platform(url: str) -> str:
     if host == "feishu.cn" or host.endswith(".feishu.cn"):
         return "飞书"
     return ""
+
+
+def _github_repo_label(url: str) -> str:
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    if host != "github.com" and not host.endswith(".github.com"):
+        return ""
+    parts = [part for part in parsed.path.split("/") if part]
+    if len(parts) < 2:
+        return ""
+    return parts[1].removesuffix(".git")
 
 
 def _append_platform(label: str, platform: str) -> str:
@@ -172,11 +188,14 @@ def _description_resources(description: str) -> list[tuple[str, str]]:
             continue
         for index, url in enumerate(urls, start=1):
             resource_name = label
-            if label in _GENERIC_RESOURCE_LABELS and previous_context_label:
-                resource_name = previous_context_label
+            if label in _GENERIC_RESOURCE_LABELS:
+                if previous_context_label:
+                    resource_name = previous_context_label
+                elif _resource_platform(url) == "GitHub":
+                    resource_name = _github_repo_label(url)
             elif not label:
                 resource_name = previous_label
-            resource_name = resource_name or f"UP 主资源 {len(candidates) + index}"
+            resource_name = resource_name or _github_repo_label(url) or f"UP 主资源 {len(candidates) + index}"
             candidates.append((_display_resource_label(resource_name, section, url), url))
         previous_label = ""
         previous_context_label = ""
@@ -193,6 +212,31 @@ def _description_resources(description: str) -> list[tuple[str, str]]:
         old_label, old_url = resources[existing]
         if len(label) > len(old_label):
             resources[existing] = (label, old_url)
+    return resources
+
+
+def _normalized_resource_url(url: str) -> str:
+    return html.unescape(url).strip().rstrip("/ \t\r\n，。；！？、")
+
+
+def _merge_author_resources(*resource_groups: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    resources: list[tuple[str, str]] = []
+    index_by_url: dict[str, int] = {}
+    for group in resource_groups:
+        for label, url in group:
+            normalized = _normalized_resource_url(url)
+            if not normalized:
+                continue
+            existing = index_by_url.get(normalized)
+            if existing is None:
+                index_by_url[normalized] = len(resources)
+                resources.append((label, normalized))
+                continue
+            old_label, old_url = resources[existing]
+            old_generic = old_label.startswith("UP 主资源 ")
+            new_generic = label.startswith("UP 主资源 ")
+            if (old_generic and not new_generic) or (old_generic == new_generic and len(label) > len(old_label)):
+                resources[existing] = (label, old_url)
     return resources
 
 
@@ -282,9 +326,16 @@ def render_video_materials(job: dict[str, Any]) -> str:
         raise ValueError("简介状态不是可生成笔记的状态")
 
     bvid = str(job["bvid"])
-    resources = _description_resources(description) if status == "present" else []
+    description_resources = _description_resources(description) if status == "present" else []
     overview = _description_overview(description) if status == "present" else None
     notices = list(job.get("resource_access_notices") or [])
+    pinned_comment = job.get("uploader_pinned_comment")
+    pinned_comment = pinned_comment if isinstance(pinned_comment, dict) else {}
+    pinned_text = str(pinned_comment.get("text") or "").strip() if pinned_comment.get("status") == "present" else ""
+    pinned_resources = _description_resources(pinned_text) if pinned_text else []
+    resources = _merge_author_resources(description_resources, pinned_resources)
+    if pinned_resources:
+        notices = [notice for notice in notices if "评论/关键词" not in str(notice.get("condition") or "")]
     user_source = job.get("user_supplied_source")
     user_source = user_source if isinstance(user_source, dict) else {}
     user_source_label = str(user_source.get("label") or "用户补充材料").strip()
@@ -325,15 +376,20 @@ def render_video_materials(job: dict[str, Any]) -> str:
     if overview:
         result.extend(["", f'<p class="video-note-overview"><strong>视频简介</strong>：{html.escape(overview)}</p>'])
 
-    if status == "present":
-        normalized_description = html.unescape(description)
+    if status == "present" or pinned_text:
+        source_parts: list[str] = []
+        if status == "present":
+            source_parts.append(html.unescape(description).strip())
+        if pinned_text:
+            source_parts.append("【UP 主置顶评论补充】\n" + html.unescape(pinned_text).strip())
+        source_summary = "UP 主原文（视频简介 + 置顶评论）" if pinned_text else "UP 主原文（完整说明与链接）"
         result.extend(
             [
                 "",
                 '<details class="video-note-source-details">',
-                "<summary>UP 主原文（完整说明与链接）</summary>",
+                f"<summary>{source_summary}</summary>",
                 "",
-                html.escape(normalized_description),
+                html.escape("\n\n".join(part for part in source_parts if part)),
                 "",
                 "</details>",
             ]

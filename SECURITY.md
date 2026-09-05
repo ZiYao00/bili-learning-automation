@@ -7,7 +7,7 @@
 - 不要提交到 Git；
 - 不要复制到 Issue、PR、日志或示例文档；
 - 不要在调试输出中打印内容；
-- 程序只应把配置的 Cookie 文件路径交给 yt-dlp；
+- 正常字幕/简介采集只把 Cookie 文件路径交给 yt-dlp；命中置顶评论白名单时，核心可在本机读取 Netscape Cookie 以构造一次只读评论请求，但 Cookie 值不得打印、写入 Job/笔记、上传或提交；
 - 不要把单个 `SESSDATA`、完整 Cookie 请求头或真实 `cookies.txt` 当作排错文本发送给 Agent。
 
 第一次获取、导出和更新 Cookie 的安全教程见 [Bilibili Cookie 获取与安全配置](docs/BILIBILI-COOKIE.md)。

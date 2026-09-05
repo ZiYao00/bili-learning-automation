@@ -22,6 +22,7 @@ from .doctor import onboarding_report
 from .input_resolver import extract_user_supplied_source, resolve_input
 from .navigation import build_navigation
 from .note_library import find_notes_by_bvid, note_sha256, validate_update_target
+from .pinned_comment import fetch_uploader_pinned_comment, is_pinned_comment_whitelisted, should_lookup_pinned_comment
 from .publisher import UpdateConflictError, publish_validated_draft, publish_validated_update
 from .quality import load_analysis_report, validate_analysis_report
 from .runtime import (
@@ -456,6 +457,15 @@ def _prepare_materials(
         else:
             source = SourceMaterial(SOURCE_MODE_DESCRIPTION)
 
+        pinned_comment: dict[str, Any] | None = None
+        description = str(info.get("description") or "")
+        pinned_comment_whitelisted = is_pinned_comment_whitelisted(project_root, info)
+        if should_lookup_pinned_comment(description, source) or pinned_comment_whitelisted:
+            pinned_comment = fetch_uploader_pinned_comment(
+                resolved.bvid,
+                cookie_file=settings.cookie_file if pinned_comment_whitelisted else None,
+            )
+
         operation_mode = requested_operation_mode
         job = create_job(
             settings,
@@ -466,6 +476,7 @@ def _prepare_materials(
             job_dir,
             description_sidecar=description_sidecar,
             user_supplied_source=extract_user_supplied_source(message),
+            uploader_pinned_comment=pinned_comment,
             operation_mode=operation_mode,
             update_target_path=selected_update_target,
             update_target_sha256=selected_update_hash,

@@ -1,22 +1,22 @@
 # Codex Skill 安装教程
 
-这份文档用于安装独立的 Codex 薄适配层。Codex Skill 复用项目核心，不复制 Hermes、WorkBuddy 或 ChatGPT 的入口规则。
+这份文档用于安装统一 `bili-learning-automation` Skill 的 Codex 安装出口。Codex 与 ChatGPT、Hermes、WorkBuddy 共用一份人工维护的 Skill 真源和同一项目核心；Codex 只保留本地工作区这一最小宿主边界。
 
-## 1. Codex Skill 源码
+## 1. 统一 Skill 真源与 Codex 安装出口
 
-仓库级 Skill 位于：
+唯一需要人工编辑的 Skill 真源位于：
+
+```text
+<repo-root>\skill\bili-learning-automation
+```
+
+运行 `scripts\build_agent_skill_packages.py` 后，会生成仓库级 Codex 安装出口：
 
 ```text
 <repo-root>\.agents\skills\bili-learning-automation-codex
 ```
 
-名称为：
-
-```text
-bili-learning-automation-codex
-```
-
-当 Codex 从该项目目录或其子目录启动时，会按仓库级 Skill 规则自动发现它。适配层仍要求本机存在完整的 `bili-learning-automation` 项目。
+其安装名称仍是 `bili-learning-automation-codex`，因此现有调用方式不变。当 Codex 从该项目目录或其子目录启动时会自动发现这个生成出口；不要直接修改其中的 `SKILL.md`。
 
 ## 2. 推荐方式：直接使用仓库级 Skill
 
@@ -121,4 +121,4 @@ python scripts/run_bili_learning.py <command> [args]
 
 ## 7. 与其他入口的关系
 
-Hermes、WorkBuddy、ChatGPT 和 Codex 使用不同薄适配层，但共用同一个 Python 核心、配置、Job lifecycle、来源契约和 finalizer。各适配层应分别安装，不要把多个适配层打进同一个 Skill ZIP。
+Hermes、WorkBuddy、ChatGPT 和 Codex 共用同一个 Skill 真源、Python 核心、配置、Job lifecycle、来源契约和 finalizer，只保留不同安装出口与最小宿主权限边界。四个 ZIP 由同一构建脚本分别生成，不需要人工同步四份 `SKILL.md`。

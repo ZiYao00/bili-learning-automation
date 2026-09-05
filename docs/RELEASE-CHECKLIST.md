@@ -1,14 +1,14 @@
-# v1.0 Release Checklist
+# Release Checklist
 
-This document defines the release-freeze gate for `bili-learning-automation` v1.0.0.
+This document defines the reusable pre-release and pre-push gate for `bili-learning-automation`. Version-specific acceptance reports remain under `docs/reports/`.
 
-The project is currently in **Feature Freeze**. Until v1.0.0 is released, only release-blocking fixes, documentation corrections, packaging/version metadata, security fixes, and verification work should be accepted. New features should wait for a later minor release.
+Use this checklist whenever preparing a commit that will be pushed publicly or promoted to a Release. During an explicit release freeze, limit changes to release-blocking fixes, documentation corrections, packaging/version metadata, security fixes, and verification work.
 
 ---
 
 ## Release criteria
 
-v1.0.0 is ready when all of the following are true:
+A release candidate is ready when all applicable checks below are true:
 
 - [x] Core workflow is stable in normal daily use.
 - [x] Default collection path does not download video or audio.
@@ -26,16 +26,16 @@ v1.0.0 is ready when all of the following are true:
 - [x] Ruff passes in the existing project virtual environment.
 - [x] Public pytest suite passes.
 - [x] Source, shared launchers, Hermes, and WorkBuddy compatibility scripts compile successfully.
-- [x] ChatGPT and Codex Skill packages are built separately; each archive contains exactly one root `SKILL.md` and no local credentials or machine configuration.
+- [x] `skill/bili-learning-automation/SKILL.md` is the single maintained Skill source; ChatGPT/Codex/Hermes/WorkBuddy install exits pass `build_agent_skill_packages.py --check`, and each archive contains exactly one root `SKILL.md` with no local credentials or machine configuration.
 - [x] Fresh-install / clean-room walkthrough rerun after the 2026-08-22 dense-note extraction and compact-template corrections; see `docs/reports/2026-08-23-v1.0-cleanroom-acceptance.md`.
-- [x] `pyproject.toml` version is changed from the current development version to `1.0.0` immediately before release.
-- [x] Changelog contains the final `1.0.0` release entry/date.
+- [ ] `pyproject.toml` version matches the intended release version before tagging.
+- [ ] Changelog contains the final release entry/date for that version.
 - [x] Final diff review confirms no local credentials, private notes, runtime jobs, captured test materials, or machine-specific configuration are staged.
 - [x] Public tracked documentation contains no maintainer-specific absolute paths, Vault/backup locations, private identifiers, or machine-only examples; generic placeholders are used instead.
 - [ ] Git author/committer identity for the release commit uses an email address the maintainer intentionally wants to expose publicly (for privacy, prefer a GitHub `noreply` address when appropriate).
 - [x] Older public commits that contained an unintended private email were separately reviewed and rewritten before this release candidate; the public refs were revalidated before promotion.
 - [ ] CI is green on the exact commit selected for the release tag.
-- [ ] GitHub Release `v1.0.0` is created from that verified commit.
+- [ ] The GitHub Release for the intended version is created from that verified commit.
 
 ---
 
@@ -59,7 +59,7 @@ Use a fresh clone or otherwise isolated checkout and verify only the documented 
 12. Convert the same video again after the first job is complete and confirm the existing note is not overwritten.
 13. Confirm the generated note contains the expected metadata, summary/body structure, video resources, uploader description, and any source-supported conditional resource instructions.
 14. Confirm the finalizer reports `note_ready` before treating the task as successful.
-15. Confirm `.runtime` temporary job data is removed after successful finalization.
+15. Confirm the successful Job leaves the active runtime area and is retired safely; physical deletion is not a business-success requirement.
 16. Confirm no Cookie content appears in logs, notes, Git diff, or generated examples.
 
 A failure in steps 3-16 is a release blocker if it prevents the documented default workflow or violates the stated security/data boundary.
@@ -72,8 +72,8 @@ Do not add features during this sequence.
 
 1. Complete the clean-room walkthrough.
 2. Fix only release-blocking defects or documentation mismatches found by that walkthrough.
-3. Change `pyproject.toml` to `version = "1.0.0"`.
-4. Add the final `## [1.0.0] - YYYY-MM-DD` changelog entry.
+3. Set `pyproject.toml` to the intended release version.
+4. Add the final `## [X.Y.Z] - YYYY-MM-DD` changelog entry for that version.
 5. Run:
 
 ```powershell
@@ -81,16 +81,17 @@ python -m compileall -q src scripts hermes-skills/bili-learning-automation/scrip
 python -m ruff check .
 python -m pytest -q
 python .\scripts\build_agent_skill_packages.py
-git diff --check
+python .\scripts\build_agent_skill_packages.py --check
+git -c core.whitespace=cr-at-eol diff --check
 ```
 
 6. Review the complete Git diff and staged file list for credentials and local-only data.
 7. Push the release commit and require CI to pass.
-8. Tag that exact commit as `v1.0.0` and create the GitHub Release.
+8. Tag that exact commit with the intended version (for example `vX.Y.Z`) and create the GitHub Release.
 
 ---
 
-## What should wait until after v1.0
+## What should usually wait until the next minor release
 
 Unless required to fix a release blocker, defer these categories until a later release:
 
@@ -104,4 +105,4 @@ Unless required to fix a release blocker, defer these categories until a later r
 - unrelated CSS redesign;
 - speculative performance optimization without a reproduced problem.
 
-For v1.0, stability, reproducibility, documentation, and data safety take priority over feature count.
+For any release candidate, stability, reproducibility, documentation, and data safety take priority over feature count.

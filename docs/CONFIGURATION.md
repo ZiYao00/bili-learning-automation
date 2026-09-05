@@ -110,6 +110,12 @@ Netscape 格式 Bilibili Cookie 文件路径。当前正常采集流程要求该
 
 第一次不知道怎样导出、怎样确认 Netscape 格式，或遇到 Windows Chrome `Failed to decrypt with DPAPI` 时，阅读 [Bilibili Cookie 获取与安全配置](BILIBILI-COOKIE.md)。
 
+### `pinned-comment-whitelist.json`
+
+`config/pinned-comment-whitelist.json` 是**可提交的公开项目配置**，用于列出“即使简介/字幕未明确指向评论区，也允许额外检查一次 UP 主置顶一级评论”的公开 UP 主身份。优先使用稳定的 UP UID，名称只作为兼容匹配；不要在这里放 Cookie、账号凭据或私人标识。
+
+普通视频仍只在当前来源明确提示评论区资源时执行一次匿名只读查询；白名单命中时允许使用项目现有 Netscape Cookie 做且只做一次只读查询。两种路径都不翻页、不抓普通评论/楼中楼、不重试，失败或无置顶评论不阻塞笔记生成。
+
 ### `workflow_mode`
 
 控制 Agent 的写作流程：

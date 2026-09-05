@@ -1,6 +1,6 @@
 # 智能体接入协议
 
-本项目当前优先服务 ChatGPT、Codex、Hermes 与 WorkBuddy。核心脚本、Source Mode、内容质量标准、taxonomy 与 finalizer 是唯一事实来源；适配层只负责各平台的入口、当前消息意图路由、授权、调用和最终回复。未来其他智能体应复用核心协议，不复制来源采集、Job 或写作规则。
+本项目当前优先服务 ChatGPT、Codex、Hermes 与 WorkBuddy。核心脚本、Source Mode、内容质量标准、taxonomy 与 finalizer 是唯一事实来源；Skill 只人工维护 `skill/bili-learning-automation/SKILL.md` 一份，四个宿主安装出口由 `scripts/build_agent_skill_packages.py` 自动生成。宿主差异只保留最小权限/安装边界，未来其他智能体也应复用统一 Skill 与核心协议，不复制来源采集、Job 或写作规则。
 
 ## 输入与授权
 
@@ -12,7 +12,7 @@
 
 1. 先通过统一 onboarding 门禁确认环境，再按当前消息的明确意图选择入口：默认 `prepare / subtitle_srt`；明确“纯资源分享 / 只整理简介 / 不用字幕”使用 `prepare-description / description_only`；默认入口返回 `subtitle_unavailable` 后，只有用户明确授权 ASR 才先取得纯文本并调用 `prepare-transcript / asr_text`。不得根据标题、历史 memory 或模型猜测自动改变来源模式。三个入口共用同一 Job lifecycle。
 2. 三个入口都会在真正采集前按 BVID 检查已发布笔记。`existing_note_found` 时停止并让用户选择：更新 / 重新执行 / 取消。更新使用 `--on-existing update --update-target <path>`；重新执行使用 `--on-existing rerun`；多篇时更新必须明确目标。重试时必须复用触发重复提示的原始完整消息，保留其中的资源与用户说明。`update_conflict` 时不得强制覆盖。
-3. 读取 `handoff_path`、`job.json`、`analysis_path`、`workflow_mode` 与 `source_manifest_path`。按 manifest 完整读取实际存在的 source chunks，不自行切分或跳读。`description_only` 的 manifest 没有伪造 chunk；此时只读取 Job 中的标题、metadata、UP 主简介和明确用户补充来源。旧 Job 仍兼容 `transcript_manifest_path`。
+3. 读取 `handoff_path`、`job.json`、`analysis_path`、`workflow_mode` 与 `source_manifest_path`。按 manifest 完整读取实际存在的 source chunks，不自行切分或跳读。`description_only` 的 manifest 没有伪造 chunk；此时读取 Job 中的标题、metadata、UP 主简介、当前 Job 已确定性采集的 UP 主置顶一级评论（如存在）和明确用户补充来源。旧 Job 仍兼容 `transcript_manifest_path`。
 4. 判断当前 `source_mode` 允许的来源是否足以支撑可信笔记，并填写 `analysis.json`。`description_only` 不得推断视频口播、画面参数或未提供的资源内容；任何模式来源不足时都停止，不用模型常识补事实。
 5. 按 `workflow_mode` 执行：
    - `light`：读取 `docs\standards\LIGHT-WORKFLOW.md`，直接完成正文；先写完整内容，再做一次独立排版优化，不创建 Fact Ledger、Semantic Draft 或 Layout Plan。
@@ -37,7 +37,7 @@
 
 ## 数据契约
 
-- 新生成的 `job.json` 继续使用 `schema_version: 1`，包含 `source_mode: subtitle_srt | asr_text | description_only`、`operation_mode: create | rerun | update`、`source_manifest_path`、source package 状态与 `workflow_mode: light | strict`。update Job 额外包含 `update_target_path`、`update_target_sha256`、`existing_note_snapshot_path`；旧 `transcript_*` 字段作为迁移期兼容别名保留。
+- 新生成的 `job.json` 继续使用 `schema_version: 1`，包含 `source_mode: subtitle_srt | asr_text | description_only`、`operation_mode: create | rerun | update`、`source_manifest_path`、source package 状态与 `workflow_mode: light | strict`；当置顶评论补充实际执行时，还可包含结构化 `uploader_pinned_comment` 状态/正文。update Job 额外包含 `update_target_path`、`update_target_sha256`、`existing_note_snapshot_path`；旧 `transcript_*` 字段作为迁移期兼容别名保留。
 - collector 与 finalizer 的 JSON 响应包含 `schema_version: 1`、`status` 和可读 `message`（如适用）；`materials_ready` 返回 `source_mode`、`source_manifest_path`、source package 状态与 `workflow_mode`，恢复时额外返回 `recovered: true`。智能体必须以结构化状态判断分支，不解析底层锁或 PID。
 - Frontmatter 的 `author`、`published`、`duration`、`source`、tags 与 `cssclasses`，以及标题下方“作者 · 日期 · 时长 · BVID”元信息行由程序生成，智能体不得自行改写；视频笔记固定使用 `learning-page + video-note` 以接入共享 Obsidian 视觉系统。
 - `analysis.json` 是 runtime-only 质量报告，不进入最终 Obsidian 笔记。它用于记录来源充分性、知识索引和覆盖复核状态。
@@ -47,7 +47,7 @@
 
 - 默认 `prepare` 使用 subtitle-first，但仍通过 `--skip-download` 不下载媒体；`prepare-transcript` 与 `prepare-description` 只采集 metadata / 简介，不请求字幕。ASR 只在 `subtitle_unavailable` 后得到用户明确授权时运行；description-only 只在当前消息明确要求纯资源分享时运行。
 - `confirmed_empty` 仅代表 info-json 明确给出空字符串且（如存在）简介 sidecar 与其一致；字段缺失、`null`、类型异常或两者不一致都必须失败。
-- Cookie 内容不得读取、打印、上传、编辑、提交或写入笔记；collector 仅可把配置的 Cookie 文件路径传给 yt-dlp。
+- Cookie 内容不得向 Agent 暴露、打印、上传、编辑、提交或写入笔记。正常字幕/简介采集只把配置的 Cookie 文件路径传给 yt-dlp；命中 `config/pinned-comment-whitelist.json` 时，核心可在本机读取 Netscape Cookie 并构造一次只读置顶评论请求，但不得把 Cookie 值写入 Job、日志或正式笔记。
 - metadata、简介、source manifest、`analysis.json`、日志和智能体临时工作文件只允许存在于单个 runtime Job。SRT / ASR 模式包含 source 文件与 chunks；ASR 先复制为 runtime `asr-transcript.txt`；description-only 不伪造 source 文件或 chunks。finalizer / failsafe 负责 retire。
 - 智能体只可编辑 `analysis.json`、草稿中的两个 AI 区域及当前模式明确提供的 runtime 工作文件。SRT 保留文字、顺序和 cue 边界；ASR 按标点/换行确定性分段且不生成虚假时间戳；description-only 的 manifest 只有来源契约而没有伪造 chunk。三种模式均不做摘要或语义过滤。
 - 智能体不得手工删除 job、reservation 或锁文件。锁、reservation、恢复与 retire 都由共享核心管理；`note_ready` 已成立时，即使返回 `temporary_data_retired: false` 或 `cleanup_warning`，也只能作为维护警告报告，不能把已成功发布的笔记改判为失败。
@@ -55,7 +55,7 @@
 
 ## 来源充分性判断
 
-当前 Job 允许的来源不等于视频本身。智能体必须先判断所选 `source_mode` 能否支撑可信笔记：subtitle / ASR 要评估文字连续性与专名质量；description-only 只能评估标题、metadata、UP 主简介和用户补充来源，不能把未采集的视频内容当作已知事实。
+当前 Job 允许的来源不等于视频本身。智能体必须先判断所选 `source_mode` 能否支撑可信笔记：subtitle / ASR 要评估文字连续性与专名质量；description-only 只能评估标题、metadata、UP 主简介、当前 Job 已确定性采集的 UP 主置顶一级评论（如存在）和用户补充来源，不能把未采集的视频内容当作已知事实。
 
 判断应结合上下文，不要用单一字符数或固定时长阈值代替思考。重点观察：
 
@@ -70,7 +70,7 @@
 
 ## 内容提取与整理原则
 
-正文事实只能来自当前 `source_mode` 允许的来源。subtitle / ASR 可使用对应文字与 UP 主简介；description-only 只能使用标题、metadata、UP 主简介和明确用户补充来源。不得利用模型常识补具体参数、资源地址或结论。若允许来源明确说明“三连 / 充电 / 评论关键词 / 私信 / 进群”等资料获取条件，核心会记录 `resource_access_notices`；资料本体未出现时只能说明条件，不得生成、还原或猜测。
+正文事实只能来自当前 `source_mode` 允许的来源。subtitle / ASR 可使用对应文字、UP 主简介、当前 Job 已确定性采集的 UP 主置顶一级评论（如存在）与明确用户补充来源；description-only 只能使用标题、metadata、UP 主简介、已采集置顶一级评论和明确用户补充来源。不得利用模型常识补具体参数、资源地址或结论。若允许来源明确说明“三连 / 充电 / 评论关键词 / 私信 / 进群”等资料获取条件，核心会记录 `resource_access_notices`；资料本体未出现时只能说明条件，不得生成、还原或猜测。
 
 对学习价值高的信息应优先保护，不能仅为了缩短篇幅而删除：
 
@@ -92,7 +92,7 @@ subtitle / ASR 来源可能存在自动转写噪声。遇到不确定专名时�
 
 ## 最终笔记结构
 
-程序负责：Frontmatter、H1、标题下方元信息行、UP 主资源、条件资料获取提示、原始简介、iframe、tags、cssclasses、文件名和路径。UP 主资源标题由程序根据原始简介中的资源小节、原标签和 URL 平台规范化，例如 `GitHub 插件 · MieNodes`、`工作流（夸克网盘）`、`国际站 · 体验地址`；重复 URL 去重，已包含平台名或平台简称的标签不重复追加平台。正式阅读顺序固定为：**标题 / 元信息 → 先看结论 → 播放器与来源区 → 动态知识正文**。播放器直接位于“先看结论”后，不显示额外“视频资料”标题；资料获取提示使用紧凑 Callout，UP 主资源使用逐条 Markdown 链接列表，视频简介使用紧凑段落，完整原始简介以“UP 主原文（完整说明与链接）”折叠保留。
+程序负责：Frontmatter、H1、标题下方元信息行、UP 主资源、条件资料获取提示、原始简介/已采集置顶一级评论、iframe、tags、cssclasses、文件名和路径。UP 主简介与置顶评论中的作者资源会进入同一资源池并按规范化 URL 去重；裸 GitHub 仓库链接及“节点/插件/仓库/项目”等泛化 GitHub 标签优先显示 URL 中的仓库名，不新增 GitHub 网络请求。正式阅读顺序固定为：**标题 / 元信息 → 先看结论 → 播放器与来源区 → 动态知识正文**。播放器直接位于“先看结论”后，不显示额外“视频资料”标题；资料获取提示使用紧凑 Callout，UP 主资源使用逐条 Markdown 链接列表，视频简介使用紧凑段落，作者原文折叠区在有置顶补充时显示“UP 主原文（视频简介 + 置顶评论）”。
 
 智能体负责两个区域：
 
@@ -123,7 +123,7 @@ subtitle / ASR 来源可能存在自动转写噪声。遇到不确定专名时�
 
 必须阅读 `docs\standards\CODEX-VIDEO-NOTE-GUIDE.md`。长字幕、百科型、参数密集或实测证据多的内容还必须阅读 `docs\standards\KNOWLEDGE-DENSE-WORKFLOW.md`。`docs\standards\STANDARD-VIDEO-NOTE-EXAMPLE.md` 是语法与局部结构片段参考，不再作为每次任务的强制目录示例；只有需要确认 Table / Grid / Card / Callout 等具体写法时再读取相关片段，且不得复制其中的章节集合、顺序、数量或组件组合。
 
-所有新笔记先进入 `00-待整理`。H1 默认使用 B站原视频标题；程序在 H1 下方生成“作者 · 发布日期 · 时长 · BVID”的紧凑元信息行。允许重复链接再次生成笔记；同名文件由程序以 `（2）`、`（3）` 防覆盖。分类建议和 tags 由程序确定；智能体不得自行跳过 `00-待整理`。
+所有新笔记先进入 `00-待整理`。H1 默认使用 B站原视频标题；程序在 H1 下方生成“作者 · 发布日期 · 时长 · BVID”的紧凑元信息行。相同 BVID 已发布时默认先返回 `existing_note_found`；只有用户明确选择 rerun 才创建 `（2）`、`（3）` 等独立序号笔记，update 则保留原路径并使用冲突保护。分类建议和 tags 由程序确定；智能体不得自行跳过 `00-待整理`。
 
 ## 学习后整理流程
 
@@ -137,11 +137,11 @@ bili-learning organize --note '<现有笔记路径>' --filename '<短文件名>'
 - 纯资源型先在 `<runtime_root>/resource-cards/` 写短资源卡，再调用 `organize --mode resource --note '<现有笔记路径>' --collection '<集合页>' --card-file '<card.md>' --confirmed-scope '<single|latest|all>'`，合并进 `05-资源`。
 - 核心负责路径验证、安全写入、原笔记备份（纯资源模式）和导航刷新；适配层不得自行移动、重命名或删除正式笔记。生成阶段与 finalizer 不承担资源类型判断。
 
-## 适配层边界
+## 统一 Skill 与安装出口边界
 
-- ChatGPT：适配层位于 `chatgpt-skills\bili-learning-automation-chatgpt\`，独立打包并安装到 ChatGPT；必须通过已授权的本地工作区桥接访问项目。
-- Hermes：仓库适配层位于 `hermes-skills\bili-learning-automation\`；独立包位于 `hermes-skills\bili-learning-automation-hermes\`。前者适合 Junction 与完整本机启动脚本，后者只包含可移植指令，需先确认用户指定的项目根目录。
-- Codex：适配层位于 `.agents\skills\bili-learning-automation-codex\`，可由仓库自动发现，也可独立安装；进入项目后先读取根目录 `AGENTS.md`。
-- WorkBuddy：仓库适配层位于 `workbuddy-skills\bili-learning-automation\`；独立包位于 `workbuddy-skills\bili-learning-automation-workbuddy\`。前者适合 Junction 与宿主 bridge，后者只包含可移植指令，需先确认用户指定的项目根目录。
-- ChatGPT、Codex 和两个独立包统一调用 `scripts\run_bili_learning.py`；仓库内 Hermes / WorkBuddy 仍保留宿主兼容入口，但所有入口最终复用同一核心 CLI。
-- 未来其他平台：只新增唯一命名的薄适配层，不复制核心 Python 逻辑、内容标准、taxonomy 或 finalizer。
+- 唯一人工维护真源：`skill\bili-learning-automation\SKILL.md`；宿主安装出口禁止直接编辑。
+- `scripts\build_agent_skill_packages.py` 会把统一真源同步到 ChatGPT、Codex、Hermes、WorkBuddy 的宿主目录，并生成四个独立 ZIP；`--check` 用于 CI/提交前检查生成副本是否漂移。
+- 四个宿主仍保留各自安装名称和最小权限边界：ChatGPT 需要本地工作区桥接；Codex 需要本地工作区；Hermes 限 owner/受信任私聊；WorkBuddy 只处理当前会话明确输入。
+- 兼容安装出口保持不变：ChatGPT `chatgpt-skills\bili-learning-automation-chatgpt\`、Codex `.agents\skills\bili-learning-automation-codex\`、Hermes `hermes-skills\bili-learning-automation\` / 独立包目录、WorkBuddy `workbuddy-skills\bili-learning-automation\` / 独立包目录；这些 `SKILL.md` 都是生成文件。
+- 所有安装出口最终复用同一 `scripts\run_bili_learning.py` 核心 CLI；Hermes / WorkBuddy 的 bridge 仅处理宿主路径/进程兼容，不拥有独立业务流程。
+- 未来新增宿主时，只在构建脚本增加一个新的安装 profile/出口，不新增第二份人工维护的 `SKILL.md`；除非宿主运行机制确有需要，否则不复制 bridge。

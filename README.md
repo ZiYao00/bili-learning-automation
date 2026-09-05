@@ -39,9 +39,9 @@ B站链接 / BV号
 
 正文事实只来自当前 Job 允许的来源：
 
-- `subtitle_srt`：当前视频字幕、UP 主原始简介和明确用户补充来源；
-- `asr_text`：用户明确授权后的 ASR 纯文本、UP 主原始简介和明确用户补充来源；
-- `description_only`：标题、metadata、UP 主原始简介和明确用户补充来源，不推断视频口播或画面事实。
+- `subtitle_srt`：当前视频字幕、UP 主原始简介、当前 Job 已确定性采集的 UP 主置顶一级评论（如存在）和明确用户补充来源；
+- `asr_text`：用户明确授权后的 ASR 纯文本、UP 主原始简介、已采集置顶一级评论（如存在）和明确用户补充来源；
+- `description_only`：标题、metadata、UP 主原始简介、已采集置顶一级评论（如存在）和明确用户补充来源，不推断视频口播或画面事实。
 
 如果字幕缺失严重、重要信息只能依赖画面判断，或现有文字不足以形成可信笔记，Agent 可以停止任务并返回 `source_insufficient`，不会使用模型常识补齐具体事实。
 
@@ -293,7 +293,7 @@ Fact Ledger
 
 ## 7. Agent 与模型说明
 
-本项目**不绑定特定 LLM**。ChatGPT、Codex、Hermes 和 WorkBuddy 是不同薄入口，来源采集、Source Mode、source manifest、taxonomy、内容标准、validator 和 finalizer 共用同一套核心逻辑。
+本项目**不绑定特定 LLM**。ChatGPT、Codex、Hermes 和 WorkBuddy 保留不同安装出口，但只人工维护 `skill/bili-learning-automation/SKILL.md` 一份统一 Skill；各宿主 `SKILL.md` 与 ZIP 由 `scripts/build_agent_skill_packages.py` 自动同步/生成。来源采集、Source Mode、source manifest、taxonomy、内容标准、validator 和 finalizer 共用同一套核心逻辑。
 
 不同模型可能在以下方面表现不同：
 

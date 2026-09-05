@@ -22,10 +22,12 @@
 
 ## 代码分层
 
-- `src/bili_learning/`：可测试的核心逻辑和 agent-neutral CLI。`prepare`、`prepare-transcript`、`prepare-description` 只是清晰的外部入口，内部共用 `_prepare_materials`；`source.py` 定义三种 Source Mode，`transcript.py` 生成统一 source manifest；`workflow.py` 只为 `strict` 模式创建并校验三份 runtime 工作文件。
+- `src/bili_learning/`：可测试的核心逻辑和 agent-neutral CLI。`prepare`、`prepare-transcript`、`prepare-description` 只是清晰的外部入口，内部共用 `_prepare_materials`；`source.py` 定义三种 Source Mode，`transcript.py` 生成统一 source manifest；`pinned_comment.py` 负责条件触发/白名单置顶一级评论补充；`workflow.py` 只为 `strict` 模式创建并校验三份 runtime 工作文件。
+- `skill/bili-learning-automation/`：唯一需要人工维护的 Skill 真源；不复制评论策略、Cookie 细节、taxonomy 或 finalizer 业务规则。
+- `scripts/build_agent_skill_packages.py`：从统一 Skill 真源生成 ChatGPT、Codex、Hermes、WorkBuddy 的安装出口与 ZIP，并通过 `--check` 检查生成副本是否漂移。
 - `docs/AGENT-INTEGRATION.md`：所有智能体共用的接入协议。
-- `hermes-skills/bili-learning-automation/SKILL.md`：Hermes/微信专属适配约束。
-- `hermes-skills/bili-learning-automation/scripts/`：只定位项目根目录并转发到核心 CLI 的兼容入口。
+- ChatGPT、Codex、Hermes、WorkBuddy 的宿主目录只保留由构建脚本生成的 `SKILL.md` 安装副本；宿主特有内容仅限最小权限/安装边界。
+- `hermes-skills/bili-learning-automation/scripts/`、`workbuddy-skills/bili-learning-automation/scripts/`：只处理宿主路径/进程兼容；同目录 `SKILL.md` 也是生成安装出口，不是第二套流程源码。
 - `config/bilibili-note-taxonomy.json`：模型别名、tags、后续整理建议和默认 `notes_root`。
 - `docs/standards/`：人类可读的笔记质量与版式语义标准。
 - `config/obsidian-style.json`：共享 CSS 依赖契约，声明本项目需要的 `learning-lab.css` Core、`video-note.css` Extension 与 Frontmatter class。
@@ -67,7 +69,7 @@ taxonomy 的 route.path 不直接决定新文件的路径。新笔记统一先�
 
 - 长期产物：私人 Markdown 笔记与导航页，默认不入 Git。
 - runtime 产物：`.runtime/bilibili-learning` 的活动 Job 始终包含 source manifest、analysis 与草稿；subtitle / ASR 还包含 source chunks，ASR 会保存 runtime 内纯文本副本，description-only 不伪造独立 source 文件或 chunk。`strict` 模式额外包含 Fact Ledger、Semantic Draft 与 Layout Plan。任务完成后 Job retire 到 `retired/`。
-- 敏感数据：`key/` 中的 Cookie 文件；程序只把路径传给 yt-dlp，不读取内容。
+- 敏感数据：`key/` 中的 Cookie 文件。正常字幕/简介采集仍把文件路径交给 yt-dlp；命中置顶评论白名单时，`pinned_comment.py` 会在本机读取 Netscape Cookie 并构造一次只读评论请求。Cookie 值不得打印、写入 Job/笔记、上传或提交。
 - 历史资料：`archive/`、`materials/` 及本机 legacy 依赖，不属于公开源码主链路。
 
 ## 配置边界

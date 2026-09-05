@@ -20,6 +20,7 @@ python -m compileall -q src scripts hermes-skills/bili-learning-automation/scrip
 python -m ruff check .
 python -m pytest -q
 python .\scripts\build_agent_skill_packages.py
+python .\scripts\build_agent_skill_packages.py --check
 ```
 
 测试不得依赖真实 Cookie、真实 Bilibili 登录态或私人 Obsidian 笔记。
@@ -27,11 +28,12 @@ python .\scripts\build_agent_skill_packages.py
 ## 设计原则
 
 - 确定性数据由 Python 生成，不让 LLM 重写元数据。
+- Skill 只人工维护 `skill/bili-learning-automation/SKILL.md`；所有宿主 `SKILL.md` 都由 `scripts/build_agent_skill_packages.py` 生成。改 Skill 时先改真源，再运行构建脚本；禁止在生成出口直接打补丁。
 - `subtitle_srt`、`asr_text`、`description_only` 只在 SourceMaterial 层分流；三个外部入口必须共用 `_prepare_materials`、Job、handoff、finalizer、恢复与 retire，不为新来源复制 lifecycle。
 - taxonomy 是分类规则与 repository fallback 的配置源；正式 Obsidian 笔记位置优先使用本机 `vault_root + notes_subdir`，旧 `notes_root` 仅用于兼容。
-- 每次成功转换生成一篇笔记；同名文件使用序号防覆盖，BVID 不作为文件级唯一性约束。
+- 相同 BVID 默认先返回 `existing_note_found`，由用户选择 update / rerun / cancel；只有明确 rerun 才创建同标题序号笔记，update 保留原路径并使用 SHA-256 冲突保护。
 - 公开 CI 不访问真实 Bilibili 账号。
-- Cookie 只能作为 yt-dlp 的本地文件参数使用，不能读取内容。
+- Cookie 是本地凭据：正常采集只把文件路径交给 yt-dlp；命中置顶评论白名单时，核心可以在本机读取 Netscape Cookie 构造一次只读请求，但不得把值暴露给 Agent、日志、Job、笔记或 Git。
 - cleanup 只能作用于 `.runtime/bilibili-learning` 下的 job。
 
 ## 兼容入口
@@ -83,7 +85,8 @@ python -m compileall -q src scripts hermes-skills/bili-learning-automation/scrip
 python -m ruff check .
 python -m pytest -q
 python .\scripts\build_agent_skill_packages.py
-git diff --check
+python .\scripts\build_agent_skill_packages.py --check
+git -c core.whitespace=cr-at-eol diff --check
 ```
 
 本轮涉及内容质量与版式升级时，还应确认：
@@ -96,4 +99,4 @@ git diff --check
 
 ## CI
 
-`.github/workflows/ci.yml` 在 Windows / Linux、Python 3.10 / 3.12 上执行 compile、Ruff 和 pytest，不配置 Cookie Secret。
+`.github/workflows/ci.yml` 在 Windows / Linux、Python 3.10 / 3.12 上执行 compile、Ruff、统一 Skill 生成出口 `--check` 和 pytest，不配置 Cookie Secret。

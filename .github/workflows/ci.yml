@@ -23,5 +23,7 @@ jobs:
         run: python -m compileall -q src scripts hermes-skills/bili-learning-automation/scripts workbuddy-skills/bili-learning-automation/scripts
       - name: Ruff
         run: python -m ruff check .
+      - name: Skill source sync
+        run: python scripts/build_agent_skill_packages.py --check
       - name: Pytest
         run: python -m pytest -q
