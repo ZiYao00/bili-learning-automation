@@ -15,6 +15,18 @@
 
 默认流程字幕优先且**不会下载视频或音频**。只有用户明确要求 ASR 才下载临时音轨转写；只有当前消息明确要求“纯资源分享 / 只整理简介 / 不用字幕”才跳过字幕请求。三个入口共用同一 Job lifecycle。
 
+### 可选：部署 `local-ASR-service`
+
+`local-ASR-service` 是本项目推荐的**可选本地转写服务**，适合经常处理“已确认没有可提取字幕”的视频。它不是首次安装的必需依赖，也不会被 collector 自动调用或自动下载媒体。
+
+可在本项目首次配置后，按 [local-ASR-service](https://github.com/ZiYao00/local-ASR-service) 的说明预先部署到本机；但只有用户明确要求继续 ASR 时，才用它取得纯文本 transcript，并通过现有入口交回本项目：
+
+```powershell
+bili-learning prepare-transcript "https://www.bilibili.com/video/BV..." --transcript "C:\path\to\transcript.txt"
+```
+
+不要把服务部署、音频下载或 ASR 调用加入默认字幕优先链路。项目只接收真实纯文本，继续沿用统一 Job、handoff 与 finalizer 流程。
+
 ---
 
 ## 1. 使用前需要准备什么
