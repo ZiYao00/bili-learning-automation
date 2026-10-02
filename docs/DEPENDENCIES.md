@@ -8,6 +8,7 @@
 | canonical Skill / 宿主入口 | 接收链接、调用核心流程、填写 AI 内容区域 | 只维护 `skill/bili-learning-automation/`；Codex / Hermes / WorkBuddy 通过 Junction 直接安装，ChatGPT Web 单独构建 ZIP |
 | yt-dlp | 采集元数据、简介和字幕，不下载媒体 | 默认自动检测系统 PATH；环境变量 / `local.json` 只用于自定义路径覆盖 |
 | Bilibili Cookie | 获取需要登录态的字幕/元数据 | `BILI_LEARNING_COOKIE_FILE` |
+| `local-ASR-service`（可选） | 用户明确授权且视频无可用字幕时提供本地 ASR | 默认 `http://127.0.0.1:8001`；可用 `BILI_LEARNING_LOCAL_ASR_BASE_URL` / `local_asr_base_url` 覆盖 |
 
 默认 Cookie 相对项目根目录为 `key/bilibili_cookies.txt`。当前正常采集要求存在 Mozilla / Netscape 格式的完整 Cookie 文件；不要只配置单个 `SESSDATA`。正常字幕/简介采集把 Cookie **文件路径**传给 yt-dlp；仅命中用户主动配置的 `config/pinned-comment-whitelist.local.json` 时，核心才会在本机读取同一 Netscape 文件并构造一次只读评论请求。Cookie 值与本地名单不得向 Agent 暴露、打印、写入示例/Job/笔记或提交。第一次获取和导出方法见 [Bilibili Cookie 获取与安全配置](BILIBILI-COOKIE.md)。
 
@@ -39,6 +40,7 @@ winget install yt-dlp
 - `BILI_LEARNING_NOTES_ROOT`（旧版兼容）
 - `BILI_LEARNING_YTDLP`
 - `BILI_LEARNING_COOKIE_FILE`
+- `BILI_LEARNING_LOCAL_ASR_BASE_URL`（可选；只影响明确授权的 `prepare-asr`）
 
 ## 开发依赖
 

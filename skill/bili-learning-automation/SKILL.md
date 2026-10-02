@@ -41,9 +41,10 @@ python <repo-root>\scripts\run_bili_learning.py onboarding
 
 - 默认转换：`prepare '<原始完整消息>'`
 - 明确要求纯资源、只整理简介或不用字幕：`prepare-description '<原始完整消息>'`
-- 默认入口返回 `subtitle_unavailable` 后，只有用户明确授权 ASR，才取得纯文本并使用 `prepare-transcript '<原始完整消息>' --transcript '<文件>'`
+- 默认入口返回 `subtitle_unavailable` 后，只有用户明确授权 ASR，才先运行 `asr-health`；`ready` 时使用 `prepare-asr '<原始完整消息>'` 调用外部 `local-ASR-service`，服务不可用时停止并报告状态，不在本项目安装或启动另一套 ASR。
+- 用户已经通过其它已授权工具取得真实纯文本时，仍可使用 `prepare-transcript '<原始完整消息>' --transcript '<文件>'` 直接接入标准 Job。
 
-ASR 回流必须使用真实纯文本；不得把纯文本伪造成 SRT，也不得制造时间戳。不要根据标题、历史记忆或模型猜测自动跳过字幕。
+`prepare-asr` 仅在明确授权后临时下载音轨，转写结束即清理临时媒体；回流给 Job 的仍是真实纯文本，不得把纯文本伪造成 SRT，也不得制造时间戳。不要根据标题、历史记忆或模型猜测自动跳过字幕。
 
 `existing_note_found` 时停止并让用户选择更新、重新执行或取消。重试必须继续使用原始完整消息；重新执行使用 `--on-existing rerun`，更新使用 `--on-existing update` 并在多篇候选时明确 `--update-target`。`update_conflict` 不得强制覆盖。
 

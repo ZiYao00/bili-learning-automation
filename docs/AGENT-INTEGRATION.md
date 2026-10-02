@@ -10,7 +10,7 @@
 
 ## 必须执行的流程
 
-1. 先通过统一 onboarding 门禁确认环境，再按当前消息的明确意图选择入口：默认 `prepare / subtitle_srt`；明确“纯资源分享 / 只整理简介 / 不用字幕”使用 `prepare-description / description_only`；默认入口返回 `subtitle_unavailable` 后，只有用户明确授权 ASR 才先取得纯文本并调用 `prepare-transcript / asr_text`。不得根据标题、历史 memory 或模型猜测自动改变来源模式。三个入口共用同一 Job lifecycle。
+1. 先通过统一 onboarding 门禁确认环境，再按当前消息的明确意图选择入口：默认 `prepare / subtitle_srt`；明确“纯资源分享 / 只整理简介 / 不用字幕”使用 `prepare-description / description_only`；默认入口返回 `subtitle_unavailable` 后，只有用户明确授权 ASR 才先运行 `asr-health`，服务 `ready` 时调用 `prepare-asr / asr_text`。`prepare-asr` 通过外部 `local-ASR-service` 临时下载并转录音轨，再回流现有 `prepare-transcript` Job 生命周期；服务不可用时停止，不在本项目复制或安装 ASR Pipeline。用户已经通过其它授权工具取得真实纯文本时，仍可直接调用 `prepare-transcript / asr_text`。不得根据标题、历史 memory 或模型猜测自动改变来源模式。
 2. 三个入口都会在真正采集前按 BVID 检查已发布笔记。`existing_note_found` 时停止并让用户选择：更新 / 重新执行 / 取消。更新使用 `--on-existing update --update-target <path>`；重新执行使用 `--on-existing rerun`；多篇时更新必须明确目标。重试时必须复用触发重复提示的原始完整消息，保留其中的资源与用户说明。`update_conflict` 时不得强制覆盖。
 3. 读取 `handoff_path`、`job.json`、`analysis_path`、`workflow_mode` 与 `source_manifest_path`。按 manifest 完整读取实际存在的 source chunks，不自行切分或跳读。`description_only` 的 manifest 没有伪造 chunk；此时读取 Job 中的标题、metadata、UP 主简介、当前 Job 已确定性采集的 UP 主置顶一级评论（如存在）和明确用户补充来源。旧 Job 仍兼容 `transcript_manifest_path`。
 4. 判断当前 `source_mode` 允许的来源是否足以支撑可信笔记，并填写 `analysis.json`。`description_only` 不得推断视频口播、画面参数或未提供的资源内容；任何模式来源不足时都停止，不用模型常识补事实。

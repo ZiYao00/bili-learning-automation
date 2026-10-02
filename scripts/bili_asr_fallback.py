@@ -1,7 +1,8 @@
-"""Manual ASR fallback for Bilibili videos that truly have no usable subtitles.
+"""Legacy SiliconFlow ASR fallback kept for compatibility.
 
-This script is intentionally outside the normal Skill workflow. Run it only after
-confirming that the source video has no extractable subtitle track.
+The canonical Agent/Skill path now uses ``asr-health`` + ``prepare-asr`` to call
+external ``local-ASR-service`` after explicit user authorization. This script is
+not part of that main workflow and should not be selected automatically.
 """
 
 from __future__ import annotations

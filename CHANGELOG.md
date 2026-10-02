@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- 新增外部 `local-ASR-service` 接口：`asr-health` 负责结构化健康检查，`prepare-asr` 仅在用户明确授权后临时下载音轨、调用本机 ASR，并把真实纯文本回流现有 `prepare-transcript / asr_text` Job lifecycle；默认 `prepare` 仍保持字幕优先且不下载媒体。
+- 新增 `local_asr_base_url` / `BILI_LEARNING_LOCAL_ASR_BASE_URL` 可选配置；外部 ASR 未运行不会阻塞 onboarding 或普通字幕流程。
+
 ### Changed
 
 - Skill 架构进一步收敛为单一 canonical 本地入口：Codex、Hermes、WorkBuddy 的用户级 Skill 目录直接 Junction 到 `skill/bili-learning-automation/`，仓库不再生成或维护宿主专用 Skill 副本；宿主路径 / `PYTHONPATH` 兼容统一由 canonical Skill 内的 `local_bridge.*` 处理。

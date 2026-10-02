@@ -14,7 +14,15 @@ from .config import (
     load_settings,
 )
 from .doctor import doctor_report, onboarding_report, run_doctor
-from .lifecycle import FAILSAFE_SECONDS, finalize_note, prepare_description_note, prepare_note, prepare_transcript_note
+from .lifecycle import (
+    FAILSAFE_SECONDS,
+    finalize_note,
+    prepare_description_note,
+    prepare_local_asr_note,
+    prepare_note,
+    prepare_transcript_note,
+)
+from .local_asr import health_report as local_asr_health_report
 from .navigation import build_navigation
 from .organizer import find_duplicate_bvid_notes, organize_note, organize_resource_note
 
@@ -50,6 +58,8 @@ def main() -> None:
     doctor_parser = subparsers.add_parser("doctor", help="检查本机依赖和配置")
     doctor_parser.add_argument("--json", action="store_true", dest="as_json", help="输出机器可读诊断 JSON")
     subparsers.add_parser("onboarding", help="输出首次使用所需的结构化环境检查")
+    asr_health_parser = subparsers.add_parser("asr-health", help="检查外部 local-ASR-service 是否可用")
+    asr_health_parser.add_argument("--timeout", type=int, default=3, help="健康检查超时秒数")
 
     configure_parser = subparsers.add_parser("configure-obsidian", help="把本机 Obsidian Vault 写入 config/local.json")
     configure_parser.add_argument("--vault", type=Path, required=True, help="包含 .obsidian 的 Vault 根目录")
@@ -71,6 +81,10 @@ def main() -> None:
     prepare_parser.add_argument("--after-seconds", type=int, default=FAILSAFE_SECONDS)
     prepare_parser.add_argument("--cleanup-runner", type=Path, help=argparse.SUPPRESS)
     _add_existing_note_arguments(prepare_parser)
+    asr_parser = subparsers.add_parser("prepare-asr", help="用户明确授权后，通过 local-ASR-service 转录并创建标准 Job")
+    asr_parser.add_argument("message", help="Bilibili 复制链接、短链或 BV 号")
+    asr_parser.add_argument("--cleanup-runner", type=Path, help=argparse.SUPPRESS)
+    _add_existing_note_arguments(asr_parser)
     transcript_parser = subparsers.add_parser("prepare-transcript", help="把已授权取得的纯文本 transcript 接入标准 Job")
     transcript_parser.add_argument("message", help="Bilibili 复制链接、短链或 BV 号")
     transcript_parser.add_argument("--transcript", type=Path, required=True, help="已有的无时间戳纯文本 transcript")
@@ -167,6 +181,10 @@ def main() -> None:
         report = onboarding_report(settings)
         print(json.dumps(report, ensure_ascii=False, indent=2))
         raise SystemExit(0 if report["status"] == "ready" else 2)
+    if args.command == "asr-health":
+        report, code = local_asr_health_report(settings, timeout=args.timeout)
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        raise SystemExit(code)
     if args.command == "build-nav":
         build_navigation(settings)
         print(f"导航已刷新：{settings.notes_root / settings.navigation_dir}")
@@ -178,6 +196,16 @@ def main() -> None:
             dry_run=args.dry_run,
             cleanup_job_path=args.cleanup_job,
             after_seconds=args.after_seconds,
+            cleanup_runner=args.cleanup_runner,
+            on_existing=args.on_existing,
+            update_target=args.update_target,
+        )
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        raise SystemExit(code)
+    if args.command == "prepare-asr":
+        payload, code = prepare_local_asr_note(
+            project_root,
+            args.message,
             cleanup_runner=args.cleanup_runner,
             on_existing=args.on_existing,
             update_target=args.update_target,

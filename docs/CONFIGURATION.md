@@ -31,6 +31,7 @@ config/local.json.example
   "vault_root": "D:\\Notes\\MyVault",
   "notes_subdir": "bilibili",
   "cookie_file": "key/bilibili_cookies.txt",
+  "local_asr_base_url": "http://127.0.0.1:8001",
   "workflow_mode": "light"
 }
 ```
@@ -64,6 +65,31 @@ winget install yt-dlp
 ```json
 "ytdlp": "D:\\Tools\\yt-dlp.exe"
 ```
+
+### `local_asr_base_url`（可选外部能力）
+
+`local-ASR-service` 是独立共享基础设施，不属于本项目必需依赖。默认地址为：
+
+```text
+http://127.0.0.1:8001
+```
+
+普通字幕流程不会检查、启动或调用它，也不会下载音频。只有默认 `prepare` 已确认 `subtitle_unavailable`，并且用户明确授权 ASR 后，Agent 才运行：
+
+```powershell
+python .\\scripts\\run_bili_learning.py asr-health
+python .\\scripts\\run_bili_learning.py prepare-asr '<原始完整消息>'
+```
+
+`prepare-asr` 会临时下载该视频的音轨，调用外部 `local-ASR-service /v1/audio/transcriptions`，取得真实纯文本后复用标准 `prepare-transcript / asr_text` Job lifecycle；临时音轨和中间 transcript 不作为长期业务资产保存。本项目不会安装、复制或启动另一套 FunASR / Whisper Pipeline。
+
+如外部服务使用其他地址，可在本机配置：
+
+```json
+"local_asr_base_url": "http://127.0.0.1:8001"
+```
+
+也可用 `BILI_LEARNING_LOCAL_ASR_BASE_URL` 临时覆盖。该能力是可选项，因此服务未启动不会让 onboarding 失败。
 
 ### `vault_root`
 

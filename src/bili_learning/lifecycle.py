@@ -4,6 +4,7 @@ import json
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,7 @@ from .collector import (
 from .config import DependencyError, load_settings
 from .doctor import onboarding_report
 from .input_resolver import extract_user_supplied_source, resolve_input
+from .local_asr import LOCAL_ASR_SERVICE_NAME, LocalAsrError, transcribe_bilibili
 from .navigation import build_navigation
 from .note_library import find_notes_by_bvid, note_sha256, validate_update_target
 from .pinned_comment import fetch_uploader_pinned_comment, is_pinned_comment_whitelisted, should_lookup_pinned_comment
@@ -578,6 +580,64 @@ def prepare_transcript_note(
         on_existing=on_existing,
         update_target=update_target,
     )
+
+
+def prepare_local_asr_note(
+    project_root: Path,
+    message: str | None,
+    *,
+    cleanup_runner: Path | None = None,
+    on_existing: str = "ask",
+    update_target: Path | None = None,
+) -> tuple[dict[str, Any], int]:
+    settings = load_settings(project_root)
+    if not message:
+        return _status({"status": "failed", "message": "需要提供 B站复制链接、短链接或 BV 号。"}, 2)
+
+    onboarding = onboarding_report(settings)
+    if onboarding["status"] == "action_required":
+        return _status(
+            {
+                "status": "onboarding_required",
+                "message": "首次使用环境尚未准备完成；请先处理必需配置，再重试原链接。",
+                "actions": onboarding["actions"],
+                "warnings": onboarding["warnings"],
+            },
+            2,
+        )
+
+    try:
+        _resolved, result = transcribe_bilibili(settings, message)
+        with tempfile.TemporaryDirectory(prefix="bili-learning-asr-transcript-") as temp:
+            transcript_path = Path(temp) / "transcript.txt"
+            transcript_path.write_text(str(result["text"]).strip() + "\n", encoding="utf-8")
+            payload, code = prepare_transcript_note(
+                project_root,
+                message,
+                transcript_path,
+                cleanup_runner=cleanup_runner,
+                on_existing=on_existing,
+                update_target=update_target,
+            )
+        if payload.get("status") == "materials_ready":
+            payload["asr_provider"] = LOCAL_ASR_SERVICE_NAME
+            payload["asr_model"] = result.get("model")
+        return payload, code
+    except DependencyError as error:
+        return _status({"status": "failed", "code": error.code, "message": str(error)}, 1)
+    except LocalAsrError as error:
+        return _status(
+            {
+                "status": "asr_unavailable" if error.code.startswith("local_asr_") else "failed",
+                "code": error.code,
+                "provider": LOCAL_ASR_SERVICE_NAME,
+                "base_url": settings.local_asr_base_url,
+                "message": str(error),
+            },
+            2 if error.code.startswith("local_asr_") else 1,
+        )
+    except Exception as error:
+        return _status({"status": "failed", "message": str(error)}, 1)
 
 
 def prepare_description_note(

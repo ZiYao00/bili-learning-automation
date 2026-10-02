@@ -12,6 +12,7 @@ LOCAL_CONFIG_RELATIVE_PATH = Path("config/local.json")
 DEFAULT_NOTES_SUBDIR = "bilibili"
 DEFAULT_WORKFLOW_MODE = "light"
 SUPPORTED_WORKFLOW_MODES = {"light", "strict"}
+DEFAULT_LOCAL_ASR_BASE_URL = "http://127.0.0.1:8001"
 OBSIDIAN_SNIPPET_NAMES = ("learning-lab.css", "video-note.css")
 OBSIDIAN_STYLE_REPOSITORY = "https://github.com/ZiYao00/obsidian-learning-snippets"
 YTDLP_INSTALL_URL = "https://github.com/yt-dlp/yt-dlp/wiki/Installation"
@@ -52,6 +53,7 @@ class Settings:
     cookie_file: Path
     ytdlp: ExecutableResolution
     local_config_path: Path
+    local_asr_base_url: str = DEFAULT_LOCAL_ASR_BASE_URL
     workflow_mode: str = DEFAULT_WORKFLOW_MODE
 
 
@@ -144,7 +146,17 @@ def _load_local_config(project_root: Path) -> tuple[Path, dict[str, Any]]:
         raise ConfigurationError("local_config_invalid_json", f"本机配置不是有效 JSON：{path}") from exc
     if not isinstance(raw, dict):
         raise ConfigurationError("local_config_invalid_type", "本机配置必须是 JSON 对象")
-    allowed = {"taxonomy", "notes_root", "vault_root", "notes_subdir", "cookie_file", "ytdlp", "workflow_mode", "siliconflow"}
+    allowed = {
+        "taxonomy",
+        "notes_root",
+        "vault_root",
+        "notes_subdir",
+        "cookie_file",
+        "ytdlp",
+        "workflow_mode",
+        "siliconflow",
+        "local_asr_base_url",
+    }
     unknown = sorted(set(raw) - allowed)
     if unknown:
         raise ConfigurationError("local_config_unknown_key", "本机配置存在不支持字段：" + ", ".join(unknown))
@@ -276,6 +288,17 @@ def find_ytdlp(project_root: Path, local_config: dict[str, str]) -> ExecutableRe
     return ExecutableResolution(None, "missing", tuple(checked))
 
 
+def _resolve_local_asr_base_url(local_config: dict[str, Any]) -> str:
+    value = os.environ.get("BILI_LEARNING_LOCAL_ASR_BASE_URL") or local_config.get("local_asr_base_url") or DEFAULT_LOCAL_ASR_BASE_URL
+    normalized = str(value).strip().rstrip("/")
+    if not normalized.startswith(("http://", "https://")):
+        raise ConfigurationError(
+            "local_asr_base_url_invalid",
+            "BILI_LEARNING_LOCAL_ASR_BASE_URL / local_asr_base_url 必须是 http(s) URL。",
+        )
+    return normalized
+
+
 def _resolve_workflow_mode(local_config: dict[str, str]) -> str:
     mode = (os.environ.get("BILI_LEARNING_WORKFLOW_MODE") or local_config.get("workflow_mode") or DEFAULT_WORKFLOW_MODE)
     normalized = mode.strip().lower()
@@ -322,5 +345,6 @@ def load_settings(project_root: Path) -> Settings:
         cookie_file=cookie_file,
         ytdlp=find_ytdlp(project_root, local_config),
         local_config_path=local_config_path,
+        local_asr_base_url=_resolve_local_asr_base_url(local_config),
         workflow_mode=_resolve_workflow_mode(local_config),
     )

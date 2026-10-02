@@ -3,8 +3,6 @@
   "vault_root": "D:\\YourObsidianVault",
   "notes_subdir": "bilibili",
   "cookie_file": "key/bilibili_cookies.txt",
-  "workflow_mode": "light",
-  "siliconflow": {
-    "api_key": [REDACTED_SECRET]
-  }
+  "local_asr_base_url": "http://127.0.0.1:8001",
+  "workflow_mode": "light"
 }
