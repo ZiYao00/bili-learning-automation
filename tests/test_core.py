@@ -583,18 +583,76 @@ def test_legacy_notes_root_remains_supported(
     assert settings.notes_is_fallback is False
 
 
-def test_notes_root_conflicts_with_vault_config(tmp_path: Path, taxonomy: dict) -> None:
+def test_notes_root_can_pair_with_vault_metadata(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     (config_dir / "bilibili-note-taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
+    vault = tmp_path / "vault"
+    (vault / ".obsidian").mkdir(parents=True)
     (config_dir / "local.json").write_text(
-        json.dumps({"notes_root": "notes", "vault_root": "vault"}),
+        json.dumps({"notes_root": "notes/bilibili", "vault_root": str(vault), "notes_subdir": "bilibili"}),
         encoding="utf-8",
     )
+    monkeypatch.delenv("BILI_LEARNING_NOTES_ROOT", raising=False)
+    monkeypatch.delenv("BILI_LEARNING_VAULT_ROOT", raising=False)
+    monkeypatch.delenv("BILI_LEARNING_NOTES_SUBDIR", raising=False)
 
-    with pytest.raises(ConfigurationError) as error:
-        load_settings(tmp_path)
-    assert error.value.code == "local_config_notes_conflict"
+    settings = load_settings(tmp_path)
+
+    assert settings.notes_root == tmp_path / "notes" / "bilibili"
+    assert settings.vault_root == vault
+    assert settings.notes_subdir == Path("bilibili")
+    assert settings.notes_source == "local_notes_root_with_vault"
+    assert settings.notes_is_fallback is False
+
+
+def test_doctor_reports_hybrid_notes_mapping(tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "bilibili-note-taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
+    vault = tmp_path / "vault"
+    mapped_notes = vault / "bilibili"
+    mapped_notes.mkdir(parents=True)
+    (vault / ".obsidian").mkdir()
+    (config_dir / "local.json").write_text(
+        json.dumps({"notes_root": str(mapped_notes), "vault_root": str(vault), "notes_subdir": "bilibili"}),
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("BILI_LEARNING_NOTES_ROOT", raising=False)
+    monkeypatch.delenv("BILI_LEARNING_VAULT_ROOT", raising=False)
+    monkeypatch.delenv("BILI_LEARNING_NOTES_SUBDIR", raising=False)
+
+    report = doctor_report(load_settings(tmp_path))
+    checks = {check["code"]: check for check in report["checks"]}
+
+    assert checks["obsidian_notes_mapping"]["status"] == "OK"
+
+
+def test_onboarding_blocks_invalid_hybrid_notes_mapping(
+    tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "bilibili-note-taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
+    notes_root = tmp_path / "notes" / "bilibili"
+    notes_root.mkdir(parents=True)
+    vault = tmp_path / "vault"
+    (vault / ".obsidian").mkdir(parents=True)
+    (vault / "bilibili").mkdir()
+    (config_dir / "local.json").write_text(
+        json.dumps({"notes_root": str(notes_root), "vault_root": str(vault), "notes_subdir": "bilibili"}),
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("BILI_LEARNING_NOTES_ROOT", raising=False)
+    monkeypatch.delenv("BILI_LEARNING_VAULT_ROOT", raising=False)
+    monkeypatch.delenv("BILI_LEARNING_NOTES_SUBDIR", raising=False)
+
+    report = onboarding_report(load_settings(tmp_path))
+    action_codes = {action["code"] for action in report["actions"]}
+
+    assert "obsidian_notes_mapping_invalid" in action_codes
 
 
 def test_load_settings_accepts_utf8_bom_in_local_config(tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -670,7 +728,7 @@ def test_configure_obsidian_preserves_other_local_values(tmp_path: Path, taxonom
     assert saved["ytdlp"] == "tools/yt-dlp.exe"
     assert saved["workflow_mode"] == "strict"
     assert saved["siliconflow"] == {"api_key": "local-only-test-key"}
-    assert "notes_root" not in saved
+    assert saved["notes_root"] == "old/notes"
     assert saved["vault_root"] == str(vault.resolve())
     assert saved["notes_subdir"] == str(Path("Resources/Bilibili"))
 
@@ -1976,31 +2034,27 @@ def test_duplicate_bvid_detection_reports_other_notes_without_blocking(tmp_path:
     assert duplicates == [duplicate.resolve()]
 
 
-def test_agent_skills_require_organize_scope_confirmation() -> None:
+def test_agent_skill_requires_organize_scope_confirmation() -> None:
     root = Path(__file__).parents[1]
-    for relative in (
-        "workbuddy-skills/bili-learning-automation/SKILL.md",
-        "hermes-skills/bili-learning-automation/SKILL.md",
-    ):
-        text = (root / relative).read_text(encoding="utf-8")
-        assert "默认关闭" in text
-        assert "指定" in text
-        assert "最近一篇" in text
-        assert "全部待整理笔记" in text
-        assert "single" in text
-        assert "--filename" in text
-        assert "--destination" in text
-        assert "不得修改笔记内容" in text
-        assert "--confirmed-scope" in text
-        assert "prepare-transcript" in text
-        assert "不得把纯文本伪造成 SRT" in text
-        assert "不得制造时间戳" in text
-        assert "existing_note_found" in text
-        assert "--on-existing rerun" in text
-        assert "--on-existing update" in text
-        assert "--update-target" in text
-        assert "原始完整消息" in text
-        assert "update_conflict" in text
+    text = (root / "skill/bili-learning-automation/SKILL.md").read_text(encoding="utf-8")
+    assert "默认关闭" in text
+    assert "指定" in text
+    assert "最近一篇" in text
+    assert "全部待整理笔记" in text
+    assert "single" in text
+    assert "--filename" in text
+    assert "--destination" in text
+    assert "不得修改笔记内容" in text
+    assert "--confirmed-scope" in text
+    assert "prepare-transcript" in text
+    assert "不得把纯文本伪造成 SRT" in text
+    assert "不得制造时间戳" in text
+    assert "existing_note_found" in text
+    assert "--on-existing rerun" in text
+    assert "--on-existing update" in text
+    assert "--update-target" in text
+    assert "原始完整消息" in text
+    assert "update_conflict" in text
 
 
 def test_organize_note_only_renames_moves_and_rebuilds_navigation(tmp_path: Path, taxonomy: dict) -> None:

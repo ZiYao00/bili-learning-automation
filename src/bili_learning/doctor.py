@@ -79,6 +79,19 @@ def doctor_report(settings: Settings) -> dict[str, object]:
                 f"CSS snippet {snippet_name}",
                 str(snippet_path),
             )
+        if settings.notes_source.endswith("_notes_root_with_vault") and settings.notes_subdir is not None:
+            mapped_notes = settings.vault_root / settings.notes_subdir
+            try:
+                mapping_ok = mapped_notes.resolve(strict=True) == settings.notes_root.resolve(strict=True)
+            except OSError:
+                mapping_ok = False
+            add(
+                "OK" if mapping_ok else "FAIL",
+                "obsidian_notes_mapping",
+                "Obsidian notes mapping",
+                str(mapped_notes),
+                target=str(settings.notes_root),
+            )
     else:
         add(
             "WARN",
@@ -184,6 +197,15 @@ def onboarding_report(settings: Settings) -> dict[str, object]:
             current_value=str(settings.vault_root) if settings.vault_root is not None else "",
         )
 
+    mapping_check = checks.get("obsidian_notes_mapping")
+    if mapping_check and mapping_check["status"] == "FAIL":
+        add_action(
+            "obsidian_notes_mapping_invalid",
+            "Obsidian 中的笔记目录没有正确映射到项目 notes_root；请修复 Junction 后重试。",
+            mapped_path=str(mapping_check.get("detail", "")),
+            expected_target=str(settings.notes_root),
+        )
+
     if settings.ytdlp.path is None or not settings.ytdlp.path.is_file():
         add_action(
             "ytdlp_required",
@@ -237,7 +259,7 @@ def onboarding_report(settings: Settings) -> dict[str, object]:
         warnings.append(
             {
                 "code": "obsidian_vault_unknown",
-                "message": "当前使用兼容的旧版 notes_root，笔记仍可生成，但无法可靠检查 CSS；建议以后迁移到 vault_root + notes_subdir。",
+                "message": "当前只配置了 notes_root，笔记仍可生成，但无法可靠检查 Obsidian Vault 与 CSS；如需完整环境检查，请补充 vault_root + notes_subdir。",
             }
         )
 
@@ -256,6 +278,8 @@ def onboarding_report(settings: Settings) -> dict[str, object]:
             "status": "required" if settings.notes_is_fallback else "ready",
             "vault_root": str(settings.vault_root) if settings.vault_root is not None else None,
             "notes_root": str(settings.notes_root),
+            "notes_subdir": str(settings.notes_subdir) if settings.notes_subdir is not None else None,
+            "notes_source": settings.notes_source,
         },
         "css": {"status": "missing_optional" if missing_css else "ready", "missing": missing_css},
         "workflow_mode": settings.workflow_mode,

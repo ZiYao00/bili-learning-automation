@@ -1,20 +1,17 @@
 # Local credentials and machine-specific overrides
-key/
+key/*
+!key/.gitkeep
+!key/*.example
 .env
 .env.*
 !*.example
 config/local.json
 config/pinned-comment-whitelist.local.json
 
-# Private learning content and generated navigation
+# Private note storage and runtime jobs
 notes/**
 !notes/.gitkeep
-!notes/bilibili/.gitkeep
-archive/
-materials/
 .runtime/
-.backup/
-.codex-backups/
 
 # Test outputs and Python cache
 tests/yt-dlp/
@@ -27,12 +24,5 @@ tests/yt-dlp/
 build/
 dist/
 
-# Local agent state and project memory
+# Local agent state
 .workbuddy/
-
-# Bundled or locally copied third-party dependencies
-bili-note/
-web-access/
-
-# Local source package and legacy input archive
-hermes-video-learning-docs-v1.0.0.zip

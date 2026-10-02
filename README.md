@@ -94,23 +94,27 @@ Copy-Item .\config\local.json.example .\config\local.json
 
 ```json
 {
+  "notes_root": "notes/bilibili",
   "vault_root": "D:\\Notes\\MyVault",
   "notes_subdir": "bilibili",
-  "cookie_file": "D:\\Private\\bilibili_cookies.txt",
+  "cookie_file": "key/bilibili_cookies.txt",
   "workflow_mode": "light"
 }
 ```
 
 其中：
 
+- `notes_root`：真实笔记存储目录；推荐放在项目内的 `notes/bilibili`，该目录被 Git 忽略，便于本地 Agent / CodexPro 直接读写；
 - `vault_root`：直接包含 `.obsidian` 的 Obsidian Vault 根目录；
-- `notes_subdir`：本项目在 Vault 中保存笔记的相对子目录；
-- `cookie_file`：Netscape 格式 Bilibili Cookie 文件路径；
+- `notes_subdir`：Vault 中显示本项目笔记的相对子目录；推荐把 `<vault_root>/<notes_subdir>` 做成 Junction，目标指向 `<repo-root>/notes/bilibili`；
+- `cookie_file`：Netscape 格式 Bilibili Cookie 文件路径；默认可放在被 Git 忽略的 `key/`；
 - `workflow_mode`：默认使用 `light`。
 
-`config/local.json` 已被 Git 忽略，用于保存当前电脑自己的路径配置。
+推荐的数据方向是“**Vault → 项目 notes**”：真实 Markdown 存在项目内，Obsidian 通过 Junction 查看同一批文件。不要反过来把项目 `notes/bilibili` Junction 到工作区外，否则本地 Agent 可能拿到工作区外路径。
 
-更完整的字段和优先级见：[配置手册](docs/CONFIGURATION.md)。
+`config/local.json`、`notes/**`、`key/*` 与 `.runtime/` 都是本机数据，不进入公开 Git；仅 `notes/.gitkeep` 与 `key/.gitkeep` 用于保留目录结构。
+
+更完整的字段、Junction 检查和优先级见：[配置手册](docs/CONFIGURATION.md)。
 
 ### 3.3 准备 Bilibili Cookie
 
@@ -179,9 +183,7 @@ video-note.css
 | Agent | 使用方式 | 教程 |
 | --- | --- | --- |
 | ChatGPT Work | 通过本地工作区桥接访问项目并生成笔记 | [ChatGPT Skill 安装教程](docs/CHATGPT-SKILL-INSTALL.md) |
-| Codex | 在本地项目中直接生成、测试或维护 | [Codex Skill 安装教程](docs/CODEX-SKILL-INSTALL.md) |
-| Hermes | 手机 / 私聊发送 B站链接，电脑处理 | [Hermes Skill 安装教程](docs/HERMES-SKILL-INSTALL.md) |
-| WorkBuddy | 在 WorkBuddy 会话中发送链接 | [WorkBuddy Skill 安装教程](docs/WORKBUDDY-SKILL-INSTALL.md) |
+| Codex / Hermes / WorkBuddy | 通过 Junction 直接安装同一个 canonical Skill | [本地 Agent Skill 安装](docs/LOCAL-AGENT-INSTALL.md) |
 
 ---
 
@@ -293,7 +295,7 @@ Fact Ledger
 
 ## 7. Agent 与模型说明
 
-本项目**不绑定特定 LLM**。ChatGPT、Codex、Hermes 和 WorkBuddy 保留不同安装出口，但只人工维护 `skill/bili-learning-automation/SKILL.md` 一份统一 Skill；各宿主 `SKILL.md` 与 ZIP 由 `scripts/build_agent_skill_packages.py` 自动同步/生成。来源采集、Source Mode、source manifest、taxonomy、内容标准、validator 和 finalizer 共用同一套核心逻辑。
+本项目**不绑定特定 LLM**。只人工维护 `skill/bili-learning-automation/SKILL.md` 一份 canonical Skill；Codex、Hermes、WorkBuddy 的用户级 Skill 目录都直接 Junction 到它，不在仓库生成宿主副本。ChatGPT Web ZIP 由 `scripts/build_chatgpt_skill.py` 单独构建，并附带从当前项目文档生成的安全 references 快照；来源采集、Source Mode、source manifest、taxonomy、内容标准、validator 和 finalizer 仍共用同一套核心逻辑。
 
 不同模型可能在以下方面表现不同：
 
@@ -333,14 +335,12 @@ Fact Ledger
 
 ```text
 key/                 # Cookie / 本机凭据
+notes/**             # 私人学习笔记；真实 Markdown 可保存在项目内，但不进 Git
 config/local.json    # 本机路径配置
-notes/**             # 私人学习笔记
 .runtime/            # 活动 / retired runtime 任务
-.codex-backups/      # 本地备份
-archive/ materials/  # 本地资料
 ```
 
-公开仓库只应保存通用配置示例，例如 `config/local.json.example`。
+公开仓库只应保存通用配置示例和空目录占位文件，例如 `config/local.json.example`、`key/.gitkeep`、`notes/.gitkeep`。
 
 详细说明见：[SECURITY.md](SECURITY.md)。
 
@@ -348,14 +348,14 @@ archive/ materials/  # 本地资料
 
 ## 10. 文档导航
 
-完整文档索引见：**[docs/README.md](docs/README.md)**。
+完整文档索引见：**[docs/README.md](docs/README.md)**。其它 Agent / 开发者第一次接手项目时，先读 **[维护交接文档](docs/MAINTENANCE-HANDOFF.md)**，再按任务进入架构、配置或集成文档。
 
 ### 新手与操作教程
 
 - [新手快速上手](docs/QUICKSTART.md)：从下载项目到生成第一篇笔记；
 - [Bilibili Cookie 获取与安全配置](docs/BILIBILI-COOKIE.md)：第一次导出 Cookie、格式检查、安全保存和失效处理；
-- [Hermes Skill 安装教程](docs/HERMES-SKILL-INSTALL.md)：安装、更新和验证 Hermes 入口；
-- [WorkBuddy Skill 安装教程](docs/WORKBUDDY-SKILL-INSTALL.md)：安装、更新和验证 WorkBuddy 入口；
+- [本地 Agent Skill 安装](docs/LOCAL-AGENT-INSTALL.md)：用同一个 canonical Skill 安装 Codex、Hermes、WorkBuddy；
+- [ChatGPT Skill 安装教程](docs/CHATGPT-SKILL-INSTALL.md)：构建并安装 ChatGPT Web 专用 ZIP；
 - [Obsidian 样式教程](docs/OBSIDIAN-STYLING.md)：安装 CSS、启用样式和排查显示问题；
 - [学习后归档](docs/NOTE-ORGANIZATION.md)：只改文件名和路径，采用最多两层的“领域 / 对象”目录，并保留原笔记内容不变。
 
@@ -374,8 +374,7 @@ archive/ materials/  # 本地资料
 ### 开发与维护
 
 - [开发说明](docs/DEVELOPMENT.md)：测试、质量回归和 CI；
-- [Release Checklist](docs/RELEASE-CHECKLIST.md)：正式版本发布前检查；
-- [Legacy 说明](docs/LEGACY.md)：旧 Chrome/CDP 路线的历史兼容信息。
+- [Release Checklist](docs/RELEASE-CHECKLIST.md)：正式版本发布前检查。
 
 ---
 

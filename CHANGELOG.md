@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Skill 架构进一步收敛为单一 canonical 本地入口：Codex、Hermes、WorkBuddy 的用户级 Skill 目录直接 Junction 到 `skill/bili-learning-automation/`，仓库不再生成或维护宿主专用 Skill 副本；宿主路径 / `PYTHONPATH` 兼容统一由 canonical Skill 内的 `local_bridge.*` 处理。
+- 只保留 ChatGPT Web 的独立分发包；`scripts/build_chatgpt_skill.py` 直接从 canonical Skill 与当前公开项目文档生成安全 `references/` 快照，连接本地项目后仍以 `AGENTS.md`、当前 Job handoff 与本地文档为运行事实源。
+- 笔记存储支持推荐的 hybrid 拓扑：`notes_root` 作为项目内 Git-ignored 的真实 Markdown 真源，`vault_root + notes_subdir` 作为 Obsidian 映射元数据；doctor/onboarding 新增 `obsidian_notes_mapping` 校验，要求 Vault 子目录 Junction 正确指向 `notes_root`。
+
+### Removed
+
+- 退役旧 Chrome/CDP collector、Hermes 子命令 wrappers、WorkBuddy 独立 bridge 目录、Codex 仓库级生成副本以及旧多宿主 package builder；本地三 Agent 统一复用 canonical Skill。
+- 退役仓库自定义 source snapshot 备份脚本；源码回滚以 Git / tag / release 为准。已确认无主链依赖的本机历史目录移入 Windows 系统回收站，由维护者自行清理。
+
 ## [1.4.0] - 2026-09-10
 
 ### Added

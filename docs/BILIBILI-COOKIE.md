@@ -153,7 +153,7 @@ D:\Private\bilibili_cookies.txt
 也可以让 Agent 在 onboarding 时帮你写入：
 
 ```powershell
-python .\hermes-skills\bili-learning-automation\scripts\configure_cookie_bilibili_learning.py --file 'D:\Private\bilibili_cookies.txt'
+python .\scripts\run_bili_learning.py configure-cookie --file 'D:\Private\bilibili_cookies.txt'
 ```
 
 这个命令只保存**文件路径**，不会读取或打印 Cookie 内容。
@@ -211,7 +211,7 @@ Cookie: SESSDATA=xxxx; ...
 先运行 onboarding：
 
 ```powershell
-python .\hermes-skills\bili-learning-automation\scripts\onboarding_bilibili_learning.py
+python .\scripts\run_bili_learning.py onboarding
 ```
 
 Cookie 正常时，不应再出现：
@@ -223,7 +223,7 @@ cookie_file_required
 也可以运行完整诊断：
 
 ```powershell
-python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py
+python .\scripts\run_bili_learning.py doctor
 ```
 
 看到类似下面的结果，表示**文件路径存在**：

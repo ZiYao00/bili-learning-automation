@@ -2,15 +2,16 @@
 
 普通用户优先让 Agent 通过 onboarding 检查并补齐缺失配置；这些本机值最终保存到 `config/local.json`。它用于保存当前电脑的本地路径与私密配置，并已被 Git 忽略；公开仓库只提交 `config/local.json.example`。高级用户也可以直接手工维护这个文件。
 
-新版本把 Obsidian 配置拆成两个概念：
+当前推荐把“真实存储”和“Obsidian 展示路径”分开：
 
 ```text
-vault_root     = Obsidian Vault 根目录（直接包含 .obsidian）
-notes_subdir   = 本项目在 Vault 内使用的相对子目录
-notes_root     = vault_root / notes_subdir（程序计算结果）
+notes_root    = 真实 Markdown 存储目录；推荐 <repo-root>/notes/bilibili
+vault_root    = Obsidian Vault 根目录（直接包含 .obsidian）
+notes_subdir  = Vault 内显示本项目笔记的相对子目录
+Vault 映射    = <vault_root>/<notes_subdir> -> Junction -> <notes_root>
 ```
 
-这样程序既知道笔记应该写到哪里，也知道 CSS 应该检查哪个 `.obsidian/snippets/`。
+这样本地 Agent / CodexPro 始终读写授权工作区内的 `notes_root`，Obsidian 仍能在自己的 Vault 里看到同一批文件，同时 doctor 仍可检查 `.obsidian/snippets/` 和 Junction 映射。
 
 ---
 
@@ -26,18 +27,21 @@ config/local.json.example
 
 ```json
 {
+  "notes_root": "notes/bilibili",
   "vault_root": "D:\\Notes\\MyVault",
   "notes_subdir": "bilibili",
-  "cookie_file": "D:\\Private\\bilibili_cookies.txt",
+  "cookie_file": "key/bilibili_cookies.txt",
   "workflow_mode": "light"
 }
 ```
 
-最终笔记会写到：
+真实笔记会写到：
 
 ```text
-D:\Notes\MyVault\bilibili\00-待整理\
+<repo-root>\notes\bilibili\00-待整理\
 ```
+
+Obsidian 中的 `D:\Notes\MyVault\bilibili` 推荐做成指向上述目录的 Junction；doctor 会校验它与 `notes_root` 是否解析到同一位置。
 
 CSS 则应该位于：
 
@@ -144,7 +148,7 @@ Copy-Item .\config\pinned-comment-whitelist.example.json .\config\pinned-comment
 Agent 首次生成笔记前应先运行统一 onboarding，而不是直接启动采集：
 
 ```powershell
-python .\hermes-skills\bili-learning-automation\scripts\onboarding_bilibili_learning.py
+python .\scripts\run_bili_learning.py onboarding
 ```
 
 它只把**用户需要处理的首次配置**放进 `actions`：Vault、Cookie、yt-dlp 与 Python 环境；CSS 缺失放进 `warnings`，不阻塞 Markdown 笔记生成。完整项目诊断仍由 `doctor` 负责。
@@ -153,91 +157,71 @@ python .\hermes-skills\bili-learning-automation\scripts\onboarding_bilibili_lear
 
 ```powershell
 # Obsidian Vault；notes_subdir 默认 bilibili
-python .\hermes-skills\bili-learning-automation\scripts\configure_bilibili_learning.py --vault 'D:\Notes\MyVault'
+python .\scripts\run_bili_learning.py configure-obsidian --vault 'D:\Notes\MyVault'
 
 # Netscape Cookie 文件路径；不要把 Cookie 内容传给 Agent
-python .\hermes-skills\bili-learning-automation\scripts\configure_cookie_bilibili_learning.py --file 'D:\Private\bilibili_cookies.txt'
+python .\scripts\run_bili_learning.py configure-cookie --file 'D:\Private\bilibili_cookies.txt'
 
 # 仅当 yt-dlp 位于自定义目录且未加入 PATH 时使用
-python .\hermes-skills\bili-learning-automation\scripts\configure_ytdlp_bilibili_learning.py --path 'D:\Tools\yt-dlp.exe'
+python .\scripts\run_bili_learning.py configure-ytdlp --path 'D:\Tools\yt-dlp.exe'
 ```
 
 ### 第一次绑定 Vault
 
-除了手工编辑 JSON，也可以使用统一 Vault 配置命令：
+统一 Vault 配置入口：
 
 ```powershell
-python .\hermes-skills\bili-learning-automation\scripts\configure_bilibili_learning.py --vault 'D:\Notes\MyVault' --notes-subdir 'bilibili'
+python .\scripts\run_bili_learning.py configure-obsidian --vault 'D:\Notes\MyVault' --notes-subdir 'bilibili'
 ```
 
-这个命令会：
+它会检查 Vault 与 `.obsidian`，保留 `local.json` 中已有的 `notes_root`、Cookie、yt-dlp 等值，只更新 `vault_root / notes_subdir`。因此：
 
-- 检查 Vault 目录是否存在；
-- 检查该目录下是否有 `.obsidian`；
-- 保留 `local.json` 中已有的 yt-dlp、Cookie 等配置；
-- 如果存在旧版 `notes_root`，迁移为新的 `vault_root + notes_subdir`；
-- 不复制或覆盖 CSS；
-- 不访问 Bilibili。
+- 已有 `notes_root`：保持 hybrid 模式，真实文件继续写入项目内 `notes_root`；
+- 没有 `notes_root`：保持 direct-vault 兼容模式，真实文件直接写入 `<vault_root>/<notes_subdir>`。
 
-配置成功后会返回：
+推荐 hybrid 模式的初始化步骤是：
 
-```json
-{
-  "status": "configured",
-  "vault_root": "D:\\Notes\\MyVault",
-  "notes_root": "D:\\Notes\\MyVault\\bilibili"
-}
-```
-
-Hermes / WorkBuddy / Codex 会在正式采集前通过 onboarding 发现 Vault 缺失，并在 `onboarding_required.actions` 中要求用户提供这个路径，再调用同一配置入口。
+1. 把真实笔记放到 `<repo-root>\notes\bilibili`；
+2. 把 `<vault_root>\bilibili` 建为指向项目 notes 的 Junction；
+3. 在 `config/local.json` 保存 `"notes_root": "notes/bilibili"`；
+4. 运行 `configure-obsidian` 写入 Vault 元数据；
+5. 运行 onboarding，确认 `obsidian_notes_mapping = OK`。
 
 ---
 
-## 3. 为什么不再默认把笔记写进仓库
+## 3. 推荐的数据拓扑：项目内真实存储 + Vault Junction
 
-Taxonomy 仍保留：
-
-```text
-notes/bilibili
-```
-
-作为安全 fallback，便于开发、测试和诊断。但它现在被定义为**临时状态**，不是正式用户的长期笔记目录。
-
-如果没有显式配置 Vault 或旧版 `notes_root`：
-
-- doctor 会报告 `notes_repository_fallback`；
-- 普通新采集会被 onboarding 门禁拦住并返回 `onboarding_required`；
-- yt-dlp 不会启动；
-- 不会静默把私人笔记写进代码仓库。
-
-已有 runtime job 的 finalizer / 清理流程不受这个门禁影响，避免升级后把旧任务卡死。
-
----
-
-## 4. 旧版 `notes_root` 仍然兼容
-
-旧配置：
+推荐正式配置同时保留三项：
 
 ```json
 {
-  "notes_root": "D:\\Notes\\MyVault\\bilibili"
-}
-```
-
-仍可继续使用，程序不会强制破坏现有用户配置。
-
-但旧配置只告诉程序“笔记目录”，没有明确告诉程序 Vault 根在哪里，因此 doctor 无法可靠判断 `.obsidian/snippets/`。
-
-建议有机会时迁移为：
-
-```json
-{
+  "notes_root": "notes/bilibili",
   "vault_root": "D:\\Notes\\MyVault",
   "notes_subdir": "bilibili"
 }
 ```
 
-不要同时配置 `notes_root` 和 `vault_root / notes_subdir`。两套配置同时出现时程序会明确报错，避免路径歧义。
+语义分别是：
+
+- `notes_root`：真实 Markdown 文件所在位置；推荐在项目内并保持 Git ignored；
+- `vault_root + notes_subdir`：Obsidian 中用户看到的逻辑位置；
+- Windows 上推荐让 `<vault_root>/<notes_subdir>` 成为 Junction，目标指向 `<repo-root>/notes/bilibili`；
+- doctor 会增加 `obsidian_notes_mapping` 检查；映射不正确时 onboarding 返回 `action_required`，避免 Agent 写到错误位置。
+
+**Junction 方向必须是 Vault → 项目 notes。** 不要把项目内的 `notes/bilibili` 反向 Junction 到工作区外，否则 Agent 虽然能看到目录名，但真实路径仍可能超出其授权工作区。
+
+Taxonomy 仍保留 `notes/bilibili` 作为未配置时的 repository fallback；如果没有显式 `notes_root` 或 Vault 配置，它仍会被标记为 fallback 并阻止普通新采集。
+
+---
+
+## 4. 兼容模式
+
+下面两种旧模式仍然支持：
+
+1. 只配置 `vault_root + notes_subdir`：程序直接把 Vault 子目录作为 `notes_root`；
+2. 只配置 `notes_root`：程序正常生成笔记，但因为不知道 Vault 根目录，无法可靠检查 CSS。
+
+当前推荐模式允许 `notes_root` 与 `vault_root + notes_subdir` **同时存在**：前者决定真实写入路径，后两者只描述并校验 Obsidian 映射。
 
 ---
 
@@ -250,20 +234,21 @@ notes/bilibili
 | `BILI_LEARNING_YTDLP` | yt-dlp 可执行文件 |
 | `BILI_LEARNING_VAULT_ROOT` | Obsidian Vault 根目录 |
 | `BILI_LEARNING_NOTES_SUBDIR` | Vault 内笔记相对子目录 |
-| `BILI_LEARNING_NOTES_ROOT` | 旧版兼容：直接指定笔记根目录 |
+| `BILI_LEARNING_NOTES_ROOT` | 真实笔记根目录；可与 Vault 元数据组合为 hybrid 模式 |
 | `BILI_LEARNING_COOKIE_FILE` | Cookie 文件 |
 | `BILI_LEARNING_TAXONOMY` | 自定义 taxonomy 文件 |
 | `BILI_LEARNING_WORKFLOW_MODE` | `light` 或 `strict` 写作模式 |
 | `SILICONFLOW_API_KEY` | 手动 ASR 旁路的 SiliconFlow Key；优先级高于 `config/local.json` |
 
-推荐的新方式：
+推荐的 hybrid 环境变量方式：
 
 ```powershell
+$env:BILI_LEARNING_NOTES_ROOT = 'notesilibili'
 $env:BILI_LEARNING_VAULT_ROOT = 'D:\Notes\MyVault'
 $env:BILI_LEARNING_NOTES_SUBDIR = 'bilibili'
 ```
 
-旧版 `BILI_LEARNING_NOTES_ROOT` 继续兼容，但不能与 `BILI_LEARNING_VAULT_ROOT / BILI_LEARNING_NOTES_SUBDIR` 同时使用。
+环境变量也支持同一混合模型：`BILI_LEARNING_NOTES_ROOT` 可以与 `BILI_LEARNING_VAULT_ROOT` / `BILI_LEARNING_NOTES_SUBDIR` 同时使用；此时前者决定真实写入位置，后两者用于 Vault / Junction 校验。单独设置 `BILI_LEARNING_NOTES_SUBDIR` 仍然无效，必须同时提供 Vault 根目录。
 
 ---
 
@@ -272,14 +257,14 @@ $env:BILI_LEARNING_NOTES_SUBDIR = 'bilibili'
 笔记位置按以下顺序解析：
 
 ```text
-1. 旧环境变量 BILI_LEARNING_NOTES_ROOT
-   或新环境变量 BILI_LEARNING_VAULT_ROOT + BILI_LEARNING_NOTES_SUBDIR
-2. config/local.json 的旧 notes_root
-   或新 vault_root + notes_subdir
+1. BILI_LEARNING_NOTES_ROOT + 可选 Vault 映射元数据
+   否则 BILI_LEARNING_VAULT_ROOT + BILI_LEARNING_NOTES_SUBDIR 直接写 Vault
+2. config/local.json 的 notes_root + 可选 vault_root / notes_subdir
+   否则 vault_root + notes_subdir 直接写 Vault
 3. taxonomy 的 notes/bilibili fallback
 ```
 
-环境变量和 `local.json` 内部如果混用新旧两套路径模型，会直接报配置冲突，不做静默猜测。
+当 `notes_root` 与 Vault 元数据同时存在时，`notes_root` 是物理存储真源，Vault 只用于 Obsidian/CSS/Junction 校验。
 
 `yt-dlp` 的顺序是：
 
@@ -296,21 +281,22 @@ BILI_LEARNING_YTDLP
 运行：
 
 ```powershell
-python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py
+python .\scripts\run_bili_learning.py doctor
 ```
 
 结构化输出：
 
 ```powershell
-python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py --json
+python .\scripts\run_bili_learning.py doctor --json
 ```
 
 重点检查：
 
 - Python 版本；
 - 项目根和 taxonomy；
-- 当前笔记位置是否仍是仓库 fallback；
+- 当前笔记位置是否仍是未配置的 repository fallback；
 - `vault_root` 是否真正包含 `.obsidian`；
+- hybrid 模式下 `<vault_root>/<notes_subdir>` 是否与 `notes_root` 解析到同一位置（`obsidian_notes_mapping`）；
 - `learning-lab.css` 是否存在；
 - `video-note.css` 是否存在；
 - notes/runtime 是否可写；
@@ -350,26 +336,28 @@ Doctor 不访问 Bilibili，也不读取 Cookie 内容。
 
 ```text
 ytdlp
+notes_root
 vault_root
 notes_subdir
-notes_root      # 旧版兼容
 cookie_file
 taxonomy
 workflow_mode
+siliconflow
 ```
 
 推荐新配置：
 
 ```json
 {
+  "notes_root": "notes/bilibili",
   "vault_root": "D:\\Notes\\MyVault",
   "notes_subdir": "bilibili",
-  "cookie_file": "D:\\Private\\bilibili_cookies.txt",
+  "cookie_file": "key/bilibili_cookies.txt",
   "workflow_mode": "light"
 }
 ```
 
-本机配置出现未知字段、空路径、新旧笔记路径冲突或非法 `notes_subdir` 时会直接停止，不会尝试“猜一个能跑的值”。
+本机配置出现未知字段、空路径、孤立的 `notes_subdir` 或非法相对路径时会直接停止。`notes_root` 与 Vault 元数据可以同时存在，但 hybrid 模式的 Junction 映射必须由 onboarding 验证通过。
 
 ---
 

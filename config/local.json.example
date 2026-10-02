@@ -1,9 +1,10 @@
 {
+  "notes_root": "notes/bilibili",
   "vault_root": "D:\\YourObsidianVault",
   "notes_subdir": "bilibili",
-  "cookie_file": "C:\\PrivateConfig\\bilibili_cookies.txt",
+  "cookie_file": "key/bilibili_cookies.txt",
   "workflow_mode": "light",
   "siliconflow": {
-    "api_key": "YOUR_SILICONFLOW_API_KEY"
+    "api_key": [REDACTED_SECRET]
   }
 }

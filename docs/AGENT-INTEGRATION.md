@@ -1,6 +1,6 @@
 # 智能体接入协议
 
-本项目当前优先服务 ChatGPT、Codex、Hermes 与 WorkBuddy。核心脚本、Source Mode、内容质量标准、taxonomy 与 finalizer 是唯一事实来源；Skill 只人工维护 `skill/bili-learning-automation/SKILL.md` 一份，四个宿主安装出口由 `scripts/build_agent_skill_packages.py` 自动生成。宿主差异只保留最小权限/安装边界，未来其他智能体也应复用统一 Skill 与核心协议，不复制来源采集、Job 或写作规则。
+本项目当前优先服务 ChatGPT、Codex、Hermes 与 WorkBuddy。核心脚本、Source Mode、内容质量标准、taxonomy 与 finalizer 是唯一事实来源；本地 Skill 只人工维护 `skill/bili-learning-automation/SKILL.md` 一份。Codex、Hermes、WorkBuddy 通过用户级 Junction 直接安装该 canonical Skill；ChatGPT Web 由 `scripts/build_chatgpt_skill.py` 生成独立 ZIP。宿主差异只保留最小权限/安装边界，未来其他智能体也应复用统一 Skill 与核心协议，不复制来源采集、Job 或写作规则。
 
 ## 输入与授权
 
@@ -41,6 +41,8 @@
 - collector 与 finalizer 的 JSON 响应包含 `schema_version: 1`、`status` 和可读 `message`（如适用）；`materials_ready` 返回 `source_mode`、`source_manifest_path`、source package 状态与 `workflow_mode`，恢复时额外返回 `recovered: true`。智能体必须以结构化状态判断分支，不解析底层锁或 PID。
 - Frontmatter 的 `author`、`published`、`duration`、`source`、tags 与 `cssclasses`，以及标题下方“作者 · 日期 · 时长 · BVID”元信息行由程序生成，智能体不得自行改写；视频笔记固定使用 `learning-page + video-note` 以接入共享 Obsidian 视觉系统。
 - `analysis.json` 是 runtime-only 质量报告，不进入最终 Obsidian 笔记。它用于记录来源充分性、知识索引和覆盖复核状态。
+- `settings.notes_root` / Job 返回的笔记路径是正式文件操作的唯一物理真源。推荐拓扑把真实 Markdown 保存在 `<repo-root>\notes\bilibili`（Git ignored），再由 `<vault_root>\<notes_subdir>` 通过 Windows Junction 指向它。Agent 不得把 Vault 展示路径替换成写入真源，也不得把项目 `notes\bilibili` 反向 Junction 到工作区外。
+- 混合 `notes_root + vault_root + notes_subdir` 模式下，onboarding 必须出现 `obsidian_notes_mapping = OK`；`obsidian_notes_mapping_invalid` 是阻塞状态，先修复映射再采集。
 - 只有 `strict` 模式会在 `agent_work_dir` 创建 `fact-ledger.md`、`semantic-draft.md` 与 `layout-plan.md`，并返回对应路径；`light` 模式不创建这些文件。
 
 ## 不可突破的数据边界
@@ -137,11 +139,11 @@ bili-learning organize --note '<现有笔记路径>' --filename '<短文件名>'
 - 纯资源型先在 `<runtime_root>/resource-cards/` 写短资源卡，再调用 `organize --mode resource --note '<现有笔记路径>' --collection '<集合页>' --card-file '<card.md>' --confirmed-scope '<single|latest|all>'`，合并进 `05-资源`。
 - 核心负责路径验证、安全写入、原笔记备份（纯资源模式）和导航刷新；适配层不得自行移动、重命名或删除正式笔记。生成阶段与 finalizer 不承担资源类型判断。
 
-## 统一 Skill 与安装出口边界
+## 统一 Skill 与安装边界
 
-- 唯一人工维护真源：`skill\bili-learning-automation\SKILL.md`；宿主安装出口禁止直接编辑。
-- `scripts\build_agent_skill_packages.py` 会把统一真源同步到 ChatGPT、Codex、Hermes、WorkBuddy 的宿主目录，并生成四个独立 ZIP；`--check` 用于 CI/提交前检查生成副本是否漂移。
-- 四个宿主仍保留各自安装名称和最小权限边界：ChatGPT 需要本地工作区桥接；Codex 需要本地工作区；Hermes 限 owner/受信任私聊；WorkBuddy 只处理当前会话明确输入。
-- 兼容安装出口保持不变：ChatGPT `chatgpt-skills\bili-learning-automation-chatgpt\`、Codex `.agents\skills\bili-learning-automation-codex\`、Hermes `hermes-skills\bili-learning-automation\` / 独立包目录、WorkBuddy `workbuddy-skills\bili-learning-automation\` / 独立包目录；这些 `SKILL.md` 都是生成文件。
-- 所有安装出口最终复用同一 `scripts\run_bili_learning.py` 核心 CLI；Hermes / WorkBuddy 的 bridge 仅处理宿主路径/进程兼容，不拥有独立业务流程。
-- 未来新增宿主时，只在构建脚本增加一个新的安装 profile/出口，不新增第二份人工维护的 `SKILL.md`；除非宿主运行机制确有需要，否则不复制 bridge。
+- 唯一人工维护的本地 Skill 真源：`skill\bili-learning-automation\SKILL.md`；本地宿主不得维护生成副本或第二套规则。
+- Codex、Hermes、WorkBuddy 使用同一个 Skill 名称 `bili-learning-automation`，其用户级 Skill 目录都直接 Junction 到 `skill\bili-learning-automation\`；仓库不再保留任何本地 Agent 宿主副本。
+- `skill\bili-learning-automation\scripts\local_bridge.py` / `.ps1` 只解决 Junction、Python、`PYTHONPATH` 与 cleanup runner 兼容，所有业务规则仍来自共享核心。
+- ChatGPT Web 是唯一需要独立打包的宿主。`scripts\build_chatgpt_skill.py` 从 canonical Skill 与公开项目文档生成 `bili-learning-automation-chatgpt.zip`；references 只是构建快照，连接本地项目后仍以 `AGENTS.md`、当前 Job handoff 与本地文档为事实源。
+- 所有入口最终复用同一 `scripts\run_bili_learning.py` / `src\bili_learning` 核心；ChatGPT 需要本地工作区桥接，Hermes 限 owner/受信任私聊，WorkBuddy 只处理当前会话明确输入。
+- 未来新增本地宿主时优先通过目录链接复用 canonical Skill；只有宿主机制无法使用本地 Skill 目录时，才设计新的独立分发适配。

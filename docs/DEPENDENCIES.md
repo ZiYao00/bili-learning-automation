@@ -5,7 +5,7 @@
 | 依赖 | 用途 | 配置方式 |
 | --- | --- | --- |
 | Python 3.10+ | 运行核心 package 与平台适配脚本 | 使用本机或接入智能体的 Python 环境 |
-| 统一 Skill / 宿主安装出口 | 接收链接、调用核心流程、填写 AI 内容区域 | 只维护 `skill/bili-learning-automation/SKILL.md`；ChatGPT / Codex / Hermes / WorkBuddy 安装出口由构建脚本生成 |
+| canonical Skill / 宿主入口 | 接收链接、调用核心流程、填写 AI 内容区域 | 只维护 `skill/bili-learning-automation/`；Codex / Hermes / WorkBuddy 通过 Junction 直接安装，ChatGPT Web 单独构建 ZIP |
 | yt-dlp | 采集元数据、简介和字幕，不下载媒体 | 默认自动检测系统 PATH；环境变量 / `local.json` 只用于自定义路径覆盖 |
 | Bilibili Cookie | 获取需要登录态的字幕/元数据 | `BILI_LEARNING_COOKIE_FILE` |
 
@@ -55,9 +55,6 @@ python -m pip install -e ".[dev]"
 
 公共 CI 不需要 Cookie，也不访问真实 Bilibili 账号。
 
-## 可选 / 历史依赖
+## 已退役依赖
 
-- [Rimagination/bili-note](https://github.com/Rimagination/bili-note)：旧 Chrome/CDP 流程使用；当前默认 yt-dlp 路线不调用。
-- [eze-is/web-access](https://github.com/eze-is/web-access)：旧 Chrome/CDP 流程使用；当前默认路线不调用。
-
-这两个本地副本不属于当前项目源码。重新启用前应单独确认版本、许可证、接口和安全边界，不能作为默认流程的静默 fallback。
+旧 Chrome/CDP 采集链及其本地第三方副本已经退出当前架构，不属于运行时、开发依赖或 fallback。历史背景通过 Git / CHANGELOG 追溯；如果未来重新引入浏览器采集，应作为新的独立设计重新评估版本、许可证、接口与安全边界。

@@ -31,7 +31,7 @@ D:\Notes\MyVault
 
 > CSS 始终安装到 `<vault_root>\.obsidian\snippets\`，不是 `<notes_root>\.obsidian\snippets\`。
 
-旧版 `notes_root` / `BILI_LEARNING_NOTES_ROOT` 继续兼容，但它只告诉程序“笔记在哪”，不能可靠告诉程序“Vault 根在哪”。这种情况下 doctor 会提示 `obsidian_vault_unknown`，CSS 路径需要用户自己确认。
+当前推荐同时配置 `notes_root + vault_root + notes_subdir`：真实 Markdown 放在项目内 Git-ignored 的 `notes_root`，Vault 子目录通过 Junction 指向它；CSS 仍只安装在 `<vault_root>\.obsidian\snippets\`。如果只配置 `notes_root` 而不提供 Vault 元数据，doctor 才会提示 `obsidian_vault_unknown`。
 
 ## 第一次安装 CSS
 
@@ -89,7 +89,7 @@ D:\Notes\MyVault\.obsidian\snippets\
 运行：
 
 ```powershell
-python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py
+python .\scripts\run_bili_learning.py doctor
 ```
 
 在已经配置 `vault_root` 时，doctor 会检查：

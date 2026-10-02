@@ -16,7 +16,7 @@ A release candidate is ready when all applicable checks below are true:
 - [x] Long transcript preparation and tiny-tail merge behavior are covered by tests.
 - [x] Finalizer is the only successful publication gate.
 - [x] New notes do not overwrite existing notes with the same title.
-- [x] Obsidian Vault binding and repository-fallback protection are implemented.
+- [x] Obsidian storage supports the recommended hybrid topology: physical `notes_root` in Git-ignored project storage plus a Vault Junction mapping, while repository fallback remains protected.
 - [x] yt-dlp is detected rather than silently bundled or installed.
 - [x] Cookie contents are excluded from logs, notes, examples, and Git by design.
 - [x] ChatGPT, Codex, Hermes, and WorkBuddy share the same core workflow and content rules.
@@ -25,8 +25,8 @@ A release candidate is ready when all applicable checks below are true:
 - [x] Repository license wording is consistent with `LICENSE`.
 - [x] Ruff passes in the existing project virtual environment.
 - [x] Public pytest suite passes.
-- [x] Source, shared launchers, Hermes, and WorkBuddy compatibility scripts compile successfully.
-- [x] `skill/bili-learning-automation/SKILL.md` is the single maintained Skill source; ChatGPT/Codex/Hermes/WorkBuddy install exits pass `build_agent_skill_packages.py --check`, and each archive contains exactly one root `SKILL.md` with no local credentials or machine configuration.
+- [x] Source, shared launchers, and canonical Skill bridge scripts compile successfully.
+- [x] `skill/bili-learning-automation/SKILL.md` is the single maintained local Skill source; Codex/Hermes/WorkBuddy use user-level Junctions to that directory, and `build_chatgpt_skill.py --check` validates the only distributable Skill ZIP. The ChatGPT archive contains only the generated Skill metadata and approved documentation reference snapshot, with no local credentials or machine configuration.
 - [x] Fresh-install / clean-room walkthrough rerun after the 2026-08-22 dense-note extraction and compact-template corrections; see `docs/reports/2026-08-23-v1.0-cleanroom-acceptance.md`.
 - [ ] `pyproject.toml` version matches the intended release version before tagging.
 - [ ] Changelog contains the final release entry/date for that version.
@@ -48,10 +48,10 @@ Use a fresh clone or otherwise isolated checkout and verify only the documented 
 1. Clone the repository.
 2. Confirm `config/local.json` does not already exist.
 3. Follow `docs/QUICKSTART.md` without relying on remembered local setup.
-4. Copy `config/local.json.example` to `config/local.json` and set a test Vault/Cookie path.
-5. Run doctor before doing a real collection.
+4. Copy `config/local.json.example` to `config/local.json`; configure a Git-ignored `notes_root`, test Vault/Cookie path, and create the Vault → `notes_root` Junction when testing the recommended hybrid topology.
+5. Run doctor/onboarding before doing a real collection and confirm `obsidian_notes_mapping` is OK in hybrid mode.
 6. Confirm missing yt-dlp produces installation guidance rather than an automatic install attempt.
-7. Confirm an unbound Vault returns `configuration_required` and does not start collection.
+7. Confirm an unconfigured note/Vault location returns `configuration_required` and does not start collection; a broken hybrid Junction must return `obsidian_notes_mapping_invalid`.
 8. Install/enable both Obsidian CSS snippets and confirm doctor recognizes them.
 9. Install one supported agent entry point using its documented instructions.
 10. Convert one normal Bilibili video with usable Chinese subtitles.
@@ -77,11 +77,11 @@ Do not add features during this sequence.
 5. Run:
 
 ```powershell
-python -m compileall -q src scripts hermes-skills/bili-learning-automation/scripts workbuddy-skills/bili-learning-automation/scripts
+python -m compileall -q src scripts skill/bili-learning-automation/scripts
 python -m ruff check .
 python -m pytest -q
-python .\scripts\build_agent_skill_packages.py
-python .\scripts\build_agent_skill_packages.py --check
+python .\scripts\build_chatgpt_skill.py
+python .\scripts\build_chatgpt_skill.py --check
 git -c core.whitespace=cr-at-eol diff --check
 ```
 

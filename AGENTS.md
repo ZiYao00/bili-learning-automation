@@ -1,6 +1,6 @@
 # B站视频转笔记
 
-本项目服务 ChatGPT、Codex、Hermes 与 WorkBuddy。四个薄适配层共用同一套环境门禁、来源采集、Job lifecycle、taxonomy、确定性笔记骨架、校验、发布、导航和清理逻辑。
+本项目服务 ChatGPT、Codex、Hermes 与 WorkBuddy。Codex、Hermes、WorkBuddy 通过目录链接共享同一个 canonical Skill；ChatGPT Web 使用由该 Skill 构建的独立 ZIP。四个宿主共用同一套环境门禁、来源采集、Job lifecycle、taxonomy、确定性笔记骨架、校验、发布、导航和清理逻辑。
 
 ## 安装验收、首次使用与环境门禁
 
@@ -51,6 +51,8 @@
 - Python 负责 Frontmatter、H1、标题元信息、播放器与来源区、UP 主资源、原始简介、iframe、tags、`learning-page + video-note`、文件名、路径和 marker；Agent 只填写两个 AI 区域与 runtime `analysis.json`。
 - 正文事实只来自当前 Job 允许的来源：SRT 字幕、明确授权后的 ASR 纯文本、确定性采集到的 UP 主简介 / UP 主置顶一级评论、以及明确标注的用户补充来源；`description_only` 仍不得推断视频口播、画面参数或未提供的资源本体。置顶评论默认只在来源明确指向评论区资源时做一次匿名只读补充；仅当用户在被 Git 忽略的 `config/pinned-comment-whitelist.local.json` 中主动配置并命中 UP 主身份时，才允许使用项目现有 Netscape Cookie 做且只做一次只读查询。不得回退读取公开模板或预置任何 UP 主。两种模式都不翻页、不抓普通评论或楼中楼、不重试，失败或不存在不得阻塞任务；抓到置顶也不等于内容必然与当前视频主题相关，Agent 仍需按当前视频来源判断相关性。来源不足时停止，不用模型常识补具体参数、资源或结论。
 - 不覆盖已有笔记，不把 Cookie、runtime 路径、日志或内部状态写进正式笔记。
+- 本机笔记数据以 `settings.notes_root` 为唯一物理真源；推荐并当前采用 `<repo-root>\notes\bilibili`，该目录被 Git 忽略。Obsidian 的 `<vault_root>\<notes_subdir>` 只作为 Junction 映射到 `notes_root`，方向必须是 **Vault → 项目 notes**，不得把项目 `notes\bilibili` 反向链接到工作区外。Agent 编辑、finalize、整理和查重都必须使用 Job / Settings 返回的 `notes_root` 路径，不得自行改写为 Vault 路径。
+- `config\local.json`、`notes\**`、`key\*`、`.runtime\*` 都是本机数据，禁止提交；只允许跟踪空目录占位文件和公开 example。onboarding 出现 `obsidian_notes_mapping_invalid` 时停止采集，先修复 Junction。
 - 视频简介抓取失败不能当作视频没有简介。
 - finalizer 返回 `note_ready` 即表示业务完成；临时数据采用 retire/维护语义，`temporary_data_retired` 或 `cleanup_warning` 不得覆盖已成功的发布结果。
 - 学习后整理默认关闭。只有用户明确要求并确认 `single / latest / all` 范围后才读取 `docs\NOTE-ORGANIZATION.md`。整理阶段完整阅读笔记后再判断长期价值：知识型/混合型继续 `archive`，只改文件名与路径；纯资源型才使用 `resource` 压缩进 `05-资源` 集合页。不得把该判断提前到生成阶段，也不得自动整理。
@@ -61,6 +63,6 @@
 
 修改笔记版式或 Frontmatter 前，先读取 `config\obsidian-style.json`。本项目只使用 `learning-lab.css` Core 与 `video-note.css` Extension；不得在此仓库复制、重建、fork 或独立修改共享 CSS，也不得把受 Git 跟踪的项目目录 junction 到共享仓库。需要改共享视觉系统时，修改共享仓库，再同步到 Obsidian Vault。
 
-唯一需要人工维护的 Skill 真源是 `skill\bili-learning-automation\SKILL.md`。ChatGPT、Codex、Hermes 与 WorkBuddy 的安装出口 `SKILL.md` 都由 `scripts\build_agent_skill_packages.py` 自动生成，禁止直接编辑；宿主差异只允许保留在构建脚本中的最小权限/安装壳，不得复制核心流程。ChatGPT 与 Codex 使用共享 `scripts\run_bili_learning.py`，Hermes / WorkBuddy 的 bridge 只处理宿主路径与进程兼容，所有业务规则仍复用共享核心。
+唯一需要人工维护的本地 Skill 真源是 `skill\bili-learning-automation\SKILL.md`。Codex、Hermes、WorkBuddy 的用户级 Skill 目录都应直接 Junction 到 `skill\bili-learning-automation\`，仓库不维护宿主副本。`skill\bili-learning-automation\scripts\local_bridge.*` 只处理 Junction、Python 与宿主进程兼容，所有业务规则仍复用共享核心。ChatGPT Web ZIP 由 `scripts\build_chatgpt_skill.py` 从 canonical Skill 与当前公开文档生成；包内 references 只是构建快照，连接本地项目后仍以根目录 `AGENTS.md`、当前 Job handoff 与本地文档为运行事实源。
 
 准备正式提交、推送或 Release 时，先阅读 `docs/RELEASE-CHECKLIST.md`。不要把 `ComfyUI-Learning-Lab` 的独立工作区混入本仓库提交。

@@ -1,96 +1,72 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import zipfile
 from pathlib import Path
 
-import pytest
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
-BUILD_SCRIPT = REPO_ROOT / "scripts" / "build_agent_skill_packages.py"
+BUILD_SCRIPT = REPO_ROOT / "scripts" / "build_chatgpt_skill.py"
 LAUNCHER = REPO_ROOT / "scripts" / "run_bili_learning.py"
 CANONICAL_SKILL = REPO_ROOT / "skill" / "bili-learning-automation"
-GENERATED_MARKER = "GENERATED from skill/bili-learning-automation/SKILL.md; DO NOT EDIT DIRECTLY."
-SKILLS = (
-    (
-        "bili-learning-automation-chatgpt",
-        REPO_ROOT / "chatgpt-skills" / "bili-learning-automation-chatgpt",
-        True,
-    ),
-    (
-        "bili-learning-automation-codex",
-        REPO_ROOT / ".agents" / "skills" / "bili-learning-automation-codex",
-        True,
-    ),
-    (
-        "bili-learning-automation-hermes",
-        REPO_ROOT / "hermes-skills" / "bili-learning-automation-hermes",
-        False,
-    ),
-    (
-        "bili-learning-automation-workbuddy",
-        REPO_ROOT / "workbuddy-skills" / "bili-learning-automation-workbuddy",
-        False,
-    ),
-)
-NATIVE_MIRRORS = (
-    REPO_ROOT / "hermes-skills" / "bili-learning-automation",
-    REPO_ROOT / "workbuddy-skills" / "bili-learning-automation",
-)
+LOCAL_BRIDGE = CANONICAL_SKILL / "scripts" / "local_bridge.py"
+CHATGPT_SKILL_NAME = "bili-learning-automation-chatgpt"
+CHATGPT_REFERENCES = {
+    "AGENT-INTEGRATION.md",
+    "BILIBILI-COOKIE.md",
+    "CONFIGURATION.md",
+    "MAINTENANCE-HANDOFF.md",
+    "NOTE-ORGANIZATION.md",
+    "OBSIDIAN-STYLING.md",
+    "TROUBLESHOOTING.md",
+    "LIGHT-WORKFLOW.md",
+    "CODEX-VIDEO-NOTE-GUIDE.md",
+    "KNOWLEDGE-DENSE-WORKFLOW.md",
+    "STANDARD-VIDEO-NOTE-EXAMPLE.md",
+}
 
 
-def test_canonical_skill_is_single_maintained_source() -> None:
-    skill_text = (CANONICAL_SKILL / "SKILL.md").read_text(encoding="utf-8")
-    yaml_text = (CANONICAL_SKILL / "agents" / "openai.yaml").read_text(encoding="utf-8")
-
-    assert "name: bili-learning-automation" in skill_text
-    assert "唯一需要人工维护的 Skill 流程真源" in skill_text
-    assert GENERATED_MARKER not in skill_text
-    assert "$bili-learning-automation" in yaml_text
-    assert list(CANONICAL_SKILL.rglob("SKILL.md")) == [CANONICAL_SKILL / "SKILL.md"]
-
-
-@pytest.mark.parametrize(("skill_name", "skill_dir", "requires_openai_metadata"), SKILLS)
-def test_generated_install_exit_metadata_is_unique_and_complete(
-    skill_name: str, skill_dir: Path, requires_openai_metadata: bool
-) -> None:
-    skill_text = (skill_dir / "SKILL.md").read_text(encoding="utf-8")
-
-    assert f"name: {skill_name}" in skill_text
-    assert "description:" in skill_text
-    assert GENERATED_MARKER in skill_text
-    assert list(skill_dir.rglob("SKILL.md")) == [skill_dir / "SKILL.md"]
-    if requires_openai_metadata:
-        yaml_text = (skill_dir / "agents" / "openai.yaml").read_text(encoding="utf-8")
-        assert "$" + skill_name in yaml_text
-
-
-@pytest.mark.parametrize("skill_dir", NATIVE_MIRRORS)
-def test_native_junction_install_exit_is_generated(skill_dir: Path) -> None:
-    skill_text = (skill_dir / "SKILL.md").read_text(encoding="utf-8")
-    assert "name: bili-learning-automation" in skill_text
-    assert GENERATED_MARKER in skill_text
-
-
-def test_all_install_exits_are_in_sync_with_canonical_source() -> None:
-    result = subprocess.run(
-        [sys.executable, str(BUILD_SCRIPT), "--check"],
+def run_build(*args: str) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8"
+    return subprocess.run(
+        [sys.executable, str(BUILD_SCRIPT), *args],
         cwd=REPO_ROOT,
         check=False,
         capture_output=True,
         text=True,
         encoding="utf-8",
+        env=env,
     )
+
+
+def test_canonical_skill_is_the_only_local_skill_source() -> None:
+    skill_text = (CANONICAL_SKILL / "SKILL.md").read_text(encoding="utf-8")
+    yaml_text = (CANONICAL_SKILL / "agents" / "openai.yaml").read_text(encoding="utf-8")
+
+    assert "name: bili-learning-automation" in skill_text
+    assert "唯一需要人工维护" in skill_text
+    assert "目录链接安装" in skill_text
+    assert "$bili-learning-automation" in yaml_text
+    assert list(CANONICAL_SKILL.rglob("SKILL.md")) == [CANONICAL_SKILL / "SKILL.md"]
+    assert LOCAL_BRIDGE.is_file()
+    assert (CANONICAL_SKILL / "scripts" / "local_bridge.ps1").is_file()
+
+
+def test_chatgpt_package_render_is_valid() -> None:
+    result = run_build("--check")
 
     assert result.returncode == 0, result.stdout + result.stderr
     payload = json.loads(result.stdout)
-    assert payload["status"] == "skill_sources_in_sync"
+    assert payload["status"] == "chatgpt_skill_ready"
     assert Path(payload["canonical"]).resolve() == CANONICAL_SKILL.resolve()
+    assert payload["skill"] == CHATGPT_SKILL_NAME
+    assert payload["files"] == 13
 
 
-def test_launcher_works_outside_project_directory(tmp_path: Path) -> None:
+def test_shared_launcher_works_outside_project_directory(tmp_path: Path) -> None:
     result = subprocess.run(
         [sys.executable, str(LAUNCHER), "--help"],
         cwd=tmp_path,
@@ -106,10 +82,10 @@ def test_launcher_works_outside_project_directory(tmp_path: Path) -> None:
     assert "prepare-description" in result.stdout
 
 
-def test_build_creates_four_isolated_skill_archives(tmp_path: Path) -> None:
+def test_local_bridge_resolves_project_outside_project_directory(tmp_path: Path) -> None:
     result = subprocess.run(
-        [sys.executable, str(BUILD_SCRIPT), "--output-dir", str(tmp_path)],
-        cwd=REPO_ROOT,
+        [sys.executable, str(LOCAL_BRIDGE), "--help"],
+        cwd=tmp_path,
         check=False,
         capture_output=True,
         text=True,
@@ -117,30 +93,58 @@ def test_build_creates_four_isolated_skill_archives(tmp_path: Path) -> None:
     )
 
     assert result.returncode == 0, result.stderr
-    payload = json.loads(result.stdout)
-    assert payload["status"] == "packages_ready"
-    assert Path(payload["canonical"]).resolve() == CANONICAL_SKILL.resolve()
-    assert {item["skill"] for item in payload["packages"]} == {name for name, _, _ in SKILLS}
+    assert "bili-learning" in result.stdout
+    assert "onboarding" in result.stdout
 
-    for skill_name, _, _ in SKILLS:
-        archive_path = tmp_path / f"{skill_name}.zip"
-        assert archive_path.is_file()
-        with zipfile.ZipFile(archive_path) as archive:
-            names = archive.namelist()
-            skill_files = [name for name in names if name.endswith("/SKILL.md")]
-            assert skill_files == [f"{skill_name}/SKILL.md"]
-            assert all(name.startswith(f"{skill_name}/") for name in names)
-            packaged_skill = archive.read(f"{skill_name}/SKILL.md").decode("utf-8")
-            assert GENERATED_MARKER in packaged_skill
-            assert not any(
-                forbidden in name.lower()
-                for name in names
-                for forbidden in (
-                    "/key/",
-                    "cookies.txt",
-                    "config/local.json",
-                    "pinned-comment-whitelist.local.json",
-                    "/.runtime/",
-                    "/notes/",
-                )
+
+def test_build_creates_only_chatgpt_archive_with_safe_references(tmp_path: Path) -> None:
+    result = run_build("--output-dir", str(tmp_path))
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "chatgpt_skill_built"
+    assert payload["files"] == 13
+
+    archive_path = tmp_path / f"{CHATGPT_SKILL_NAME}.zip"
+    assert archive_path.is_file()
+    with zipfile.ZipFile(archive_path) as archive:
+        names = set(archive.namelist())
+        prefix = f"{CHATGPT_SKILL_NAME}/"
+        assert all(name.startswith(prefix) for name in names)
+        assert f"{prefix}SKILL.md" in names
+        assert f"{prefix}agents/openai.yaml" in names
+        assert not any(f"{prefix}scripts/" in name for name in names)
+
+        ref_prefix = f"{prefix}references/"
+        packaged_references = {name.removeprefix(ref_prefix) for name in names if name.startswith(ref_prefix)}
+        assert packaged_references == CHATGPT_REFERENCES
+
+        skill_text = archive.read(f"{prefix}SKILL.md").decode("utf-8")
+        yaml_text = archive.read(f"{prefix}agents/openai.yaml").decode("utf-8")
+        assert f"name: {CHATGPT_SKILL_NAME}" in skill_text
+        assert "ChatGPT Web 宿主边界" in skill_text
+        assert "$bili-learning-automation-chatgpt" in yaml_text
+        assert not any(
+            forbidden in name.lower()
+            for name in names
+            for forbidden in (
+                "/key/",
+                "cookies.txt",
+                "bilibili_cookies.txt",
+                "config/local.json",
+                "pinned-comment-whitelist.local.json",
+                "/.runtime/",
+                "/notes/",
             )
+        )
+
+
+def test_chatgpt_archive_is_reproducible(tmp_path: Path) -> None:
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    assert run_build("--output-dir", str(first)).returncode == 0
+    assert run_build("--output-dir", str(second)).returncode == 0
+
+    first_bytes = (first / f"{CHATGPT_SKILL_NAME}.zip").read_bytes()
+    second_bytes = (second / f"{CHATGPT_SKILL_NAME}.zip").read_bytes()
+    assert first_bytes == second_bytes

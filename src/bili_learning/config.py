@@ -161,11 +161,6 @@ def _load_local_config(project_root: Path) -> tuple[Path, dict[str, Any]]:
         if not isinstance(value, str) or not value.strip():
             raise ConfigurationError("local_config_invalid_value", f"本机配置 {key} 必须是非空字符串")
         values[key] = value.strip()
-    if "notes_root" in values and ({"vault_root", "notes_subdir"} & values.keys()):
-        raise ConfigurationError(
-            "local_config_notes_conflict",
-            "notes_root 是旧版直接路径配置，不能与 vault_root / notes_subdir 同时使用。",
-        )
     if "notes_subdir" in values and "vault_root" not in values:
         raise ConfigurationError("local_config_notes_subdir_without_vault", "配置 notes_subdir 时必须同时配置 vault_root。")
     workflow_mode = values.get("workflow_mode")
@@ -185,11 +180,6 @@ def _resolve_notes_location(
     env_notes_root = os.environ.get("BILI_LEARNING_NOTES_ROOT")
     env_vault_root = os.environ.get("BILI_LEARNING_VAULT_ROOT")
     env_notes_subdir = os.environ.get("BILI_LEARNING_NOTES_SUBDIR")
-    if env_notes_root and (env_vault_root or env_notes_subdir):
-        raise ConfigurationError(
-            "environment_notes_conflict",
-            "BILI_LEARNING_NOTES_ROOT 不能与 BILI_LEARNING_VAULT_ROOT / BILI_LEARNING_NOTES_SUBDIR 同时使用。",
-        )
     if env_notes_subdir and not env_vault_root:
         raise ConfigurationError(
             "environment_notes_subdir_without_vault",
@@ -197,16 +187,26 @@ def _resolve_notes_location(
         )
 
     if env_notes_root:
-        return _resolve_path(project_root, env_notes_root), None, None, "environment_notes_root", False
+        notes_root = _resolve_path(project_root, env_notes_root)
+        if env_vault_root:
+            vault_root = _resolve_path(project_root, env_vault_root)
+            notes_subdir = _normalize_notes_subdir(env_notes_subdir or DEFAULT_NOTES_SUBDIR)
+            return notes_root, vault_root, notes_subdir, "environment_notes_root_with_vault", False
+        return notes_root, None, None, "environment_notes_root", False
     if env_vault_root:
         vault_root = _resolve_path(project_root, env_vault_root)
         notes_subdir = _normalize_notes_subdir(env_notes_subdir or DEFAULT_NOTES_SUBDIR)
         return vault_root / notes_subdir, vault_root, notes_subdir, "environment_vault", False
 
     local_notes_root = local_config.get("notes_root")
-    if local_notes_root:
-        return _resolve_path(project_root, local_notes_root), None, None, "local_notes_root", False
     local_vault_root = local_config.get("vault_root")
+    if local_notes_root:
+        notes_root = _resolve_path(project_root, local_notes_root)
+        if local_vault_root:
+            vault_root = _resolve_path(project_root, local_vault_root)
+            notes_subdir = _normalize_notes_subdir(local_config.get("notes_subdir") or DEFAULT_NOTES_SUBDIR)
+            return notes_root, vault_root, notes_subdir, "local_notes_root_with_vault", False
+        return notes_root, None, None, "local_notes_root", False
     if local_vault_root:
         vault_root = _resolve_path(project_root, local_vault_root)
         notes_subdir = _normalize_notes_subdir(local_config.get("notes_subdir") or DEFAULT_NOTES_SUBDIR)
@@ -233,7 +233,6 @@ def configure_obsidian(project_root: Path, vault_root: Path, notes_subdir: str =
 
     path, local_config = _load_local_config(project_root)
     updated = dict(local_config)
-    updated.pop("notes_root", None)
     updated["vault_root"] = str(vault_root)
     updated["notes_subdir"] = str(normalized_subdir)
     return _save_local_config(path, updated)

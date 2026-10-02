@@ -12,7 +12,7 @@
 
 第一次获取、导出和更新 Cookie 的安全教程见 [Bilibili Cookie 获取与安全配置](docs/BILIBILI-COOKIE.md)。
 
-私人 Obsidian 笔记、`.runtime`、`archive`、`materials` 和本机第三方副本默认也不属于公开仓库内容。
+私人 Obsidian 笔记、`.runtime`、本机 Cookie / 配置和其它机器私有数据都不属于公开 Git 内容。私人笔记可以物理保存在仓库工作区的 `notes/**` 以便本地 Agent 访问，但该目录必须保持 Git ignored；Vault 通过 Junction 映射时也不得因此把私人笔记加入提交。
 
 ## Git 身份与公开提交
 

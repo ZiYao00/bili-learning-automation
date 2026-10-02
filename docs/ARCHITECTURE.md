@@ -23,11 +23,11 @@
 ## 代码分层
 
 - `src/bili_learning/`：可测试的核心逻辑和 agent-neutral CLI。`prepare`、`prepare-transcript`、`prepare-description` 只是清晰的外部入口，内部共用 `_prepare_materials`；`source.py` 定义三种 Source Mode，`transcript.py` 生成统一 source manifest；`pinned_comment.py` 负责条件触发/白名单置顶一级评论补充；`workflow.py` 只为 `strict` 模式创建并校验三份 runtime 工作文件。
-- `skill/bili-learning-automation/`：唯一需要人工维护的 Skill 真源；不复制评论策略、Cookie 细节、taxonomy 或 finalizer 业务规则。
-- `scripts/build_agent_skill_packages.py`：从统一 Skill 真源生成 ChatGPT、Codex、Hermes、WorkBuddy 的安装出口与 ZIP，并通过 `--check` 检查生成副本是否漂移。
+- `skill/bili-learning-automation/`：唯一需要人工维护的 canonical 本地 Skill；Codex、Hermes、WorkBuddy 的用户级 Skill 目录直接 Junction 到这里。`scripts/local_bridge.py` / `.ps1` 只处理宿主路径、Python 与 `PYTHONPATH` 兼容，不复制业务规则。
+- `scripts/build_chatgpt_skill.py`：从 canonical Skill 与批准的公开文档直接渲染唯一的 ChatGPT Web ZIP，并通过 `--check` 验证 package render；不生成本地 Agent 副本。
 - `docs/AGENT-INTEGRATION.md`：所有智能体共用的接入协议。
-- ChatGPT、Codex、Hermes、WorkBuddy 的宿主目录只保留由构建脚本生成的 `SKILL.md` 安装副本；宿主特有内容仅限最小权限/安装边界。
-- `hermes-skills/bili-learning-automation/scripts/`、`workbuddy-skills/bili-learning-automation/scripts/`：只处理宿主路径/进程兼容；同目录 `SKILL.md` 也是生成安装出口，不是第二套流程源码。
+- 本地 Agent 安装目录存在于用户环境而不是仓库；仓库不再维护宿主专用 Skill 副本。
+- ChatGPT Web 通过专用 ZIP + 本地工作区桥接进入同一个项目核心；ZIP 不包含 Python core、Cookie、runtime、私人笔记或本机配置。
 - `config/bilibili-note-taxonomy.json`：模型别名、tags、后续整理建议和默认 `notes_root`。
 - `docs/standards/`：人类可读的笔记质量与版式语义标准。
 - `config/obsidian-style.json`：共享 CSS 依赖契约，声明本项目需要的 `learning-lab.css` Core、`video-note.css` Extension 与 Frontmatter class。
@@ -70,11 +70,11 @@ taxonomy 的 route.path 不直接决定新文件的路径。新笔记统一先�
 - 长期产物：私人 Markdown 笔记与导航页，默认不入 Git。
 - runtime 产物：`.runtime/bilibili-learning` 的活动 Job 始终包含 source manifest、analysis 与草稿；subtitle / ASR 还包含 source chunks，ASR 会保存 runtime 内纯文本副本，description-only 不伪造独立 source 文件或 chunk。`strict` 模式额外包含 Fact Ledger、Semantic Draft 与 Layout Plan。任务完成后 Job retire 到 `retired/`。
 - 敏感数据：`key/` 中的 Cookie 文件和被 Git 忽略的 `config/pinned-comment-whitelist.local.json`。正常字幕/简介采集仍把文件路径交给 yt-dlp；仅当用户主动配置的本地置顶评论白名单命中时，`pinned_comment.py` 才会在本机读取 Netscape Cookie 并构造一次只读评论请求。Cookie 值不得打印、写入 Job/笔记、上传或提交。
-- 历史资料：`archive/`、`materials/` 及本机 legacy 依赖，不属于公开源码主链路。
+- 已退役的 Chrome/CDP、本机历史采集材料与第三方副本不再保留在工作区；历史背景通过 Git / CHANGELOG 追溯。
 
 ## 配置边界
 
-正式用户推荐显式配置 `vault_root + notes_subdir`，由统一 settings loader 计算 `notes_root`；旧版 `notes_root` / `BILI_LEARNING_NOTES_ROOT` 保持兼容。taxonomy 的 `notes/bilibili` 只作为临时 repository fallback；未显式配置时，新采集会被 onboarding 门禁阻止，但已有 Job 的 finalizer / retire lifecycle 仍可继续。collector、finalizer、navigation 与 doctor 共用同一 settings loader。
+正式用户推荐显式配置 `notes_root + vault_root + notes_subdir`：`notes_root` 是真实 Markdown 写入真源，推荐位于 `<repo-root>/notes/bilibili` 并保持 Git ignored；`vault_root + notes_subdir` 只描述 Obsidian 映射位置，Windows 上应由 Vault 子目录 Junction 指向 `notes_root`。统一 settings loader 同时保留 direct-vault 和 notes-root-only 兼容模式；hybrid 模式由 doctor/onboarding 校验 `obsidian_notes_mapping`。taxonomy 的 `notes/bilibili` 仍只作为未配置时的 repository fallback；collector、finalizer、navigation 与 doctor 共用同一 settings loader。
 
 ## 可靠性原则
 

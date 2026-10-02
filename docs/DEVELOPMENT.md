@@ -2,7 +2,7 @@
 
 ## 环境
 
-项目核心 package 位于 `src/bili_learning`。ChatGPT 与 Codex 通过共享启动器调用核心 CLI；Hermes / WorkBuddy 的宿主脚本保留为兼容入口。
+项目核心 package 位于 `src/bili_learning`。Codex、Hermes、WorkBuddy 通过同一个 canonical Skill 与共享启动器调用核心 CLI；必要的宿主兼容集中在 `skill/bili-learning-automation/scripts/local_bridge.*`。ChatGPT Web 使用由同一 canonical Skill 构建的专用 ZIP。
 
 ```powershell
 py -3 -m venv .venv
@@ -16,11 +16,11 @@ python -m pip install -e ".[dev]"
 ## 本地验证
 
 ```powershell
-python -m compileall -q src scripts hermes-skills/bili-learning-automation/scripts workbuddy-skills/bili-learning-automation/scripts
+python -m compileall -q src scripts skill/bili-learning-automation/scripts
 python -m ruff check .
 python -m pytest -q
-python .\scripts\build_agent_skill_packages.py
-python .\scripts\build_agent_skill_packages.py --check
+python .\scripts\build_chatgpt_skill.py
+python .\scripts\build_chatgpt_skill.py --check
 ```
 
 测试不得依赖真实 Cookie、真实 Bilibili 登录态或私人 Obsidian 笔记。
@@ -28,25 +28,17 @@ python .\scripts\build_agent_skill_packages.py --check
 ## 设计原则
 
 - 确定性数据由 Python 生成，不让 LLM 重写元数据。
-- Skill 只人工维护 `skill/bili-learning-automation/SKILL.md`；所有宿主 `SKILL.md` 都由 `scripts/build_agent_skill_packages.py` 生成。改 Skill 时先改真源，再运行构建脚本；禁止在生成出口直接打补丁。
+- Skill 只人工维护 `skill/bili-learning-automation/SKILL.md`；Codex / Hermes / WorkBuddy 通过用户级 Junction 直接使用该 canonical Skill，仓库不生成本地宿主副本。只有 ChatGPT Web 使用 `scripts/build_chatgpt_skill.py` 生成独立 ZIP；禁止在安装目录或 ZIP 快照中维护第二套规则。
 - `subtitle_srt`、`asr_text`、`description_only` 只在 SourceMaterial 层分流；三个外部入口必须共用 `_prepare_materials`、Job、handoff、finalizer、恢复与 retire，不为新来源复制 lifecycle。
-- taxonomy 是分类规则与 repository fallback 的配置源；正式 Obsidian 笔记位置优先使用本机 `vault_root + notes_subdir`，旧 `notes_root` 仅用于兼容。
+- taxonomy 是分类规则与未配置时 repository fallback 的配置源；正式本机推荐 `notes_root + vault_root + notes_subdir` 混合模式：`notes_root` 是项目内 Git-ignored 物理真源，Vault 子目录通过 Junction 指向它；doctor/onboarding 校验映射。direct-vault 与 notes-root-only 仅作为兼容模式。
 - 相同 BVID 默认先返回 `existing_note_found`，由用户选择 update / rerun / cancel；只有明确 rerun 才创建同标题序号笔记，update 保留原路径并使用 SHA-256 冲突保护。
 - 公开 CI 不访问真实 Bilibili 账号。
 - Cookie 和 `config/pinned-comment-whitelist.local.json` 都是本机私有配置：正常采集只把 Cookie 文件路径交给 yt-dlp；仅命中用户主动配置的本地置顶评论白名单时，核心才可以读取 Netscape Cookie 构造一次只读请求，不得把名单或 Cookie 值暴露给 Agent、日志、Job、笔记或 Git。
 - cleanup 只能作用于 `.runtime/bilibili-learning` 下的 job。
 
-## 兼容入口
+## 稳定入口
 
-- `prepare_ytdlp_bilibili_note.py`
-- `prepare_transcript_bilibili_note.py`
-- `prepare_description_bilibili_note.py`
-- `finalize_ytdlp_bilibili_note.py`
-- `build_bilibili_navigation.py`
-- `doctor_bilibili_learning.py`
-- `configure_bilibili_learning.py`
-
-ChatGPT 与 Codex 使用共享 `scripts/run_bili_learning.py`。不要在没有迁移调用方的情况下删除或改名共享启动器或上述 Hermes 兼容入口。
+所有宿主共用 `scripts/run_bili_learning.py` 与 `src/bili_learning`。本地 Agent 需要从 Junction 安装目录进入项目、清除宿主注入的 `PYTHONPATH` 或提供稳定 cleanup runner 时，使用 canonical Skill 内的 `scripts/local_bridge.py` / `.ps1`。不要再新增按宿主或按子命令复制的 wrapper。
 
 ## Obsidian 样式维护
 
@@ -81,11 +73,11 @@ Benchmark 重点比较：
 准备 commit / push 前，先复核当前 diff，确认没有把 Cookie、`.runtime`、私人笔记、测试抓取材料、本机绝对路径或其它机器特征提交进去；同时确认 Git author / committer 邮箱是维护者愿意公开的地址。然后运行：
 
 ```powershell
-python -m compileall -q src scripts hermes-skills/bili-learning-automation/scripts workbuddy-skills/bili-learning-automation/scripts
+python -m compileall -q src scripts skill/bili-learning-automation/scripts
 python -m ruff check .
 python -m pytest -q
-python .\scripts\build_agent_skill_packages.py
-python .\scripts\build_agent_skill_packages.py --check
+python .\scripts\build_chatgpt_skill.py
+python .\scripts\build_chatgpt_skill.py --check
 git -c core.whitespace=cr-at-eol diff --check
 ```
 

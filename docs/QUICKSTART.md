@@ -147,23 +147,37 @@ Copy-Item .\config\local.json.example .\config\local.json
 
 ```json
 {
+  "notes_root": "notes/bilibili",
   "vault_root": "D:\\Notes\\MyVault",
   "notes_subdir": "bilibili",
-  "cookie_file": "D:\\Private\\bilibili_cookies.txt",
+  "cookie_file": "key/bilibili_cookies.txt",
   "workflow_mode": "light"
 }
 ```
 
 几个字段分别表示：
 
+- `notes_root`：真实 Markdown 存储目录；推荐使用项目内 `notes/bilibili`，该目录被 Git 忽略；
 - `vault_root`：Obsidian Vault 根目录，也就是直接包含 `.obsidian` 的目录；
-- `notes_subdir`：本项目在 Vault 内使用的相对子目录，默认推荐 `bilibili`；
-- `cookie_file`：Netscape 格式 Bilibili Cookie 文件的位置；
+- `notes_subdir`：Vault 内显示本项目笔记的相对子目录，默认推荐 `bilibili`；
+- `cookie_file`：Netscape 格式 Bilibili Cookie 文件的位置；项目内 `key/` 已被 Git 忽略；
 - `workflow_mode`：默认 `light`，让智能体完整读字幕后直接写笔记，再做一次排版优化；需要严格分阶段审计时改为 `strict`。
 
-最终笔记目录会自动计算为 `<vault_root>/<notes_subdir>`。例如上面的配置会写入 `D:\Notes\MyVault\bilibili\00-待整理\`。
+推荐 Windows 拓扑是：`<vault_root>/<notes_subdir>` **Junction → `<repo-root>/notes/bilibili`**。真实文件在项目工作区内，Obsidian 通过 Vault 中的链接查看同一批文件。Junction 方向不要反过来。
 
-`config/local.json` 已被 Git 忽略，适合保存本机路径。旧版 `notes_root` 仍然兼容，但新安装建议使用 `vault_root + notes_subdir`，这样程序才能准确检查 Obsidian 和 CSS。
+如果 Vault 中目标目录已经有笔记，不要直接覆盖或删目录；先把数据复制到项目 `notes/bilibili`、核对文件后，再把原 Vault 子目录替换成 Junction。
+
+新目录场景可在 PowerShell 中执行：
+
+```powershell
+$source = (Resolve-Path '.\notes\bilibili').Path
+$target = Join-Path 'D:\Notes\MyVault' 'bilibili'
+New-Item -ItemType Junction -Path $target -Target $source
+```
+
+如果 `$target` 已存在，先检查它是普通目录还是旧 Junction，不要直接覆盖。数据迁移时先比对文件数量 / 哈希，再替换目录项。
+
+`config/local.json` 已被 Git 忽略。配置完成后运行 onboarding；混合模式除 Vault/CSS 外还会检查 `obsidian_notes_mapping`，只有映射为 OK 才继续正式采集。
 
 ### yt-dlp 不需要复制进项目
 
@@ -189,13 +203,13 @@ python .\scripts\run_bili_learning.py doctor
 
 如果环境正确，你应该看到 yt-dlp、Cookie、taxonomy、Vault、notes/runtime 写权限等检查通过。doctor 还会检查 `learning-lab.css` 与 `video-note.css` 是否位于当前 Vault 的 `.obsidian/snippets/`。
 
-如果看到 `notes_repository_fallback`，说明还没有显式绑定 Vault。此时新的视频采集会被 onboarding 门禁拦住，并返回 `onboarding_required`；不会把私人笔记静默写入代码仓库。你可以修改 `config/local.json`，也可以运行：
+如果看到 `notes_repository_fallback`，说明还没有显式配置正式笔记位置。此时新的视频采集会被 onboarding 门禁拦住并返回 `onboarding_required`。推荐先在 `config/local.json` 保留 `"notes_root": "notes/bilibili"`，再绑定 Vault：
 
 ```powershell
-python .\hermes-skills\bili-learning-automation\scripts\configure_bilibili_learning.py --vault 'D:\Notes\MyVault' --notes-subdir 'bilibili'
+python .\scripts\run_bili_learning.py configure-obsidian --vault 'D:\Notes\MyVault' --notes-subdir 'bilibili'
 ```
 
-该命令只写本机 `config/local.json`，并要求 `--vault` 真正包含 `.obsidian`。
+`configure-obsidian` 会保留已有 `notes_root`，只更新 `vault_root / notes_subdir`；因此推荐 hybrid 配置不会被破坏。如果当前配置本来没有 `notes_root`，则继续使用直接写 Vault 子目录的兼容模式。
 
 如果要让智能体读取结构化诊断结果：
 
@@ -249,45 +263,25 @@ video-note
 
 ### ChatGPT Work
 
-ChatGPT 使用独立适配层：
+ChatGPT 使用构建脚本直接生成的独立 ZIP：
 
 ```text
-chatgpt-skills/bili-learning-automation-chatgpt/
+dist/bili-learning-automation-chatgpt.zip
 ```
 
-不要上传整个仓库，也不要把 Hermes、WorkBuddy 或 Codex ZIP 装进 ChatGPT。完整步骤见 [ChatGPT Skill 安装教程](CHATGPT-SKILL-INSTALL.md)。
+该 ZIP 包含生成后的 `SKILL.md`、`agents/openai.yaml` 与一组从当前项目文档自动取材的安全 references；运行时仍通过本地工作区桥接访问当前项目。不要上传整个仓库；Codex、Hermes、WorkBuddy 使用本地 Junction，不使用该 ZIP。完整步骤见 [ChatGPT Skill 安装教程](CHATGPT-SKILL-INSTALL.md)。
 
-### Codex
+### Codex / Hermes / WorkBuddy
 
-Codex 仓库级 Skill 位于：
+三个本地 Agent 共用同一个 canonical Skill：
 
 ```text
-.agents/skills/bili-learning-automation-codex/
+skill/bili-learning-automation/
 ```
 
-进入项目后 Codex 可自动发现，也可以用 Junction 或独立 ZIP 安装。完整步骤见 [Codex Skill 安装教程](CODEX-SKILL-INSTALL.md)。
+推荐把各自的用户级 Skill 目录通过 Windows Junction 直接指向该目录。更新仓库后不需要重新复制、同步或打包本地 Skill；三个宿主统一使用 Skill 名称 `bili-learning-automation`，并通过同一个 `scripts/local_bridge.py` / `.ps1` 处理必要的路径与进程兼容。
 
-### Hermes
-
-Hermes 使用：
-
-```text
-hermes-skills/bili-learning-automation/
-```
-
-建议使用 Junction 安装，更新仓库后无需再次复制文件。完整步骤见 [Hermes Skill 安装教程](HERMES-SKILL-INSTALL.md)。
-如果需要静态副本，使用 Release 中的 `bili-learning-automation-hermes.zip`；该 ZIP 只包含独立指令，运行时仍需明确指定本机项目根目录。
-
-### WorkBuddy
-
-WorkBuddy 适配层位于：
-
-```text
-workbuddy-skills/bili-learning-automation/
-```
-
-它只是入口适配层，实际仍调用同一套 Source Mode、`_prepare_materials`、Job、source manifest、finalizer 和笔记标准。第一次安装见 [WorkBuddy Skill 安装教程](WORKBUDDY-SKILL-INSTALL.md)。
-如果需要静态副本，使用 Release 中的 `bili-learning-automation-workbuddy.zip`；该 ZIP 只包含独立指令，运行时仍需明确指定本机项目根目录。
+完整安装路径与 Junction 命令见 [本地 Agent Skill 安装](LOCAL-AGENT-INSTALL.md)。本地 Agent 不再提供独立 ZIP。
 
 ---
 
@@ -459,7 +453,7 @@ git pull
 /reload-skills
 ```
 
-因为 Hermes Skill 推荐通过 Junction 指向仓库源码，所以不需要重新复制 Skill。
+因为 Codex、Hermes、WorkBuddy 都通过 Junction 指向 canonical Skill，所以更新仓库后不需要重新复制本地 Skill。
 
 如果共享 `obsidian-learning-snippets` 仓库中的 CSS 有更新，按 [Obsidian 样式教程](OBSIDIAN-STYLING.md) 将所需两份 CSS 同步到 Vault，再在 Obsidian 中刷新代码片段。
 
@@ -470,7 +464,7 @@ git pull
 第一步永远建议先运行：
 
 ```powershell
-python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py
+python .\scripts\run_bili_learning.py doctor
 ```
 
 然后查看：
@@ -495,7 +489,7 @@ python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning
 
 - [Bilibili Cookie 获取与安全配置](BILIBILI-COOKIE.md)：第一次导出 Cookie、格式检查、DPAPI 问题和失效更新；
 - [配置说明](CONFIGURATION.md)：换电脑、换 Vault、换 Cookie / yt-dlp 路径；
-- [Hermes Skill 安装](HERMES-SKILL-INSTALL.md)：Hermes 安装、更新、验证；
+- [本地 Agent Skill 安装](LOCAL-AGENT-INSTALL.md)：Codex、Hermes、WorkBuddy 的 Junction 安装、更新与验证；
 - [Obsidian 样式教程](OBSIDIAN-STYLING.md)：CSS 安装和样式问题；
 - [故障排查](TROUBLESHOOTING.md)：状态和错误怎么处理；
 - [智能体接入协议](AGENT-INTEGRATION.md)：给开发者 / 新适配层使用；

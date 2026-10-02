@@ -1,258 +1,90 @@
 # 文档中心
 
-这里按“要完成什么”来组织 `bili-learning-automation` 的文档。
+第一次使用从 [新手快速上手](QUICKSTART.md) 开始。按任务选择文档，不需要从头通读整个 `docs/`。
 
-如果是第一次使用，不需要先读架构、Agent 协议或开发说明，直接从 **[新手快速上手](QUICKSTART.md)** 开始。
+## 安装与首次使用
 
----
+| 任务 | 文档 |
+| --- | --- |
+| 从零配置项目并生成第一篇笔记 | [QUICKSTART.md](QUICKSTART.md) |
+| 获取、保存、更新 Bilibili Cookie | [BILIBILI-COOKIE.md](BILIBILI-COOKIE.md) |
+| 安装 Codex / Hermes / WorkBuddy | [LOCAL-AGENT-INSTALL.md](LOCAL-AGENT-INSTALL.md) |
+| 安装 ChatGPT Web Skill | [CHATGPT-SKILL-INSTALL.md](CHATGPT-SKILL-INSTALL.md) |
+| 安装 Obsidian CSS | [OBSIDIAN-STYLING.md](OBSIDIAN-STYLING.md) |
+| 学习后整理与归档 | [NOTE-ORGANIZATION.md](NOTE-ORGANIZATION.md) |
 
-## 一、教程：照着做即可
-
-### [新手快速上手](QUICKSTART.md)
-
-适合第一次安装。
-
-内容包括：
-
-- 下载项目；
-- 安装 / 检查 yt-dlp；
-- 配置 Obsidian Vault；
-- 获取、保存并配置 Netscape 格式的 Bilibili Cookie；
-- 运行 onboarding / doctor；
-- 安装 Obsidian CSS；
-- 选择 ChatGPT / Codex / Hermes / WorkBuddy；
-- 完成第一次 B站链接转笔记；
-- 确认输出位置和常见状态。
-
-### [Bilibili Cookie 获取与安全配置](BILIBILI-COOKIE.md)
-
-第一次不知道 Cookie 从哪里来时看这里：
-
-- Cookie 是什么、为什么项目需要它；
-- 为什么不能只复制 `SESSDATA`；
-- 怎样导出 Netscape `cookies.txt`；
-- Cookie 文件放在哪里、怎样配置路径；
-- `--cookies-from-browser` 为什么要谨慎使用；
-- Windows Chrome `Failed to decrypt with DPAPI` 怎么处理；
-- Cookie 失效以后怎样重新导出；
-- 哪些内容绝对不能发给 Agent 或提交到 Git。
-
-### [Hermes Skill 安装教程](HERMES-SKILL-INSTALL.md)
-
-只处理 Hermes 接入问题：
-
-- Skill 放在哪里；
-- 如何使用 Junction；
-- 如何验证加载路径；
-- 项目更新后如何 reload；
-- Hermes 仍使用旧 Skill 时怎么检查。
-
-### [ChatGPT Skill 安装教程](CHATGPT-SKILL-INSTALL.md)
-
-只处理 ChatGPT Work 接入问题：
-
-- 为什么必须使用独立 ChatGPT ZIP；
-- 如何连接本地工作区桥接；
-- 如何卸载旧的 Hermes / WorkBuddy 重复条目；
-- 如何区分 Skill、桥接和运行环境状态；
-- 为什么不能上传整个本地仓库。
-
-### [Codex Skill 安装教程](CODEX-SKILL-INSTALL.md)
-
-只处理 Codex 接入问题：
-
-- 仓库级 Skill 自动发现；
-- 用户级 Junction；
-- 独立 ZIP 安装；
-- 项目定位和 onboarding 验收；
-- 更新仓库后的同步方式。
-
-### [WorkBuddy Skill 安装教程](WORKBUDDY-SKILL-INSTALL.md)
-
-只处理 WorkBuddy 接入问题：
-
-- 适配层位置；
-- 本机安装方式；
-- 如何验证；
-- 更新项目后如何同步；
-- WorkBuddy safe-delete、PowerShell 阻断与 MSYS 路径兼容；
-- 旧 Job 自动恢复与 `recovered: true`。
-
-### [Obsidian 样式教程](OBSIDIAN-STYLING.md)
-
-用于安装和维护：
+本地 Codex、Hermes、WorkBuddy 共用：
 
 ```text
-learning-lab.css
-video-note.css
+skill/bili-learning-automation/
 ```
 
-也包括 CSS 不显示、Vault 路径不对等问题的检查方法。
-
-### [笔记整理与归档教程](NOTE-ORGANIZATION.md)
-
-只在用户主动要求整理时使用。说明：
-
-- 为什么新笔记默认只进入 `00-待整理`；
-- 为什么整理不会自动执行；
-- “最近一篇 / 全部”的范围确认门禁；
-- 短知识标题的命名规则；
-- 视频生成按模型生态分类的规则；
-- 分类目录与 Tags 的职责分工；
-- Organizer 的安全调用方式。
-
----
-
-## 二、说明 / 参考：需要查参数或理解行为时阅读
-
-### [配置手册](CONFIGURATION.md)
-
-查这些内容时看这里：
-
-- `config/local.json`；
-- `vault_root` / `notes_subdir` / `notes_root`；
-- Cookie 路径；
-- yt-dlp 自定义路径；
-- `workflow_mode`；
-- 环境变量；
-- 配置解析优先级；
-- doctor 会检查什么。
-
-### [依赖说明](DEPENDENCIES.md)
-
-说明运行时依赖、开发依赖、yt-dlp 与历史依赖的关系。
-
-### [架构说明](ARCHITECTURE.md)
-
-说明主链路和各模块职责：
+通过用户级 Junction 直接安装。ChatGPT Web 单独使用：
 
 ```text
-input
-→ collector
-→ transcript
-→ Agent
-→ finalizer
-→ Obsidian
-→ runtime retire / recovery
+dist/bili-learning-automation-chatgpt.zip
 ```
 
-适合需要理解源码或定位模块责任的人。
+## 配置与行为参考
 
-### [Agent 接入协议](AGENT-INTEGRATION.md)
+- [CONFIGURATION.md](CONFIGURATION.md)：`config/local.json`、Vault、Cookie、yt-dlp、workflow mode、环境变量与 doctor。
+- [ARCHITECTURE.md](ARCHITECTURE.md)：核心链路、模块职责、Job lifecycle 与 Skill 分发架构。
+- [AGENT-INTEGRATION.md](AGENT-INTEGRATION.md)：Agent 的授权边界、来源事实边界、handoff、finalizer、恢复与整理协议。
+- [DEPENDENCIES.md](DEPENDENCIES.md)：运行时与开发依赖。
+- [TROUBLESHOOTING.md](TROUBLESHOOTING.md)：按状态 / 症状定位问题。
+- [../SECURITY.md](../SECURITY.md)：Cookie、本机配置、私人数据与 Git 安全边界。
 
-用于 ChatGPT / Codex / Hermes / WorkBuddy 之外的新 Agent 接入，也用于维护现有适配层。
+## 内容标准
 
-包含：
+默认写作模式：
 
-- Agent 允许修改什么；
-- 哪些内容由 Python 固定生成；
-- 来源事实边界；
-- `analysis.json` / coverage review；
-- `materials_ready + recovered: true` 的恢复语义；
-- finalizer、Job retire 与维护状态要求。
+- [standards/LIGHT-WORKFLOW.md](standards/LIGHT-WORKFLOW.md)
 
-### [内容质量标准](standards/LIGHT-WORKFLOW.md)
+严格模式与质量回归：
 
-默认 `light` 模式的内容整理规则。
+- [standards/CODEX-VIDEO-NOTE-GUIDE.md](standards/CODEX-VIDEO-NOTE-GUIDE.md)
+- [standards/KNOWLEDGE-DENSE-WORKFLOW.md](standards/KNOWLEDGE-DENSE-WORKFLOW.md)
+- [standards/STANDARD-VIDEO-NOTE-EXAMPLE.md](standards/STANDARD-VIDEO-NOTE-EXAMPLE.md)
 
-普通用户通常不需要单独阅读；主要供 Agent 和维护者使用。
+普通用户通常不需要单独阅读这些标准；它们主要服务 Agent 和维护者。
 
-### [严格模式内容标准](standards/CODEX-VIDEO-NOTE-GUIDE.md)
+## 开发与发布
 
-主要服务 `workflow_mode: strict`，用于需要中间阶段审计和内容质量回归的任务。
+- [MAINTENANCE-HANDOFF.md](MAINTENANCE-HANDOFF.md)：其它 Agent / 开发者接手时的必读架构、数据拓扑、安全边界与验证顺序。
+- [DEVELOPMENT.md](DEVELOPMENT.md)：开发环境、测试、Ruff、内容质量回归和提交前检查。
+- [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md)：正式发布 / push 前的可复用验收门禁。
+- `reports/`：历史验收记录。当前行为以代码、README、QUICKSTART、CONFIGURATION 和现行 standards 为准。
 
----
+## 常用入口
 
-## 三、疑难解答：出现问题时阅读
-
-### [疑难解答 / 故障排查](TROUBLESHOOTING.md)
-
-建议先看任务返回的状态，再按症状查找。
-
-覆盖：
-
-- `onboarding_required`；
-- `in_progress` / `recovered` 与旧 Job 恢复；
-- WorkBuddy safe-delete / `windows-sandbox-recycle-bin-unavailable`；
-- yt-dlp 未找到；
-- Cookie 文件不存在；
-- `subtitle_unavailable`；
-- UP 主简介获取失败；
-- `note_invalid`；
-- Hermes Skill 未更新；
-- Hermes 只分析不执行；
-- 长视频读取慢；
-- Obsidian 无样式；
-- 短链解析失败；
-- `organize` 失败。
-
-遇到未知问题时，先运行：
+环境检查：
 
 ```powershell
+python .\scripts\run_bili_learning.py onboarding
 python .\scripts\run_bili_learning.py doctor
 ```
 
-需要把诊断结果交给 Agent 分析时使用：
+ChatGPT Web 包检查与构建：
 
 ```powershell
-python .\scripts\run_bili_learning.py doctor --json
+python .\scripts\build_chatgpt_skill.py --check
+python .\scripts\build_chatgpt_skill.py
 ```
 
-### [安全说明](../SECURITY.md)
+本地 Agent 安装后不需要再次生成 Skill 副本；更新仓库即可通过 Junction 读取 canonical Skill。
 
-处理下面问题时阅读：
+## 推荐阅读路径
 
-- Cookie 如何保存；
-- 什么内容不能进入公开仓库；
-- 本机路径和私人笔记；
-- Git author / committer 邮箱；
-- 安全问题如何反馈。
-
----
-
-## 四、开发与维护
-
-### [开发说明](DEVELOPMENT.md)
-
-包含：
-
-- 开发环境；
-- pytest / Ruff；
-- 内容质量 Benchmark；
-- 提交前检查；
-- CI。
-
-### [Release Checklist](RELEASE-CHECKLIST.md)
-
-正式发布版本前使用，不是普通用户安装教程。
-
-### [Legacy 说明](LEGACY.md)
-
-记录旧 Chrome/CDP、`bili-note`、`web-access` 路线。
-
-当前默认流程使用 yt-dlp 字幕优先链路，新用户不需要从 Legacy 开始。
-
-### `reports/`
-
-这里保存开发过程中的验收、实验和交接记录。
-
-这些文件用于追溯项目决策，不代表当前用户教程；当报告与 README、QUICKSTART、CONFIGURATION 或现行标准冲突时，以现行正式文档和代码为准。
-
----
-
-## 推荐阅读顺序
-
-### 第一次安装
+第一次使用：
 
 ```text
 QUICKSTART
-→ BILIBILI-COOKIE（如果尚未准备 Cookie）
-→ 对应 Agent 安装教程
+→ BILIBILI-COOKIE（需要时）
+→ LOCAL-AGENT-INSTALL 或 CHATGPT-SKILL-INSTALL
 → OBSIDIAN-STYLING
-→ 第一次发送 B站链接
 ```
 
-### 配置有问题
+配置 / 运行异常：
 
 ```text
 CONFIGURATION
@@ -260,19 +92,12 @@ CONFIGURATION
 → TROUBLESHOOTING
 ```
 
-### Agent 运行异常
-
-```text
-TROUBLESHOOTING
-→ 对应 Agent 安装教程
-→ AGENT-INTEGRATION（维护者）
-```
-
-### 修改项目
+修改项目：
 
 ```text
 ../AGENTS.md
+→ MAINTENANCE-HANDOFF
 → ARCHITECTURE
-→ DEVELOPMENT
+→ DEVELOPMENT / AGENT-INTEGRATION
 → 对应 standards
 ```

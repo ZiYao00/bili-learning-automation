@@ -7,13 +7,13 @@
 先运行：
 
 ```powershell
-python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py
+python .\scripts\run_bili_learning.py doctor
 ```
 
 如果需要给智能体分析：
 
 ```powershell
-python .\hermes-skills\bili-learning-automation\scripts\doctor_bilibili_learning.py --json
+python .\scripts\run_bili_learning.py doctor --json
 ```
 
 doctor 不访问 Bilibili，也不读取 Cookie 内容。
@@ -39,7 +39,7 @@ doctor 不访问 Bilibili，也不读取 Cookie 内容。
 
 | 状态 | 含义 | 推荐处理 |
 | --- | --- | --- |
-| `onboarding_required` | 首次环境仍缺少 Vault / Cookie / yt-dlp 等必需配置 | 按 `actions` 处理缺失项，重新运行 onboarding 后再重试原链接 |
+| `onboarding_required` | 首次环境仍缺少 Vault / Cookie / yt-dlp 等必需配置，或 hybrid 笔记映射无效 | 按 `actions` 处理缺失项；映射无效时先修复 Vault 到 `notes_root` 的 Junction，再重新运行 onboarding |
 | `materials_ready` | 采集完成，等待智能体写笔记 | 正常继续；若同时有 `recovered: true`，表示核心已恢复此前完整 Job，不会重复采集 |
 | `existing_note_found` | 当前 BVID 已有已发布笔记 | 采集尚未开始；先让用户选择更新、重新执行或取消 |
 | `update_target_required` | 同一 BVID 有多篇笔记且未指定更新目标 | 让用户明确选择具体笔记，不自动猜最新或最旧 |
@@ -50,6 +50,10 @@ doctor 不访问 Bilibili，也不读取 Cookie 内容。
 | `note_ready` | Finalizer 校验通过并已发布 | 业务完成；runtime retire/维护状态不改变发布结果 |
 | `note_invalid` | 草稿未通过最终校验 | 看错误原因，不绕过 finalizer |
 | `failed` | 配置、采集或运行失败 | 先 doctor，再按下面对应项检查 |
+
+### hybrid 笔记映射异常
+
+如果 onboarding 的 actions 出现 `obsidian_notes_mapping_invalid`，检查 Vault 子目录是不是正确的 Junction，并确认它最终解析到配置的 `notes_root`。推荐方向固定为 **Vault → 项目 notes**；不要把项目 `notes/bilibili` 反向链接到工作区外。修复后重新运行 onboarding，只有 `obsidian_notes_mapping = OK` 才继续采集。
 
 ---
 
@@ -300,7 +304,7 @@ Get-Item "$env:LOCALAPPDATA\hermes\skills\bili-learning-automation" |
 `Target` 应指向当前仓库：
 
 ```text
-<project-root>\hermes-skills\bili-learning-automation
+<project-root>\skill\bili-learning-automation
 ```
 
 然后在 Hermes 会话发送：
@@ -315,7 +319,7 @@ Get-Item "$env:LOCALAPPDATA\hermes\skills\bili-learning-automation" |
 重新读取当前安装的 SKILL.md，不要根据之前会话记忆回答。
 ```
 
-完整教程见 [Hermes Skill 安装](HERMES-SKILL-INSTALL.md)。
+完整教程见 [本地 Agent Skill 安装](LOCAL-AGENT-INSTALL.md)。
 
 ---
 
@@ -383,6 +387,18 @@ video-note
 如果 `notes_root` 只是 Vault 的一个子目录，CSS 仍然应该放在 Vault 根目录的 `.obsidian/snippets/`。
 
 完整教程见 [Obsidian 视觉样式](OBSIDIAN-STYLING.md)。
+
+### `obsidian_notes_mapping_invalid`
+
+这表示当前使用 hybrid 配置，但 `<vault_root>/<notes_subdir>` 没有解析到 `notes_root`。先停止采集，不要改写 `notes_root` 去迁就错误的 Vault 路径。
+
+Windows 上检查：
+
+```powershell
+Get-Item '<vault-root>\bilibili' | Format-List FullName,LinkType,Target
+```
+
+正确状态应为 `LinkType = Junction`，`Target` 指向 `<repo-root>\notes\bilibili`。如果 Vault 中仍是普通目录且有历史笔记，先复制到项目 `notes/bilibili` 并校验文件数量/哈希，再把原目录替换成 Junction；不要直接删除未校验的数据。修复后重新运行 `onboarding`，确认 `obsidian_notes_mapping = OK`。
 
 ---
 

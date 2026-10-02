@@ -5,7 +5,7 @@ description: Use in a supported local Agent host to turn a Bilibili copied link,
 
 # B站视频转笔记
 
-这是本项目唯一需要人工维护的 Skill 流程真源。宿主安装目录和 ZIP 由 `scripts/build_agent_skill_packages.py` 生成；不要在 ChatGPT、Codex、Hermes 或 WorkBuddy 的生成副本中维护第二套流程。
+这是本项目唯一需要人工维护、也是 Codex / Hermes / WorkBuddy 共同通过目录链接安装的本地 Skill 真源。不要为本地宿主维护或生成第二套 `SKILL.md`；ChatGPT Web 的独立 ZIP 由 `scripts/build_chatgpt_skill.py` 从本目录渲染生成。
 
 ## 运行边界
 
@@ -18,7 +18,7 @@ description: Use in a supported local Agent host to turn a Bilibili copied link,
    python <repo-root>\scripts\run_bili_learning.py <command> [args]
    ```
 
-   如果当前安装出口自带受信任的 host bridge，可以用 bridge 调用同一核心命令；bridge 只解决宿主路径/进程兼容，不得另写业务规则。
+   Codex、Hermes、WorkBuddy 通过目录链接安装本 Skill。宿主需要清除注入的 `PYTHONPATH`、从 Junction 反查项目根目录或提供稳定 cleanup runner 时，可调用 `scripts/local_bridge.ps1` / `scripts/local_bridge.py`；bridge 只解决宿主路径与进程兼容，不得另写业务规则。
 5. 不读取、展示、复述、上传或提交 Cookie 内容；不把 runtime、私人笔记或本机配置复制到远程沙箱。
 
 ## 1. 环境门禁
@@ -31,6 +31,7 @@ python <repo-root>\scripts\run_bili_learning.py onboarding
 
 - `ready`：分别报告 Skill/项目访问与运行环境状态；仅验收任务到此结束，生成任务继续。
 - `action_required`：停止采集，只处理返回的 `actions / warnings`，配置后重跑。
+- `obsidian_notes_mapping_invalid`：hybrid 模式下 Vault 子目录没有正确映射到 `notes_root`；先修复 Junction，禁止继续采集。
 - CSS 缺失是非阻塞警告，不静默复制或覆盖。
 - 仅分析、解释或维护仓库源码时，不强制运行 onboarding。
 
@@ -62,6 +63,7 @@ ASR 回流必须使用真实纯文本；不得把纯文本伪造成 SRT，也不
 - 不修改程序生成的 Frontmatter、标题元信息、播放器、来源/资源区、路径或 marker；
 - 只使用当前 Job 允许的来源支撑具体事实；来源不足时停止，不用模型常识补参数、资源或结论；
 - 不手工创建、删除或修补 Job、reservation、锁或正式笔记来绕过 lifecycle；
+- 所有正式笔记路径以 Settings / Job 返回的 `notes_root` 为准；推荐真实文件保存在项目内 Git-ignored `notes/bilibili`，Obsidian Vault 只通过 Junction 映射到它，不要反向链接项目目录到工作区外；
 - 保留与当前任务无关的用户修改。
 
 ## 4. 发布
