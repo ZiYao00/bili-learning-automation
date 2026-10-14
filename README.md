@@ -47,143 +47,34 @@ B站链接 / BV号
 
 ---
 
-## 2. 使用前准备
+## 2. 运行条件
 
-普通 Windows 用户需要：
+本项目面向 Windows 10/11 x64，以 **Agent 代替普通用户完成安装**。运行需要 Python 3.10+、Obsidian Vault、有效的 Bilibili Netscape Cookie 文件，以及至少一种能操作本地项目的 Agent（Codex、Hermes、WorkBuddy 或具备本地桥接的 ChatGPT）。
 
-| 需要 | 用途 |
-| --- | --- |
-| Python 3.10+ | 运行核心脚本 |
-| yt-dlp | 获取字幕、简介和元数据 |
-| Bilibili Cookie 文件 | 提供已登录 Bilibili 的会话凭据；当前正常采集必需 |
-| Obsidian Vault | 保存生成的学习笔记 |
-| ChatGPT / Codex / Hermes / WorkBuddy | 读取来源材料并整理正文；ChatGPT 需连接本地工作区桥接 |
+仓库自带官方单文件 `tools/yt-dlp.exe`，只调用该固定路径；无需安装 yt-dlp 源码、运行 `winget` 或配置系统 PATH。当前随仓库固定版本与校验值记录于 `tools/yt-dlp.release.json`。默认字幕优先，调用 `yt-dlp --skip-download`，不会下载视频或音频。
 
-项目不会内置或自动安装 `yt-dlp.exe`。Windows 可使用：
+`local-ASR-service` 是**可选的独立服务**，不是基础安装项。只有默认入口发现无可用字幕且用户明确同意 ASR 后才会调用。使用说明见 [配置手册](docs/CONFIGURATION.md)。
 
-```powershell
-winget install yt-dlp
-```
+## 3. 安装：直接交给 Agent
 
-Cookie 是账号凭据。项目需要 **Mozilla / Netscape 格式的完整 `cookies.txt` 文件**，不是只复制 `SESSDATA`。项目只接收 Cookie **文件路径**，不要把 Cookie 内容写入 README、Issue、PR、日志或 Agent 对话。第一次不知道怎样获取时，直接阅读 [Bilibili Cookie 获取与安全配置](docs/BILIBILI-COOKIE.md)。
-
----
-
-## 3. 第一次安装
-
-完整步骤见：[新手快速上手](docs/QUICKSTART.md)。
-
-最基本的安装过程如下。
-
-### 3.1 克隆项目
-
-```powershell
-git clone https://github.com/ZiYao00/bili-learning-automation.git
-cd bili-learning-automation
-```
-
-### 3.2 本机配置
-
-普通用户可以直接让 Agent 在 onboarding 时补齐缺失配置，不必先手工编辑 JSON。如果希望自己维护本机配置，可复制模板：
-
-```powershell
-Copy-Item .\config\local.json.example .\config\local.json
-```
-
-示例：
-
-```json
-{
-  "notes_root": "notes/bilibili",
-  "vault_root": "D:\\Notes\\MyVault",
-  "notes_subdir": "bilibili",
-  "cookie_file": "key/bilibili_cookies.txt",
-  "workflow_mode": "light"
-}
-```
-
-其中：
-
-- `notes_root`：真实笔记存储目录；推荐放在项目内的 `notes/bilibili`，该目录被 Git 忽略，便于本地 Agent / CodexPro 直接读写；
-- `vault_root`：直接包含 `.obsidian` 的 Obsidian Vault 根目录；
-- `notes_subdir`：Vault 中显示本项目笔记的相对子目录；推荐把 `<vault_root>/<notes_subdir>` 做成 Junction，目标指向 `<repo-root>/notes/bilibili`；
-- `cookie_file`：Netscape 格式 Bilibili Cookie 文件路径；默认可放在被 Git 忽略的 `key/`；
-- `workflow_mode`：默认使用 `light`。
-
-推荐的数据方向是“**Vault → 项目 notes**”：真实 Markdown 存在项目内，Obsidian 通过 Junction 查看同一批文件。不要反过来把项目 `notes/bilibili` Junction 到工作区外，否则本地 Agent 可能拿到工作区外路径。
-
-`config/local.json`、`notes/**`、`key/*` 与 `.runtime/` 都是本机数据，不进入公开 Git；仅 `notes/.gitkeep` 与 `key/.gitkeep` 用于保留目录结构。
-
-更完整的字段、Junction 检查和优先级见：[配置手册](docs/CONFIGURATION.md)。
-
-### 3.3 准备 Bilibili Cookie
-
-第一次使用时，先在浏览器正常登录 Bilibili，再导出 **Netscape `cookies.txt`**。不要只从 F12 里复制 `SESSDATA`；`yt-dlp --cookies` 需要完整 Cookie 文件。
-
-普通用户建议使用可信、支持 Netscape 格式的浏览器导出工具，尽量只导出 `bilibili.com` 当前站点，然后保存为例如：
+不提供双击安装向导。用户只需要把项目地址和安装请求发给已授权的本地 Agent：
 
 ```text
-bilibili_cookies.txt
+请帮我安装并验收 bili-learning-automation：
+https://github.com/ZiYao00/bili-learning-automation
+
+请先阅读项目 AGENTS.md、docs/QUICKSTART.md 和 docs/LOCAL-AGENT-INSTALL.md。
+由你检测环境、配置本地路径、安装需要的 Skill 并运行 onboarding。
+不要让我手工编辑 JSON 或执行命令。
+操作现有 Vault 目录、用户级 Skill 目录之前先检查是否冲突，得到授权后再修改。
+只接受 Cookie 文件路径，不索取 Cookie 内容；不要覆盖旧笔记或已有目录。
 ```
 
-可以放在项目的 `key/bilibili_cookies.txt`，也可以放在项目外的私密目录，再把路径配置到 `cookie_file`。Cookie 内容不要发送给 Agent；Agent 只需要文件路径。
+Agent 负责下载或更新项目、使用 `scripts/install_agent_skill.ps1` 规划/安装 Codex、Hermes、WorkBuddy 的 Junction，使用 `configure-obsidian` / `configure-cookie` 保存本机配置，并通过 `scripts/ensure_junction.ps1` 安全建立 Obsidian Vault → 项目 notes 的映射。**只有 onboarding 返回 `ready` 且所选 Skill 可用，才算安装完成。**
 
-完整教程，包括浏览器导出方式、格式判断、yt-dlp `--cookies-from-browser` 的安全注意事项、Windows `Failed to decrypt with DPAPI` 和 Cookie 失效处理，见：**[Bilibili Cookie 获取与安全配置](docs/BILIBILI-COOKIE.md)**。
+ChatGPT Web 需要独立 Skill ZIP 及已授权的本地工作区桥接；普通 Python 核心本身不能代替 ChatGPT 平台上的 Skill 安装和授权。
 
-### 3.4 首次环境检查
-
-接入 ChatGPT / Codex / Hermes / WorkBuddy 后，Agent 应在第一次正式采集前自动执行 onboarding，只向用户询问无法自动确定的缺失项。ChatGPT 需要先连接本地工作区桥接。统一手动入口为：
-
-```powershell
-python .\scripts\run_bili_learning.py onboarding
-```
-
-`action_required` 会返回需要处理的 Vault、Cookie、yt-dlp 等配置；CSS 缺失只作为非阻塞提醒。完整诊断可运行：
-
-```powershell
-python .\scripts\run_bili_learning.py doctor
-```
-
-Doctor 会检查：
-
-- Python；
-- yt-dlp；
-- Cookie 文件是否存在；
-- Obsidian Vault；
-- CSS；
-- taxonomy；
-- notes / runtime 写权限；
-- 项目关键文件。
-
-Doctor **不会读取 Cookie 内容，也不会访问 Bilibili**。
-
-### 3.5 安装 Obsidian 样式
-
-本项目使用共享 [Obsidian Learning Snippets](https://github.com/ZiYao00/obsidian-learning-snippets)。
-
-需要把：
-
-```text
-learning-lab.css
-video-note.css
-```
-
-放入当前 Vault 的：
-
-```text
-.obsidian/snippets/
-```
-
-然后在 Obsidian 的“设置 → 外观 → CSS 代码片段”中启用两项。
-
-详细步骤见：[Obsidian 样式教程](docs/OBSIDIAN-STYLING.md)。
-
-### 3.6 安装或选择 Agent
-
-| Agent | 使用方式 | 教程 |
-| --- | --- | --- |
-| ChatGPT Work | 通过本地工作区桥接访问项目并生成笔记 | [ChatGPT Skill 安装教程](docs/CHATGPT-SKILL-INSTALL.md) |
-| Codex / Hermes / WorkBuddy | 通过 Junction 直接安装同一个 canonical Skill | [本地 Agent Skill 安装](docs/LOCAL-AGENT-INSTALL.md) |
+详细步骤和非破坏式恢复：[Agent 安装快速上手](docs/QUICKSTART.md) · [本地 Agent 安装](docs/LOCAL-AGENT-INSTALL.md) · [ChatGPT 安装](docs/CHATGPT-SKILL-INSTALL.md)。
 
 ---
 

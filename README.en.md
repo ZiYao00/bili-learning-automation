@@ -49,108 +49,19 @@ If those materials are too incomplete to support a reliable note, the Agent may 
 
 ## 2. Requirements
 
-A normal Windows setup needs:
+Windows 10/11 x64, Python 3.10+, an Obsidian vault, a private Netscape-format Bilibili cookie file, and at least one local-capable agent (Codex, Hermes, WorkBuddy, or ChatGPT with an authorized local workspace bridge).
 
-| Requirement | Purpose |
-| --- | --- |
-| Python 3.10+ | Runs the core scripts |
-| yt-dlp | Collects subtitles, description, and metadata |
-| Bilibili Cookie file | Provides an authenticated Bilibili browser session; required by the normal collection flow |
-| Obsidian Vault | Stores generated learning notes |
-| ChatGPT / Codex / Hermes / WorkBuddy | Reads source materials and writes the learning content; ChatGPT requires a local workspace bridge |
+The repository bundles the **official standalone `tools/yt-dlp.exe`**; all runtime calls use that fixed path exclusively. No yt-dlp source installation, global PATH search, or `winget` install is needed. Release provenance and SHA-256 are recorded in `tools/yt-dlp.release.json`. Subtitle-first collection uses `--skip-download` and does not download media.
 
-The repository does not bundle or auto-install `yt-dlp.exe`.
+`local-ASR-service` is an **optional, independent** tool. It is never installed or started by this project and is only used after explicit user authorization for ASR.
 
-```powershell
-winget install yt-dlp
-```
+## 3. Installation: ask your agent
 
-Cookie files are credentials. The project expects a complete Mozilla/Netscape `cookies.txt` file, not a single `SESSDATA` value. Configure a **file path**; do not paste Cookie contents into README files, issues, pull requests, logs, or Agent conversations. The detailed beginner guide is [Bilibili Cookie setup](docs/BILIBILI-COOKIE.md) (Chinese).
+There is no double-click installer. Ask an authorized local agent to read `AGENTS.md`, `docs/QUICKSTART.md`, and `docs/LOCAL-AGENT-INSTALL.md`, then check prerequisites, install the canonical Skill, configure Obsidian and the cookie-file path, and confirm the structured `onboarding` result. Existing directories and links must not be overwritten without authorization.
 
----
+The included PowerShell helpers (`scripts/install_agent_skill.ps1`, `scripts/ensure_junction.ps1`) **only plan by default**. The agent must secure permission for the specific external location before invoking `-Apply`. ChatGPT Web also requires a separate Skill ZIP and a permitted local-workspace bridge.
 
-## 3. First installation
-
-See [Quick Start](docs/QUICKSTART.md) for the full tutorial.
-
-### 3.1 Clone
-
-```powershell
-git clone https://github.com/ZiYao00/bili-learning-automation.git
-cd bili-learning-automation
-```
-
-### 3.2 Machine-local configuration
-
-Normal users can let the Agent fill missing values during onboarding. If you prefer to maintain the local configuration manually, copy the template:
-
-```powershell
-Copy-Item .\config\local.json.example .\config\local.json
-```
-
-Example:
-
-```json
-{
-  "notes_root": "notes/bilibili",
-  "vault_root": "D:\\Notes\\MyVault",
-  "notes_subdir": "bilibili",
-  "cookie_file": "key/bilibili_cookies.txt",
-  "workflow_mode": "light"
-}
-```
-
-`notes_root` is the physical note storage location and is recommended to stay inside the repository at `notes/bilibili`, which is ignored by Git so local Agents and CodexPro can access it directly. `vault_root + notes_subdir` describes the Obsidian-visible path; on Windows, point that Vault subdirectory to the project note directory with a Junction. The preferred direction is **Vault → project notes**, not the reverse.
-
-`config/local.json`, `notes/**`, `key/*`, and `.runtime/` are machine-local/private and ignored by Git; only the empty `.gitkeep` placeholders are tracked.
-
-### 3.3 Prepare the Bilibili Cookie file
-
-Log into Bilibili in your browser and export a complete Mozilla/Netscape `cookies.txt` file. Do not copy only `SESSDATA`; yt-dlp expects the full Netscape cookie file. Store it as a private local file and configure only its path.
-
-The detailed beginner tutorial covers browser export, format validation, `--cookies-from-browser` security considerations, Windows `Failed to decrypt with DPAPI`, and cookie renewal: [Bilibili Cookie setup and security](docs/BILIBILI-COOKIE.md) (Chinese).
-
-### 3.4 First-run environment check
-
-After connecting ChatGPT, Codex, Hermes, or WorkBuddy, the Agent should run onboarding before the first real collection and only ask for values that cannot be detected automatically. ChatGPT also requires an authorized local workspace bridge. Use the shared manual entry point:
-
-```powershell
-python .\scripts\run_bili_learning.py onboarding
-```
-
-`action_required` returns only the missing user-facing setup items such as the Vault, Cookie file path, or yt-dlp. Missing CSS is a non-blocking warning. For the full diagnostic report, run:
-
-```powershell
-python .\scripts\run_bili_learning.py doctor
-```
-
-Doctor checks Python, yt-dlp, Cookie-file presence, the Vault, CSS, taxonomy, write permissions, and required project files. It **does not read Cookie contents and does not access Bilibili**.
-
-### 3.5 Install Obsidian styling
-
-The project uses the shared [Obsidian Learning Snippets](https://github.com/ZiYao00/obsidian-learning-snippets) repository.
-
-Install:
-
-```text
-learning-lab.css
-video-note.css
-```
-
-into:
-
-```text
-.obsidian/snippets/
-```
-
-Then enable both snippets in Obsidian.
-
-### 3.6 Choose an Agent entry point
-
-| Agent | Typical use | Documentation |
-| --- | --- | --- |
-| ChatGPT Work | Use the local project through a workspace bridge | [ChatGPT Skill installation](docs/CHATGPT-SKILL-INSTALL.md) |
-| Codex / Hermes / WorkBuddy | Install the same canonical Skill through a Junction | [Local Agent Skill installation](docs/LOCAL-AGENT-INSTALL.md) |
+See the [Agent-first Quick Start](docs/QUICKSTART.md), [Local Agent setup](docs/LOCAL-AGENT-INSTALL.md), and [ChatGPT Skill setup](docs/CHATGPT-SKILL-INSTALL.md). Most detailed operating documentation is maintained in Chinese.
 
 ---
 

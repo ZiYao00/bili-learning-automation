@@ -101,31 +101,24 @@ doctor 不访问 Bilibili，也不读取 Cookie 内容。
 
 ---
 
-## 3. 未找到 yt-dlp
+## 3. 项目内 yt-dlp 缺失或无法运行
 
-常见提示：
+常见代码：`ytdlp_not_configured`、`ytdlp_path_invalid`、`ytdlp_not_executable`。
+
+此项目的唯一执行文件是：
 
 ```text
-ytdlp_not_configured
-ytdlp_path_invalid
-ytdlp_not_executable
+<repo-root>\tools\yt-dlp.exe
 ```
 
-项目不会内置或自动安装 yt-dlp。第一次使用优先让 doctor 自动检测；Windows 如果返回 `ytdlp_not_configured`，先按官方方式安装：
+**不要运行 `winget install yt-dlp`，不要查找系统 PATH，也不要在 `local.json` 配置其它 yt-dlp 路径。** Agent 应检查该文件是否存在、可执行及版本。缺失或校验不符时，只从官方 Release 或可信完整项目副本恢复项目内 EXE，同步 `tools/yt-dlp.release.json` 与第三方许可证，再重新运行 doctor。
 
 ```powershell
-winget install yt-dlp
+& '<repo-root>\tools\yt-dlp.exe' --version
+python .\scripts\run_bili_learning.py doctor --json
 ```
 
-安装后重新运行 doctor。仍然找不到时再检查：
-
-1. 新终端中能否直接运行 `yt-dlp --version`；
-2. 当前 Agent 进程是否继承到更新后的 PATH；
-3. 是否设置了错误的 `BILI_LEARNING_YTDLP`；
-4. `config/local.json` 是否存在错误的自定义 `ytdlp` 路径；
-5. 如果使用自定义目录，文件是否真实存在且可执行。
-
-不要通过把 `yt-dlp.exe` 复制进 Skill 或仓库来解决。配置说明见 [CONFIGURATION.md](CONFIGURATION.md)。
+旧配置的 `ytdlp` 键和 `BILI_LEARNING_YTDLP` 不参与路径解析。Windows EXE 不支持 Linux 运行；Linux CI 仅测试通用 Python 逻辑与受控模拟，不声明跨平台采集可用。
 
 ---
 
@@ -398,7 +391,7 @@ Windows 上检查：
 Get-Item '<vault-root>\bilibili' | Format-List FullName,LinkType,Target
 ```
 
-正确状态应为 `LinkType = Junction`，`Target` 指向 `<repo-root>\notes\bilibili`。如果 Vault 中仍是普通目录且有历史笔记，先复制到项目 `notes/bilibili` 并校验文件数量/哈希，再把原目录替换成 Junction；不要直接删除未校验的数据。修复后重新运行 `onboarding`，确认 `obsidian_notes_mapping = OK`。
+正确状态应为 `LinkType = Junction`，`Target` 指向 `<repo-root>\notes\bilibili`。Agent 应先通过 `scripts/ensure_junction.ps1` 执行只读计划；目标目录如已有笔记，必须停止并报告冲突，**不得自动复制、删除、移动或替换**。数据迁移应作为另一个经用户授权的独立任务，完成备份和校验后才能处理。修复后重新运行 `onboarding`，确认 `obsidian_notes_mapping = OK`。
 
 ---
 

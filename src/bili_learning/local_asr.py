@@ -10,8 +10,7 @@ from typing import Any
 from urllib import error, request
 
 from .config import (
-    YTDLP_INSTALL_URL,
-    YTDLP_WINDOWS_INSTALL_COMMAND,
+    YTDLP_RELATIVE_PATH,
     DependencyError,
     Settings,
 )
@@ -105,9 +104,7 @@ def _download_audio(settings: Settings, canonical_url: str, temp_dir: Path) -> P
     if ytdlp is None:
         raise DependencyError(
             "ytdlp_not_configured",
-            "未检测到 yt-dlp；项目不会自动安装或内置可执行文件。"
-            f"Windows 推荐先运行 `{YTDLP_WINDOWS_INSTALL_COMMAND}`，安装后重新执行；"
-            f"官方安装说明：{YTDLP_INSTALL_URL}。",
+            f"项目缺少 {YTDLP_RELATIVE_PATH.as_posix()}；ASR 同样只使用项目内 EXE。",
         )
     if not ytdlp.is_file():
         raise DependencyError("ytdlp_path_invalid", f"yt-dlp 路径不存在或不是文件（来源：{settings.ytdlp.source}）。")

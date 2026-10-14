@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
-import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -28,7 +28,6 @@ from bili_learning.config import (
     Settings,
     configure_cookie_file,
     configure_obsidian,
-    configure_ytdlp_path,
     find_ytdlp,
     load_settings,
     validate_taxonomy,
@@ -760,10 +759,11 @@ def test_onboarding_css_warning_does_not_block_ready_state(tmp_path: Path, taxon
     (vault / ".obsidian").mkdir(parents=True)
     cookie = tmp_path / "cookies.txt"
     cookie.write_text("# Netscape HTTP Cookie File\n", encoding="utf-8")
-    ytdlp = tmp_path / "yt-dlp.exe"
+    ytdlp = tmp_path / "tools" / "yt-dlp.exe"
+    ytdlp.parent.mkdir(parents=True)
     ytdlp.write_text("stub", encoding="utf-8")
     (config_dir / "local.json").write_text(
-        json.dumps({"vault_root": str(vault), "notes_subdir": "bilibili", "cookie_file": str(cookie), "ytdlp": str(ytdlp)}),
+        json.dumps({"vault_root": str(vault), "notes_subdir": "bilibili", "cookie_file": str(cookie)}),
         encoding="utf-8",
     )
     monkeypatch.setattr("bili_learning.doctor.subprocess.run", lambda *args, **kwargs: type("Result", (), {"returncode": 0, "stdout": "2026.01.01\n", "stderr": ""})())
@@ -794,7 +794,7 @@ def test_onboarding_ytdlp_version_timeout_stays_ready_without_user_warning(
     assert report["summary"]["yt_dlp"]["status"] == "ready"
 
 
-def test_configure_cookie_and_ytdlp_preserve_existing_local_values(tmp_path: Path, taxonomy: dict) -> None:
+def test_configure_cookie_preserves_existing_local_values(tmp_path: Path, taxonomy: dict) -> None:
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     (config_dir / "bilibili-note-taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
@@ -806,18 +806,13 @@ def test_configure_cookie_and_ytdlp_preserve_existing_local_values(tmp_path: Pat
     )
     cookie = tmp_path / "cookies.txt"
     cookie.write_text("# Netscape HTTP Cookie File\n", encoding="utf-8")
-    ytdlp = tmp_path / "yt-dlp.exe"
-    ytdlp.write_text("stub", encoding="utf-8")
-
     configure_cookie_file(tmp_path, cookie)
-    configure_ytdlp_path(tmp_path, ytdlp)
     saved = json.loads((config_dir / "local.json").read_text(encoding="utf-8"))
 
     assert saved["vault_root"] == str(vault)
     assert saved["notes_subdir"] == "bilibili"
     assert saved["workflow_mode"] == "strict"
     assert saved["cookie_file"] == str(cookie.resolve())
-    assert saved["ytdlp"] == str(ytdlp.resolve())
 
 
 def _complete_ai_regions(text: str) -> str:
@@ -1081,7 +1076,8 @@ def _settings(tmp_path: Path, taxonomy: dict) -> Settings:
     runtime_root = tmp_path / ".runtime" / "bilibili-learning"
     cookie_file = tmp_path / "cookie.txt"
     cookie_file.write_text("placeholder", encoding="utf-8")
-    ytdlp = tmp_path / "yt-dlp"
+    ytdlp = tmp_path / "tools" / "yt-dlp.exe"
+    ytdlp.parent.mkdir(parents=True)
     ytdlp.write_text("placeholder", encoding="utf-8")
     return Settings(
         project_root=tmp_path,
@@ -1101,15 +1097,15 @@ def _settings(tmp_path: Path, taxonomy: dict) -> Settings:
 
 
 def test_doctor_missing_ytdlp_only_reports_install_guidance(tmp_path: Path, taxonomy: dict) -> None:
-    settings = replace(_settings(tmp_path, taxonomy), ytdlp=ExecutableResolution(None, "missing", ("PATH:yt-dlp",)))
+    settings = replace(_settings(tmp_path, taxonomy), ytdlp=ExecutableResolution(None, "missing", ("project:tools/yt-dlp.exe",)))
 
     report = doctor_report(settings)
     check = next(item for item in report["checks"] if item["code"] == "ytdlp_not_configured")
 
     assert check["status"] == "FAIL"
-    assert check["windows_install_command"] == "winget install yt-dlp"
-    assert "不会自动安装" in check["detail"]
-    assert "github.com/yt-dlp/yt-dlp/wiki/Installation" in check["install_url"]
+    assert "tools/yt-dlp.exe" in check["detail"]
+    assert check["expected_path"] == str(tmp_path / "tools" / "yt-dlp.exe")
+    assert check["release_url"].endswith("/releases/latest")
 
 
 def test_create_job_writes_runtime_draft_without_publishing_note(tmp_path: Path, taxonomy: dict) -> None:
@@ -1419,15 +1415,14 @@ def test_prepare_reports_ytdlp_dependency_code_without_auto_install(
     (config_dir / "bilibili-note-taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
     (config_dir / "local.json").write_text(json.dumps({"notes_root": "notes/bilibili"}), encoding="utf-8")
     monkeypatch.delenv("BILI_LEARNING_YTDLP", raising=False)
-    monkeypatch.setattr("bili_learning.config.shutil.which", lambda _name: None)
 
     payload, code = prepare_note(tmp_path, "BV1TXua68EYi", on_existing="rerun")
 
     assert code == 2
     assert payload["status"] == "onboarding_required"
     ytdlp_action = next(action for action in payload["actions"] if action["code"] == "ytdlp_required")
-    assert ytdlp_action["recommended_command"] == "winget install yt-dlp"
-    assert "不会自动安装" in ytdlp_action["message"]
+    assert ytdlp_action["expected_path"] == str(tmp_path / "tools" / "yt-dlp.exe")
+    assert "不使用系统 PATH" in ytdlp_action["message"]
 
 
 def test_prepare_in_progress_returns_bound_job_dir(tmp_path: Path, taxonomy: dict) -> None:
@@ -1504,9 +1499,16 @@ def _write_e2e_config(project_root: Path, taxonomy: dict) -> None:
 
     cookie = project_root / "cookies.txt"
     cookie.write_text("# Netscape HTTP Cookie File\n", encoding="utf-8")
-    ytdlp = Path(sys.executable)
+    ytdlp = project_root / "tools" / "yt-dlp.exe"
+    ytdlp.parent.mkdir(parents=True, exist_ok=True)
+    if os.name == "nt":
+        shutil.copy2(Path(__file__).resolve().parents[1] / "tools" / "yt-dlp.exe", ytdlp)
+    else:
+        # Tests simulate the package contract; no Windows binary execution in Linux CI.
+        ytdlp.write_text("#!/bin/sh\necho 2026.08.19\n", encoding="utf-8")
+        ytdlp.chmod(0o755)
     (config_dir / "local.json").write_text(
-        json.dumps({"notes_root": "notes/bilibili", "cookie_file": str(cookie), "ytdlp": str(ytdlp)}),
+        json.dumps({"notes_root": "notes/bilibili", "cookie_file": str(cookie)}),
         encoding="utf-8",
     )
 
@@ -2390,17 +2392,19 @@ def test_select_subtitle_only_accepts_supported_srt_languages(tmp_path: Path) ->
     assert select_subtitle(tmp_path) == tmp_path / "video.ai-zh.srt"
 
 
-def test_ytdlp_resolution_prefers_environment_then_local_then_path(
+def test_ytdlp_resolution_uses_only_repository_exe(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("BILI_LEARNING_YTDLP", "C:/configured/yt-dlp.exe")
-    assert find_ytdlp(tmp_path, {"ytdlp": "local/yt-dlp"}).source == "environment"
-    monkeypatch.delenv("BILI_LEARNING_YTDLP")
-    local = find_ytdlp(tmp_path, {"ytdlp": "local/yt-dlp"})
-    assert local.source == "local_config"
-    assert local.path == tmp_path / "local" / "yt-dlp"
-    monkeypatch.setattr("bili_learning.config.shutil.which", lambda _: "C:/PATH/yt-dlp.exe")
-    assert find_ytdlp(tmp_path, {}).source == "path"
+    missing = find_ytdlp(tmp_path, {"ytdlp": "local/yt-dlp"})
+    assert missing.path is None and missing.source == "missing"
+    exe = tmp_path / "tools" / "yt-dlp.exe"
+    exe.parent.mkdir(parents=True)
+    exe.write_bytes(b"exe-stub")
+    configured = find_ytdlp(tmp_path, {"ytdlp": "local/yt-dlp"})
+    assert configured.source == "project"
+    assert configured.path == exe
+    assert configured.checked_sources == ("project:tools/yt-dlp.exe",)
 
 
 def test_load_settings_reads_ignored_local_config(tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -2409,10 +2413,9 @@ def test_load_settings_reads_ignored_local_config(tmp_path: Path, taxonomy: dict
     (config_dir / "bilibili-note-taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
     (config_dir / "local.json").write_text(json.dumps({"ytdlp": "tools/yt-dlp.exe"}), encoding="utf-8")
     monkeypatch.delenv("BILI_LEARNING_YTDLP", raising=False)
-    monkeypatch.setattr("bili_learning.config.shutil.which", lambda _: None)
     settings = load_settings(tmp_path)
-    assert settings.ytdlp.source == "local_config"
-    assert settings.ytdlp.path == tmp_path / "tools" / "yt-dlp.exe"
+    assert settings.ytdlp.source == "missing"
+    assert settings.ytdlp.path is None
 
 
 def test_doctor_reports_ytdlp_source_and_version(tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch) -> None:

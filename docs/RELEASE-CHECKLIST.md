@@ -17,7 +17,7 @@ A release candidate is ready when all applicable checks below are true:
 - [x] Finalizer is the only successful publication gate.
 - [x] New notes do not overwrite existing notes with the same title.
 - [x] Obsidian storage supports the recommended hybrid topology: physical `notes_root` in Git-ignored project storage plus a Vault Junction mapping, while repository fallback remains protected.
-- [x] yt-dlp is detected rather than silently bundled or installed.
+- [x] Windows x64 project bundles only official single-file `tools/yt-dlp.exe`; collector and ASR use that path exclusively (no PATH / env / local override). SHA-256, release provenance, and bundled third-party licenses are tracked in `tools/`.
 - [x] Cookie contents are excluded from logs, notes, examples, and Git by design.
 - [x] ChatGPT, Codex, Hermes, and WorkBuddy share the same core workflow and content rules.
 - [x] Chinese README and beginner documentation are present.
@@ -27,10 +27,12 @@ A release candidate is ready when all applicable checks below are true:
 - [x] Public pytest suite passes.
 - [x] Source, shared launchers, and canonical Skill bridge scripts compile successfully.
 - [x] `skill/bili-learning-automation/SKILL.md` is the single maintained local Skill source; Codex/Hermes/WorkBuddy use user-level Junctions to that directory, and `build_chatgpt_skill.py --check` validates the only distributable Skill ZIP. The ChatGPT archive contains only the generated Skill metadata and approved documentation reference snapshot, with no local credentials or machine configuration.
-- [x] Fresh-install / clean-room walkthrough rerun after the 2026-08-22 dense-note extraction and compact-template corrections; see `docs/reports/2026-08-23-v1.0-cleanroom-acceptance.md`.
+- [x] Historical clean-room walkthrough completed in August 2026; see `docs/reports/2026-08-23-v1.0-cleanroom-acceptance.md`.
+- [ ] Repeat clean-room **Agent-led** installation on a fresh Windows 10/11 x64 environment, including authorized Junction linking, cookie-path setup and no-overwrite conflict cases.
+- [ ] Confirm Linux CI uses deterministic fake executable tests rather than treating the Windows EXE as Linux-supported.
 - [ ] `pyproject.toml` version matches the intended release version before tagging.
 - [ ] Changelog contains the final release entry/date for that version.
-- [x] Final diff review confirms no local credentials, private notes, runtime jobs, captured test materials, or machine-specific configuration are staged.
+- [ ] For the next release commit, review full staged paths and verify no local credentials, private notes, runtime jobs, captured materials, or machine-specific configuration are staged. Current read-only review is not a staged release gate.
 - [x] Public tracked documentation contains no maintainer-specific absolute paths, Vault/backup locations, private identifiers, or machine-only examples; generic placeholders are used instead.
 - [ ] Git author/committer identity for the release commit uses an email address the maintainer intentionally wants to expose publicly (for privacy, prefer a GitHub `noreply` address when appropriate).
 - [x] Older public commits that contained an unintended private email were separately reviewed and rewritten before this release candidate; the public refs were revalidated before promotion.
@@ -45,15 +47,15 @@ The final manual acceptance test should simulate a new user rather than an exper
 
 Use a fresh clone or otherwise isolated checkout and verify only the documented path:
 
-1. Clone the repository.
-2. Confirm `config/local.json` does not already exist.
-3. Follow `docs/QUICKSTART.md` without relying on remembered local setup.
-4. Copy `config/local.json.example` to `config/local.json`; configure a Git-ignored `notes_root`, test Vault/Cookie path, and create the Vault → `notes_root` Junction when testing the recommended hybrid topology.
-5. Run doctor/onboarding before doing a real collection and confirm `obsidian_notes_mapping` is OK in hybrid mode.
-6. Confirm missing yt-dlp produces installation guidance rather than an automatic install attempt.
-7. Confirm an unconfigured note/Vault location returns `configuration_required` and does not start collection; a broken hybrid Junction must return `obsidian_notes_mapping_invalid`.
-8. Install/enable both Obsidian CSS snippets and confirm doctor recognizes them.
-9. Install one supported agent entry point using its documented instructions.
+1. With an authorized Agent, clone or download the repository in a fresh Windows 10/11 x64 environment.
+2. Confirm `config/local.json` does not already exist; never import the maintainer's private config.
+3. The Agent follows `docs/QUICKSTART.md` without remembered local settings or manual JSON edits by the novice user.
+4. Confirm project `tools/yt-dlp.exe --version` runs, version and SHA-256 match `tools/yt-dlp.release.json`, and no global executable lookup occurs.
+5. Agent configures the Vault and Cookie **file path** using shared CLI. New hybrid installations must create workspace notes root safely and plan Vault → notes Junction; only apply after external target permission.
+6. Verify `scripts/ensure_junction.ps1` returns `planned` on read-only inspection, `installed` on permitted creation, `already_installed` on a repeat, and `conflict` on an occupied unrelated target; never remove existing data.
+7. Run doctor/onboarding before any real collection; missing EXE, Vault, Cookie or broken hybrid mapping must report structured actions without collecting media.
+8. Confirm missing CSS is a non-blocking warning; only copy from its upstream project with permission.
+9. Agent installs only one selected host Skill through `scripts/install_agent_skill.ps1` plan/apply; confirm the host can read canonical SKILL.md. ChatGPT Web requires separate ZIP and authorized workspace bridge.
 10. Convert one normal Bilibili video with usable Chinese subtitles.
 11. Confirm the note lands in `00-待整理` and the original video title is preserved as the filename.
 12. Convert the same video again after the first job is complete and confirm the existing note is not overwritten.

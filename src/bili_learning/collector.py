@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from .config import YTDLP_INSTALL_URL, YTDLP_WINDOWS_INSTALL_COMMAND, DependencyError, Settings
+from .config import YTDLP_RELATIVE_PATH, DependencyError, Settings
 from .note_template import note_filename, write_skeleton
 from .quality import write_analysis_template
 from .resource_access import detect_resource_access_notices
@@ -58,10 +58,7 @@ def run_ytdlp(
     if ytdlp is None:
         raise DependencyError(
             "ytdlp_not_configured",
-            "未检测到 yt-dlp；项目不会自动安装或内置可执行文件。"
-            f"Windows 推荐先运行 `{YTDLP_WINDOWS_INSTALL_COMMAND}`，安装后重新执行；"
-            f"官方安装说明：{YTDLP_INSTALL_URL}。"
-            "只有使用自定义位置时，才需要设置 BILI_LEARNING_YTDLP 或 config/local.json 的 ytdlp。",
+            f"项目缺少 {YTDLP_RELATIVE_PATH.as_posix()}；请由 Agent 恢复项目内官方单文件 EXE，禁止回退系统 yt-dlp。",
         )
     if not ytdlp.is_file():
         raise DependencyError("ytdlp_path_invalid", f"yt-dlp 路径不存在或不是文件（来源：{settings.ytdlp.source}）。")

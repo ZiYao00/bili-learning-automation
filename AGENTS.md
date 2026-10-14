@@ -14,9 +14,16 @@
 安装验收的反馈要明确区分“Skill 已安装”和“运行环境已就绪”。只有安装有效且 onboarding `ready`，才能告诉用户当前可以直接使用。
 
 - `status = ready`：简要报告 Python、yt-dlp、Bilibili Cookie、Obsidian Vault 与 CSS 的就绪状态；不要展示 Cookie 内容。安装 / 验证任务到这里结束，生成笔记任务才继续采集。
-- `status = action_required`：可以说明 Skill 安装成功，但必须明确运行环境尚未就绪；停止采集，只处理返回的 `actions`。Vault 要求用户提供直接包含 `.obsidian` 的根目录；Cookie 只接收 Netscape 文件路径，不读取或复述内容，不知道如何获取时指向 `docs/BILIBILI-COOKIE.md`；yt-dlp 默认自动检测，缺失时说明项目不会自动安装，Windows 推荐 `winget install yt-dlp`，只有自定义安装才询问可执行文件路径。
+- `status = action_required`：可以说明 Skill 安装成功，但必须明确运行环境尚未就绪；停止采集，只处理返回的 `actions`。Vault 要求用户提供直接包含 `.obsidian` 的根目录；Cookie 只接收 Netscape 文件路径，不读取或复述内容，不知道如何获取时指向 `docs/BILIBILI-COOKIE.md`；yt-dlp **只能使用项目内 `tools/yt-dlp.exe`**，缺失时让 Agent 恢复并校验官方单文件 EXE，禁止搜索系统 PATH、运行 winget、改 `local.json.ytdlp` 或静默下载。
 - `warnings` 中的 CSS 缺失不阻塞笔记生成，但首次出现时应告知：共享真源是 `obsidian-learning-snippets`，需要 `learning-lab.css + video-note.css`，程序不会静默复制或覆盖；安装后还要在 Obsidian“设置 → 外观 → CSS 代码片段”中启用。
 - 配置后重新运行 onboarding；只有 `ready` 才进入采集或把环境描述为“可直接使用”。`prepare` 自身也有同一门禁，若返回 `onboarding_required`，按其 `actions / warnings` 处理后重试原链接。
+
+## Agent 主导安装（不提供双击向导）
+
+- 安装/初始化任务先读 `docs/QUICKSTART.md` 与 `docs/LOCAL-AGENT-INSTALL.md`，由具备当前环境权限的 Agent 完成检测、配置、Junction 创建和 onboarding 验收，不要求普通用户执行 PowerShell 或编辑 JSON；不要假设每位用户都有 CodexPro。
+- Windows 本地 Codex/Hermes/WorkBuddy 的 Skill 安装：`scripts/install_agent_skill.ps1 -Agent <Codex|Hermes|WorkBuddy>` 默认只输出计划；确认具体用户级目录写入权限和用户授权后才使用 `-Apply`。Vault → 项目 notes 只使用 `scripts/ensure_junction.ps1` 进行有保护的计划/安装。
+- `planned` 不等于安装成功；`conflict` 时停止，禁止自动删除或迁移现有目录/笔记/Skill。新用户通过 `configure-obsidian` 建立推荐 Hybrid 配置，旧 direct-vault 不做静默迁移。ChatGPT Web 的 Skill ZIP 和本地连接须按其平台权限单独安装/授权。
+- `local-ASR-service` 是独立可选服务，不进入首次安装，不复制/安装/启动它的源码和模型；只在用户明确授权 ASR 后检查并调用。
 
 ## 先选择来源，再读取任务模式
 

@@ -55,6 +55,8 @@ ZIP 是生成物，不是规则真源。
 
 ## 3. 本机数据拓扑
 
+基础依赖固定为 `tools/yt-dlp.exe`，不再按 PATH / 环境变量 / 旧 `local.json.ytdlp` 解析其它可执行文件；完整来源、SHA-256 与第三方许可证分别位于 `tools/yt-dlp.release.json`、`tools/YT-DLP-LICENSE.txt` 和 `tools/THIRD_PARTY_LICENSES.txt`。`local-ASR-service` 是独立可选依赖，不随本项目安装。
+
 推荐并在维护者机器上使用的模式：
 
 ```text
@@ -107,7 +109,7 @@ notes_subdir  = Vault 中映射本项目笔记的相对子目录
 bili-learning-automation
 ```
 
-推荐用户级安装位置见 `docs/LOCAL-AGENT-INSTALL.md`。
+推荐用户级安装位置见 `docs/LOCAL-AGENT-INSTALL.md`。安装任务由 Agent 主导，先调用 `scripts/install_agent_skill.ps1 -Agent <Codex|Hermes|WorkBuddy>` 做只读计划，经明确的用户目录写入许可后才 `-Apply`；Obsidian Junction 同样用 `scripts/ensure_junction.ps1` 计划/应用。现有路径冲突不得自动删除或迁移。
 
 不要恢复以下旧架构：
 

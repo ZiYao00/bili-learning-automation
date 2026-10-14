@@ -38,6 +38,8 @@ python .\scripts\build_chatgpt_skill.py --check
 
 ## 稳定入口
 
+安装支持：`scripts/install_agent_skill.ps1`（预定义 Codex/Hermes/WorkBuddy 的用户级 Junction）和 `scripts/ensure_junction.ps1`（授权后安全建立任意已核对的 Junction）默认只做只读计划，`-Apply` 必须针对明确授权的外部路径。禁止新增双击向导或另一套配置解析器。固定使用 `tools/yt-dlp.exe`，其源码、PATH 及旧自定义路径不可回退；更新文件必须同步官方 SHA-256、许可证和跨平台测试说明。
+
 所有宿主共用 `scripts/run_bili_learning.py` 与 `src/bili_learning`。本地 Agent 需要从 Junction 安装目录进入项目、清除宿主注入的 `PYTHONPATH` 或提供稳定 cleanup runner 时，使用 canonical Skill 内的 `scripts/local_bridge.py` / `.ps1`。不要再新增按宿主或按子命令复制的 wrapper。
 
 ## Obsidian 样式维护

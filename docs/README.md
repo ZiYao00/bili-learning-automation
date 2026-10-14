@@ -1,12 +1,12 @@
 # 文档中心
 
-第一次使用从 [新手快速上手](QUICKSTART.md) 开始。按任务选择文档，不需要从头通读整个 `docs/`。
+首次安装先看 [Agent 安装快速上手](QUICKSTART.md)：**由 Agent 执行安装、配置和验收，不提供双击安装向导，也不要求普通用户编辑 JSON**。其它文档按任务读取，不必通读整个 `docs/`。
 
 ## 安装与首次使用
 
 | 任务 | 文档 |
 | --- | --- |
-| 从零配置项目并生成第一篇笔记 | [QUICKSTART.md](QUICKSTART.md) |
+| 让 Agent 从零安装项目并生成第一篇笔记 | [QUICKSTART.md](QUICKSTART.md) |
 | 获取、保存、更新 Bilibili Cookie | [BILIBILI-COOKIE.md](BILIBILI-COOKIE.md) |
 | 安装 Codex / Hermes / WorkBuddy | [LOCAL-AGENT-INSTALL.md](LOCAL-AGENT-INSTALL.md) |
 | 安装 ChatGPT Web Skill | [CHATGPT-SKILL-INSTALL.md](CHATGPT-SKILL-INSTALL.md) |

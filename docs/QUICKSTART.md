@@ -1,496 +1,114 @@
-# 新手快速上手
+# 快速上手：由 Agent 完成安装
 
-> 文档类型：**操作教程**。适合第一次安装和第一次生成笔记。
+> 面向 Windows 10/11 x64。本项目不提供双击安装向导；**普通用户只向 Agent 描述目标、提供必要路径和授权，不手工执行安装命令。** 以下命令是给 Agent 的操作参考。
 
-这份文档只解决“怎样从零跑通一次”的问题。内部架构、完整配置字段和开发细节分别放在其它说明文档中。
+## 1. 用户只需要说什么
 
-完成本教程后，应能够跑通：
+在能够访问本地工作区的 Codex、Hermes、WorkBuddy 或 ChatGPT（需本地桥接）中发送：
 
 ```text
-发送 B站链接 / BV号
-→ 按当前消息明确意图选择字幕 / ASR / 纯简介资源来源
-→ 智能体按标准 Job 整理笔记
-→ 写入 Obsidian
+请安装并验证 bili-learning-automation：
+https://github.com/ZiYao00/bili-learning-automation
+
+请阅读 AGENTS.md、docs/QUICKSTART.md 和 docs/LOCAL-AGENT-INSTALL.md，
+检查 Python、项目内 tools/yt-dlp.exe、Obsidian 和 Cookie 文件路径，
+按需安装我正在使用的 Agent Skill，配置并验证 Junction，
+最后运行 onboarding，汇报已就绪项和未完成项。
+你负责执行，不让我手工修改配置。不要覆盖任何已有笔记、目录或 Skill。
+需要写入我的 Vault / 用户级 Skill 目录时，先说明位置并取得授权。
+Cookie 只使用本地文件路径，不读取或发送内容。
 ```
 
-默认流程字幕优先且**不会下载视频或音频**。只有用户明确要求 ASR 才下载临时音轨转写；只有当前消息明确要求“纯资源分享 / 只整理简介 / 不用字幕”才跳过字幕请求。三个入口共用同一 Job lifecycle。
+如果尚未下载项目，Agent 可以在获得项目工作区创建权限后自行克隆或获取源码。安装前不假设本机有 CodexPro；任何能执行相同操作且已获授权的本地 Agent 均可使用。远程 ChatGPT 沙箱不能直接读取本机 Windows 磁盘路径。
 
-### 可选：部署 `local-ASR-service`
+## 2. Agent 的安装顺序
 
-`local-ASR-service` 是本项目推荐的**可选本地转写服务**，适合经常处理“已确认没有可提取字幕”的视频。它不是首次安装的必需依赖，也不会被 collector 自动调用或自动下载媒体。
+1. **识别项目根**：确认 `AGENTS.md`、`pyproject.toml`、`scripts/run_bili_learning.py`、`config/bilibili-note-taxonomy.json` 全部存在；只操作已授权路径。
+2. **检查基础运行环境**：Python 3.10+；`tools/yt-dlp.exe` 存在，且直接执行 `--version` 成功。只使用项目内 EXE，不查找系统 PATH、不安装 yt-dlp 源码。
+3. **检查配置**：运行 `python scripts/run_bili_learning.py onboarding`；根据 `actions` 补齐缺失项，不能仅凭文件存在就宣布成功。
+4. **安装所选本地 Agent Skill**：通过下文的安全辅助脚本先计划、再按授权应用。Codex/Hermes/WorkBuddy 共享同一 canonical Skill；不复制多套 `SKILL.md`。
+5. **绑定 Obsidian**：确认真实 Vault 根目录包含 `.obsidian`；让核心写入配置，然后建立并验证 Vault → 项目 notes 的 Junction。
+6. **配置 Cookie**：用户自己通过可信方式取得 Netscape `cookies.txt`，Agent 只接收路径、检查文件存在，绝不读取或打印凭据。
+7. **复验**：运行 `onboarding`；只有返回 `ready` 且 Skill 安装有效，才向用户报告可直接转换视频。
 
-可在本项目首次配置后，按 [local-ASR-service](https://github.com/ZiYao00/local-ASR-service) 的说明预先部署到本机；但只有用户明确要求继续 ASR 时，才用它取得纯文本 transcript，并通过现有入口交回本项目：
+### 2.1 本地 Agent Skill 安装（Agent 执行）
+
+以下命令 **默认只做只读计划，不修改用户目录**：
 
 ```powershell
-bili-learning prepare-transcript "https://www.bilibili.com/video/BV..." --transcript "C:\path\to\transcript.txt"
+.\scripts\install_agent_skill.ps1 -Agent Codex
+.\scripts\install_agent_skill.ps1 -Agent Hermes
+.\scripts\install_agent_skill.ps1 -Agent WorkBuddy
 ```
 
-不要把服务部署、音频下载或 ASR 调用加入默认字幕优先链路。项目只接收真实纯文本，继续沿用统一 Job、handoff 与 finalizer 流程。
-
----
-
-## 1. 使用前需要准备什么
-
-Windows 用户准备下面几项即可：
-
-| 需要 | 用途 | 是否必须 |
-| --- | --- | --- |
-| Python 3.10+ | 运行核心脚本 | 是 |
-| yt-dlp | 获取视频元数据、简介、字幕 | 是 |
-| Bilibili Cookie 文件 | 提供已登录 Bilibili 的会话凭据，用于字幕 / 元数据访问 | **是** |
-| Obsidian Vault | 保存学习笔记；Vault 根目录需直接包含 `.obsidian` | 是 |
-| ChatGPT / Codex / Hermes / WorkBuddy | 负责阅读来源并写正文；ChatGPT 需本地桥接 | 至少一种 |
-
-> Cookie 是账号凭据。项目只需要 Cookie **文件路径**，不要把 Cookie 内容写进 README、Issue、聊天记录或 Git。
-
----
-
-## 2. 下载项目
+只针对用户实际使用的 Agent 执行。取得相应**用户级 Skill 目录**的明确写入许可后，再调用：
 
 ```powershell
-git clone https://github.com/ZiYao00/bili-learning-automation.git
-cd bili-learning-automation
+.\scripts\install_agent_skill.ps1 -Agent Codex -Apply
 ```
 
-如果只是通过 Hermes / WorkBuddy 使用，核心运行时没有第三方 Python 包依赖；如果还要开发、运行测试，建议创建项目虚拟环境：
+其它宿主替换 `-Agent` 值即可。现有正确 Junction 会返回 `already_installed`；目标已有普通目录、静态副本或指向其他位置时返回 `conflict`，**不得删除或自动替换**。细节见 [本地 Agent 安装](LOCAL-AGENT-INSTALL.md)。
+
+### 2.2 Obsidian 配置与 Junction（Agent 执行）
+
+确认 Vault 路径属于用户已授权范围后：
 
 ```powershell
-py -3 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
+python .\scripts\run_bili_learning.py configure-obsidian --vault '<vault-root>' --notes-subdir 'bilibili'
 ```
 
----
+全新配置自动使用项目内 `notes/bilibili` 作为真实物理存储，不改变已有直接写 Vault 的旧配置模式。由 Agent 从设置和实际路径确定两个**绝对路径**：
 
-## 3. 首次使用：让 Agent 先做环境检查
+```text
+Source = <repo-root>\notes\bilibili
+Target = <vault-root>\bilibili
+```
 
-普通用户不需要先猜路径或逐项编辑配置。ChatGPT、Codex、Hermes 与 WorkBuddy 的入口都应在正式采集前运行统一 onboarding；核心 `prepare` 也有同一门禁，避免某个 Agent 漏掉首次配置。ChatGPT 还必须先连接本地工作区桥接。
+先计划；确认授权和无冲突后才执行：
 
-统一检查会自动判断 Python、yt-dlp、Cookie、Obsidian Vault 和 CSS 状态，只对真正缺失的项目采取动作：
+```powershell
+.\scripts\ensure_junction.ps1 -Source '<source-absolute-path>' -Target '<target-absolute-path>'
+.\scripts\ensure_junction.ps1 -Source '<source-absolute-path>' -Target '<target-absolute-path>' -Apply
+```
 
-- Vault 未配置：询问直接包含 `.obsidian` 的 Vault 根目录；笔记子目录默认 `bilibili`；
-- Cookie 未配置：只询问 Netscape 格式 Cookie **文件路径**，不要在聊天中粘贴 Cookie 内容；
-- yt-dlp 未检测到：项目不会自动安装或复制可执行文件，Windows 默认推荐 `winget install yt-dlp`；只有已经安装在自定义目录时才需要提供可执行文件路径；
-- CSS 缺失：只提醒，不阻塞笔记生成，也不会静默复制或覆盖用户文件。
+如 `Target` 已经有普通文件夹或原有笔记，脚本**不会替换、迁移或删除**；应停止并请用户决定如何处理。真实方向始终是 **Vault 子目录 → 项目内 notes**，不可反向设置。完成后 `onboarding` 必须显示 `obsidian_notes_mapping` 通过。
 
-手动检查可运行：
+### 2.3 Cookie 路径（Agent 执行）
+
+```powershell
+python .\scripts\run_bili_learning.py configure-cookie --file '<private-netscape-cookie-file>'
+```
+
+不要把 Cookie 内容放进聊天、日志、项目配置或 Git。格式和个人安全操作见 [Bilibili Cookie 教程](BILIBILI-COOKIE.md)。Doctor 只确认文件存在，不验证浏览器会话是否过期。
+
+### 2.4 验收（Agent 执行）
 
 ```powershell
 python .\scripts\run_bili_learning.py onboarding
-```
-
-返回 `ready` 后即可正式采集；返回 `action_required` 时按 `actions` 中的缺失项处理，再重新检查。
-
-### Bilibili Cookie：第一次使用必须先准备
-
-如果 onboarding 返回：
-
-```text
-cookie_file_required
-```
-
-说明项目还没有找到可用的 Bilibili Cookie 文件。
-
-Cookie 可以理解为浏览器已经登录 Bilibili 的凭据。本项目需要的是 **Mozilla / Netscape 格式的完整 `cookies.txt` 文件**，不是单独复制一个 `SESSDATA`，也不是 JSON 或浏览器请求头。
-
-最适合普通用户的流程是：
-
-```text
-浏览器正常登录 Bilibili
-→ 打开 bilibili.com
-→ 使用可信、支持 Netscape cookies.txt 的导出工具
-→ 尽量只导出当前 bilibili.com 站点
-→ 保存为 bilibili_cookies.txt
-→ 只把“文件路径”告诉 Agent
-```
-
-`yt-dlp` 官方 FAQ 提到的浏览器导出工具示例包括 Chromium / Chrome 的 `Get cookies.txt LOCALLY` 与 Firefox 的 `cookies.txt`。安装浏览器扩展时务必确认来源和权限；名称相似的旧扩展不一定安全。
-
-导出的文件第一行应该是：
-
-```text
-# Netscape HTTP Cookie File
-```
-
-或：
-
-```text
-# HTTP Cookie File
-```
-
-个人本机最省事的保存位置是：
-
-```text
-<repo-root>\key\bilibili_cookies.txt
-```
-
-`key/` 已被 Git 忽略。也可以放在项目外的私密目录，例如 `D:\Private\bilibili_cookies.txt`，再把这个路径配置给 Agent。
-
-> **不要把真实 Cookie 内容发送给 Agent。** Agent 只需要文件路径。不要把 Cookie 提交到 Git、Issue、PR、日志、截图或公开网盘。
-
-如果不想安装浏览器扩展，yt-dlp 也可以使用 `--cookies-from-browser` 导出，但官方说明这种方式会把该浏览器中**所有网站的 Cookie**写入目标文件，因此生成的文件敏感程度更高，不建议新手把它长期放在项目目录中。
-
-完整的 Cookie 获取、格式检查、`Failed to decrypt with DPAPI` 处理和失效后重新导出说明见：**[Bilibili Cookie 获取与安全配置](BILIBILI-COOKIE.md)**。
-
-### 手工配置方式
-
-如需自行维护配置，最适合普通用户的是 `config/local.json`。`yt-dlp` 不要求预先写死路径：onboarding / doctor 会自动检测，缺失时只给安装指引，不会自动安装。
-
-先复制模板：
-
-```powershell
-Copy-Item .\config\local.json.example .\config\local.json
-```
-
-然后修改成本机路径，例如：
-
-```json
-{
-  "notes_root": "notes/bilibili",
-  "vault_root": "D:\\Notes\\MyVault",
-  "notes_subdir": "bilibili",
-  "cookie_file": "key/bilibili_cookies.txt",
-  "workflow_mode": "light"
-}
-```
-
-几个字段分别表示：
-
-- `notes_root`：真实 Markdown 存储目录；推荐使用项目内 `notes/bilibili`，该目录被 Git 忽略；
-- `vault_root`：Obsidian Vault 根目录，也就是直接包含 `.obsidian` 的目录；
-- `notes_subdir`：Vault 内显示本项目笔记的相对子目录，默认推荐 `bilibili`；
-- `cookie_file`：Netscape 格式 Bilibili Cookie 文件的位置；项目内 `key/` 已被 Git 忽略；
-- `workflow_mode`：默认 `light`，让智能体完整读字幕后直接写笔记，再做一次排版优化；需要严格分阶段审计时改为 `strict`。
-
-推荐 Windows 拓扑是：`<vault_root>/<notes_subdir>` **Junction → `<repo-root>/notes/bilibili`**。真实文件在项目工作区内，Obsidian 通过 Vault 中的链接查看同一批文件。Junction 方向不要反过来。
-
-如果 Vault 中目标目录已经有笔记，不要直接覆盖或删目录；先把数据复制到项目 `notes/bilibili`、核对文件后，再把原 Vault 子目录替换成 Junction。
-
-新目录场景可在 PowerShell 中执行：
-
-```powershell
-$source = (Resolve-Path '.\notes\bilibili').Path
-$target = Join-Path 'D:\Notes\MyVault' 'bilibili'
-New-Item -ItemType Junction -Path $target -Target $source
-```
-
-如果 `$target` 已存在，先检查它是普通目录还是旧 Junction，不要直接覆盖。数据迁移时先比对文件数量 / 哈希，再替换目录项。
-
-`config/local.json` 已被 Git 忽略。配置完成后运行 onboarding；混合模式除 Vault/CSS 外还会检查 `obsidian_notes_mapping`，只有映射为 OK 才继续正式采集。
-
-### yt-dlp 不需要复制进项目
-
-项目不会携带 `yt-dlp.exe`，也不会替用户自动下载安装。首次运行 doctor 时会依次检查环境变量、本机 `local.json` 覆盖和系统 PATH。Windows 如果未检测到 yt-dlp，按官方方式安装即可：
-
-```powershell
-winget install yt-dlp
-```
-
-安装后重新运行 doctor。只有你把 yt-dlp 放在自定义目录、且没有加入 PATH 时，才需要在 `local.json` 增加例如 `"ytdlp": "D:\\Tools\\yt-dlp.exe"`。
-
-如果不想使用 `local.json`，也可以通过环境变量配置，详见 [配置说明](CONFIGURATION.md)。
-
----
-
-## 4. 检查配置是否正确
-
-正式测试前先运行 doctor：
-
-```powershell
-python .\scripts\run_bili_learning.py doctor
-```
-
-如果环境正确，你应该看到 yt-dlp、Cookie、taxonomy、Vault、notes/runtime 写权限等检查通过。doctor 还会检查 `learning-lab.css` 与 `video-note.css` 是否位于当前 Vault 的 `.obsidian/snippets/`。
-
-如果看到 `notes_repository_fallback`，说明还没有显式配置正式笔记位置。此时新的视频采集会被 onboarding 门禁拦住并返回 `onboarding_required`。推荐先在 `config/local.json` 保留 `"notes_root": "notes/bilibili"`，再绑定 Vault：
-
-```powershell
-python .\scripts\run_bili_learning.py configure-obsidian --vault 'D:\Notes\MyVault' --notes-subdir 'bilibili'
-```
-
-`configure-obsidian` 会保留已有 `notes_root`，只更新 `vault_root / notes_subdir`；因此推荐 hybrid 配置不会被破坏。如果当前配置本来没有 `notes_root`，则继续使用直接写 Vault 子目录的兼容模式。
-
-如果要让智能体读取结构化诊断结果：
-
-```powershell
 python .\scripts\run_bili_learning.py doctor --json
 ```
 
-> doctor 不访问 Bilibili、不读取 Cookie 内容，也不会留下测试文件。
+`ready` 表示运行环境已就绪；Skill 是否在当前宿主可发现仍需单独确认。CSS 缺失是提醒，不阻塞转换。缺失样式时参考 [Obsidian 样式说明](OBSIDIAN-STYLING.md)，不可覆盖已有 CSS。
 
----
+## 3. ChatGPT Web 安装边界
 
-## 5. 安装 Obsidian 样式
+ChatGPT Web 使用 `dist/bili-learning-automation-chatgpt.zip`，不是用户级 Junction。Agent 可以从 canonical Skill 构建 ZIP，但 ChatGPT 页面中的 Skill 安装和本地连接授权必须通过受支持的操作方式完成；没有自动化入口时由用户在界面确认。**没有本地桥接的 ChatGPT 仅能安装 Skill，无法执行本机笔记转换。** 详见 [ChatGPT Skill 安装](CHATGPT-SKILL-INSTALL.md)。
 
-本项目使用共享 [Obsidian Learning Snippets](https://github.com/ZiYao00/obsidian-learning-snippets)；所需的 `learning-lab.css` 与 `video-note.css` 已在 [`config/obsidian-style.json`](../config/obsidian-style.json) 声明。本项目不再保存这两份 CSS 副本。
+## 4. 完成后怎么使用
 
-把共享仓库中的两份 CSS 安装到当前 Obsidian Vault 的：
-
-```text
-.obsidian/snippets/
-```
-
-然后打开：
+在已经接入项目的 Agent 中直接发送 Bilibili 链接或 BV 号，例如：
 
 ```text
-Obsidian → 设置 → 外观 → CSS 代码片段
-```
-
-刷新并同时启用：
-
-```text
-learning-lab
-video-note
-```
-
-`video-note.css` 依赖 `learning-lab.css`，两个都需要启用。
-
-完整说明见 [Obsidian 样式教程](OBSIDIAN-STYLING.md)。
-
----
-
-## 6. 选择一个智能体入口
-
-核心流程与智能体无关。目前主要支持：
-
-| 入口 | 适合场景 | 使用方式 |
-| --- | --- | --- |
-| ChatGPT Work | 在 ChatGPT 中调用本机项目 | 安装专用 ZIP，并连接本地工作区桥接 |
-| Codex | 本地生成、开发与测试 | 使用仓库级 Codex Skill 或独立安装包 |
-| Hermes | 手机 / 微信直接发 B站链接 | 安装 Hermes Skill 后私聊发送链接 |
-| WorkBuddy | WorkBuddy 会话中转笔记 | 安装 WorkBuddy 适配层后发送链接 |
-
-### ChatGPT Work
-
-ChatGPT 使用构建脚本直接生成的独立 ZIP：
-
-```text
-dist/bili-learning-automation-chatgpt.zip
-```
-
-该 ZIP 包含生成后的 `SKILL.md`、`agents/openai.yaml` 与一组从当前项目文档自动取材的安全 references；运行时仍通过本地工作区桥接访问当前项目。不要上传整个仓库；Codex、Hermes、WorkBuddy 使用本地 Junction，不使用该 ZIP。完整步骤见 [ChatGPT Skill 安装教程](CHATGPT-SKILL-INSTALL.md)。
-
-### Codex / Hermes / WorkBuddy
-
-三个本地 Agent 共用同一个 canonical Skill：
-
-```text
-skill/bili-learning-automation/
-```
-
-推荐把各自的用户级 Skill 目录通过 Windows Junction 直接指向该目录。更新仓库后不需要重新复制、同步或打包本地 Skill；三个宿主统一使用 Skill 名称 `bili-learning-automation`，并通过同一个 `scripts/local_bridge.py` / `.ps1` 处理必要的路径与进程兼容。
-
-完整安装路径与 Junction 命令见 [本地 Agent Skill 安装](LOCAL-AGENT-INSTALL.md)。本地 Agent 不再提供独立 ZIP。
-
----
-
-## 7. 第一次测试
-
-安装好智能体入口以后，最简单的测试方式就是直接发送：
-
-```text
+帮我将这个 B 站视频转成 Obsidian 学习笔记：
 https://www.bilibili.com/video/BVxxxxxxxxxx/
 ```
 
-也支持：
+默认先取字幕且**不下载音视频**。如果没有可用字幕，Agent 会报告 `subtitle_unavailable`，不会自动 ASR。已转换过的 BVID 默认先询问是否更新、重做或取消；成功发布以 `note_ready` 为准，笔记保存在 `00-待整理`。
 
-```text
-BVxxxxxxxxxx
-```
+`local-ASR-service` 是可选独立服务；本项目**不安装、不启动、不复制 ASR 模型**。用户主动要求 ASR 时，Agent 按 [配置手册](CONFIGURATION.md) 检查已部署的服务；如果没有安装，提供其独立项目的安装说明，不影响正常字幕流程。
 
-以及受支持的 Bilibili 复制文本和 `b23.tv` 短链。
+## 5. 更新与故障恢复
 
-来源模式只根据当前消息明确选择：
+Agent 更新仓库时必须保护本机 `config/local.json`、`key/`、`notes/`、`.runtime/` 和现有 Junction。禁止为了升级删除整个项目目录或将私人笔记加入 ZIP/Git。重复执行安装助手应安全返回 `already_installed` 或 `conflict`，不进行破坏性修复。
 
-```text
-转换这条链接                          → 默认 subtitle_srt
-纯资源分享，只整理简介，不用字幕      → description_only
-（默认流程无字幕后）ASR，下载音频转文字 → asr_text
-```
-
-不得只凭标题、视频类型猜测或历史 memory 自动跳过字幕。三个入口都会先按 BVID 检查是否已经发布过：发现重复时先询问“更新已有笔记 / 重新执行一次 / 取消”，不会先生成 `（2）` 再事后提醒。更新保留原路径并用 runtime 快照 + SHA-256 防止覆盖用户刚做的人工修改；只有明确选择重新执行时，同标题才继续使用递增序号。正常情况下，你不需要输入底层命令、指定文件名或手工处理 runtime。
-
-智能体会自动完成：
-
-```text
-识别链接和当前消息的明确来源意图
-→ 按 source_mode 采集 metadata / 简介 / 字幕或接入 ASR 纯文本
-→ 生成统一 source manifest（description-only 不伪造 chunk）
-→ 判断当前允许来源是否足够
-→ 写“先看结论 + 正文”；description-only 保持纯资源分享短记
-→ 内容完成后做一次版式优化
-→ 回看当前允许来源完成覆盖复核
-→ finalizer 校验
-→ 写入 Obsidian
-→ runtime Job 退出活动区并 retire
-```
-
----
-
-## 8. 长视频需要额外操作吗？
-
-不需要。
-
-长字幕会自动整理到当前任务的临时工作区：
-
-```text
-.runtime/bilibili-learning/<job>/agent-work/
-```
-
-程序会自动生成：
-
-```text
-source-manifest.json
-source/source-01.txt
-source/source-02.txt
-...
-```
-
-subtitle / ASR 模式会生成 source chunks：短文本通常一个，长文本按 cue 或确定性文本段自动切块，极小尾块自动合并。description-only 只生成 manifest，`chunks` 为空，因为正文来源直接位于 Job 的标题、metadata、简介和用户补充材料中。
-
-这些文件属于 runtime 数据。任务结束后，finalizer / failsafe 会把 Job 从活动区 retire 到 `.runtime/bilibili-learning/retired/`；物理删除属于后续维护，不是笔记成功的前提。用户不需要手工删除。
-
----
-
-## 9. 生成后的笔记在哪里？
-
-新笔记默认先进入：
-
-```text
-<notes_root>/00-待整理/
-```
-
-这是“还没正式学习和归档”的统一收件箱。
-
-文件名默认使用原视频标题：
-
-```text
-H3智能一体化节点重磅升级.md
-```
-
-如果用户明确选择“重新执行一次”，且同名文件已经存在，会生成：
-
-```text
-H3智能一体化节点重磅升级（2）.md
-```
-
-不会覆盖旧笔记。
-
-笔记主要结构是：
-
-```text
-标题 / 作者 · 日期 · 时长 · BV号
-→ 先看结论
-→ 播放器与来源区（资料获取 / UP 主资源 / 视频简介 / 原文折叠）
-→ 知识正文
-```
-
----
-
-## 10. 学完以后怎么整理？
-
-“转成笔记”和“学习后归档”是两个阶段。普通链接转换只负责把资料放到 `00-待整理`，**不会自动整理**。
-
-只有你明确要求整理时，智能体才进入整理流程。如果你已经指定某一篇，直接使用 `single`；如果只说“整理笔记”却没有给出对象，智能体才需要询问：
-
-```text
-要整理指定的一篇、最近一篇，还是全部待整理笔记？
-```
-
-你选择范围后，智能体会逐篇完整阅读，只决定两件事：
-
-- 更短、更容易长期检索的**文件名**；
-- 最适合的**目标目录**，通常采用最多两层的“领域 / 对象”。
-
-归档阶段不会修改 H1、Summary、正文、Frontmatter、Tags、视频简介或 UP 主资源。
-
-统一命令是：
-
-```powershell
-bili-learning organize `
-  --note '<现有笔记路径>' `
-  --filename '<新的简短文件名>' `
-  --destination '<领域/对象>' `
-  --confirmed-scope '<single|latest|all>'
-```
-
-普通用户通常不需要手工运行命令，完整规则见 [笔记整理与归档教程](NOTE-ORGANIZATION.md)。
-
----
-
-## 11. 常见状态是什么意思
-
-| 状态 | 含义 | 用户通常怎么做 |
-| --- | --- | --- |
-| `onboarding_required` | 首次环境仍缺少 Vault / Cookie / yt-dlp 等必需配置 | 按返回的 `actions` 处理，再重新检查并重试原链接 |
-| `materials_ready` | 当前 `source_mode` 的标准 Job 已准备好 | 按 `source_manifest_path` 和 handoff 继续；`recovered: true` 表示核心已恢复同一来源模式的旧 Job |
-| `existing_note_found` | 当前 BVID 已经发布过笔记 | 先选择更新、重新执行或取消；选择后继续使用触发提示时的原始完整消息 |
-| `update_target_required` | 同一 BVID 有多篇笔记，尚未指定更新目标 | 明确选择要更新的具体笔记，不自动猜最新一篇 |
-| `update_conflict` | 更新期间原笔记又发生了修改 | 不覆盖现有文件；重新发起更新 |
-| `in_progress` | 同一 BV 号仍有真实活动任务 | 不要重复启动，也不要手工处理 reservation / lock |
-| `subtitle_unavailable` | 没有取得可用中文字幕 | 本次不会生成笔记，也不会下载音视频 |
-| `source_insufficient` | 当前来源模式不足以写可靠笔记 | 默认/ASR 可换更完整文字；description-only 应补充简介资料或改走字幕流程 |
-| `note_ready` | finalizer 已校验并正式发布 | 完成；runtime retire/维护状态不改变发布结果 |
-| `note_invalid` | 草稿没有通过最终校验 | 查看错误，不要绕过 finalizer |
-| `failed` | 采集、配置或运行过程失败 | 先运行 doctor，再看故障排查 |
-
-> `in_progress` 是并发保护，不代表视频以后不能再次转换。进程异常结束但材料完整时，核心会自动恢复为 `materials_ready + recovered: true`；正常任务完成并 retire 后，同一个视频仍然可以重新生成另一篇笔记。
-
----
-
-## 12. 更新项目以后要做什么
-
-代码更新后通常只需要：
-
-```powershell
-git pull
-```
-
-如果使用 Hermes，并且当前 Gateway / 微信会话已经运行，再发送：
-
-```text
-/reload-skills
-```
-
-因为 Codex、Hermes、WorkBuddy 都通过 Junction 指向 canonical Skill，所以更新仓库后不需要重新复制本地 Skill。
-
-如果共享 `obsidian-learning-snippets` 仓库中的 CSS 有更新，按 [Obsidian 样式教程](OBSIDIAN-STYLING.md) 将所需两份 CSS 同步到 Vault，再在 Obsidian 中刷新代码片段。
-
----
-
-## 13. 出问题时先做什么
-
-第一步永远建议先运行：
-
-```powershell
-python .\scripts\run_bili_learning.py doctor
-```
-
-然后查看：
-
-[故障排查](TROUBLESHOOTING.md)
-
-不要优先尝试：
-
-- 手工删除 `.runtime` job；
-- 手工删除 reservation / lock；
-- 绕过 finalizer 直接复制草稿；
-- 把 Cookie 内容贴进聊天或日志；
-- 为了字幕失败而自动下载视频做 ASR。
-
-这些操作容易破坏并发保护、Job 恢复 / retire 生命周期或隐私边界。
-
----
-
-## 14. 下一步阅读
-
-如果你已经成功生成第一篇笔记，可以按需要继续看：
-
-- [Bilibili Cookie 获取与安全配置](BILIBILI-COOKIE.md)：第一次导出 Cookie、格式检查、DPAPI 问题和失效更新；
-- [配置说明](CONFIGURATION.md)：换电脑、换 Vault、换 Cookie / yt-dlp 路径；
-- [本地 Agent Skill 安装](LOCAL-AGENT-INSTALL.md)：Codex、Hermes、WorkBuddy 的 Junction 安装、更新与验证；
-- [Obsidian 样式教程](OBSIDIAN-STYLING.md)：CSS 安装和样式问题；
-- [故障排查](TROUBLESHOOTING.md)：状态和错误怎么处理；
-- [智能体接入协议](AGENT-INTEGRATION.md)：给开发者 / 新适配层使用；
-- [开发说明](DEVELOPMENT.md)：测试、代码维护和 CI。
+故障优先运行 `doctor` 并查询 [故障排查](TROUBLESHOOTING.md)。开发与平台兼容问题请阅读 [文档中心](README.md)。

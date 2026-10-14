@@ -10,8 +10,8 @@ from .config import (
     DEFAULT_NOTES_SUBDIR,
     OBSIDIAN_SNIPPET_NAMES,
     OBSIDIAN_STYLE_REPOSITORY,
-    YTDLP_INSTALL_URL,
-    YTDLP_WINDOWS_INSTALL_COMMAND,
+    YTDLP_RELATIVE_PATH,
+    YTDLP_RELEASE_URL,
     Settings,
 )
 
@@ -112,12 +112,12 @@ def doctor_report(settings: Settings) -> dict[str, object]:
             "FAIL",
             "ytdlp_not_configured",
             "yt-dlp",
-            f"未检测到；不会自动安装或内置可执行文件。Windows 推荐：{YTDLP_WINDOWS_INSTALL_COMMAND}",
+            f"项目缺少 {YTDLP_RELATIVE_PATH.as_posix()}；只允许项目内的 Windows 单文件 EXE，不搜索系统路径。",
             source=ytdlp.source,
             checked_sources=list(ytdlp.checked_sources),
-            windows_install_command=YTDLP_WINDOWS_INSTALL_COMMAND,
-            install_url=YTDLP_INSTALL_URL,
-            next_step="安装完成后重新运行 doctor；若使用自定义位置，再配置 BILI_LEARNING_YTDLP 或 local.json 的 ytdlp。",
+            expected_path=str(settings.project_root / YTDLP_RELATIVE_PATH),
+            release_url=YTDLP_RELEASE_URL,
+            next_step="由 Agent 从可信项目副本恢复经校验的 tools/yt-dlp.exe；不要配置系统 PATH。",
         )
     elif not ytdlp.path.is_file():
         add("FAIL", "ytdlp_path_invalid", "yt-dlp", str(ytdlp.path), source=ytdlp.source, checked_sources=list(ytdlp.checked_sources))
@@ -209,11 +209,10 @@ def onboarding_report(settings: Settings) -> dict[str, object]:
     if settings.ytdlp.path is None or not settings.ytdlp.path.is_file():
         add_action(
             "ytdlp_required",
-            "未检测到 yt-dlp。项目不会自动安装或复制可执行文件。",
-            recommended_command=YTDLP_WINDOWS_INSTALL_COMMAND,
-            install_url=YTDLP_INSTALL_URL,
-            custom_path_supported=True,
-            prompt="如已在自定义目录安装 yt-dlp，请提供可执行文件路径；否则可先按推荐命令安装。",
+            "项目缺少 tools/yt-dlp.exe。请由 Agent 核对并恢复项目内官方单文件 EXE，不使用系统 PATH 或外部自定义路径。",
+            expected_path=str(settings.project_root / YTDLP_RELATIVE_PATH),
+            release_url=YTDLP_RELEASE_URL,
+            custom_path_supported=False,
         )
 
     ytdlp_unusable = checks.get("ytdlp_not_executable")

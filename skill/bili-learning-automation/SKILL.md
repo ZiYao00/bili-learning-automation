@@ -35,6 +35,10 @@ python <repo-root>\scripts\run_bili_learning.py onboarding
 - CSS 缺失是非阻塞警告，不静默复制或覆盖。
 - 仅分析、解释或维护仓库源码时，不强制运行 onboarding。
 
+### 安装任务：由 Agent 执行，不要求用户手工安装
+
+安装前按项目 `docs/QUICKSTART.md` 与 `docs/LOCAL-AGENT-INSTALL.md` 操作。只使用项目内 `tools/yt-dlp.exe`，不得搜索系统 PATH、读取旧 `ytdlp` 配置作为可执行路径或安装源码/winget。Codex/Hermes/WorkBuddy 用户级 Skill 链接使用 `scripts/install_agent_skill.ps1`：默认只读计划，取得外部目录写入许可后才 `-Apply`；Obsidian Vault → 项目 notes 使用 `scripts/ensure_junction.ps1` 同样先计划再按授权应用。遇到已有目录、旧副本或不同目标的 Junction 返回 `conflict` 时停止，不自动删除/搬迁。首次 `configure-obsidian` 建立 Hybrid 配置，不迁移旧 direct-vault。ChatGPT Web 单独构建 ZIP 并需要有效本地桥接。`local-ASR-service` 是独立可选项目，不属于默认安装任务。
+
 ## 2. 来源路由与重复笔记
 
 保留触发任务的原始完整消息，只按当前消息的明确意图选路：

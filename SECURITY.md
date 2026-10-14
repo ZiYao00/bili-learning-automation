@@ -22,6 +22,12 @@ Git 提交元数据会公开作者名和作者邮箱。准备公开仓库、发�
 
 公开前也应检查受跟踪文档、验收报告和示例中是否残留维护者的绝对路径、Vault 位置、备份路径或其它机器特征。示例统一使用 `<repo-root>`、`<vault-root>`、`D:\\Notes\\MyVault` 等通用占位形式。
 
+## 第三方工具与安装安全
+
+本仓库附带经官方 SHA-256 校验的 Windows x64 单文件 `tools/yt-dlp.exe`。来源和版本见 `tools/yt-dlp.release.json`，许可文本见 `tools/YT-DLP-LICENSE.txt`、`tools/THIRD_PARTY_LICENSES.txt`。Agent 不得从系统 PATH 静默回退到其它版本，也不得未经授权替换可执行文件。
+
+安装脚本只读计划为默认状态，`-Apply` 必须针对经过用户授权的用户级 Skill 或 Vault 路径。旧目录、已有笔记、不同目标的 Junction 均必须保留；遇到冲突停止，不自动删除、搬迁或覆盖。
+
 ## 报告安全问题
 
 不要在公开 Issue 中附带 Cookie、账号信息、私人笔记或其他凭据。

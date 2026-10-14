@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -15,8 +15,8 @@ SUPPORTED_WORKFLOW_MODES = {"light", "strict"}
 DEFAULT_LOCAL_ASR_BASE_URL = "http://127.0.0.1:8001"
 OBSIDIAN_SNIPPET_NAMES = ("learning-lab.css", "video-note.css")
 OBSIDIAN_STYLE_REPOSITORY = "https://github.com/ZiYao00/obsidian-learning-snippets"
-YTDLP_INSTALL_URL = "https://github.com/yt-dlp/yt-dlp/wiki/Installation"
-YTDLP_WINDOWS_INSTALL_COMMAND = "winget install yt-dlp"
+YTDLP_RELATIVE_PATH = Path("tools/yt-dlp.exe")
+YTDLP_RELEASE_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest"
 
 
 class ConfigurationError(ValueError):
@@ -229,8 +229,31 @@ def _resolve_notes_location(
 
 
 def _save_local_config(path: Path, payload: dict[str, Any]) -> Path:
+    """Atomic replacement; never leave a truncated private configuration on error."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    data = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    # Temporary files remain Git-ignored even if the host blocks cleanup.
+    temp_parent = path.parent.parent / ".runtime" / "config-tmp"
+    temp_parent.mkdir(parents=True, exist_ok=True)
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", newline="\n", dir=temp_parent,
+            prefix=".local-config-", suffix=".tmp", delete=False,
+        ) as stream:
+            temporary = Path(stream.name)
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+        temporary = None  # os.replace consumed this source; do not call unlink on success.
+    finally:
+        if temporary is not None:
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                # Some Agent hosts block safe-delete; the temp stays Git-ignored.
+                pass
     return path
 
 
@@ -245,6 +268,11 @@ def configure_obsidian(project_root: Path, vault_root: Path, notes_subdir: str =
 
     path, local_config = _load_local_config(project_root)
     updated = dict(local_config)
+    # A new installation uses project-local physical notes. Preserve any
+    # previously configured direct-Vault installation without migration.
+    if "notes_root" not in updated and "vault_root" not in updated:
+        (project_root / "notes" / "bilibili").mkdir(parents=True, exist_ok=True)
+        updated["notes_root"] = "notes/bilibili"
     updated["vault_root"] = str(vault_root)
     updated["notes_subdir"] = str(normalized_subdir)
     return _save_local_config(path, updated)
@@ -262,30 +290,17 @@ def configure_cookie_file(project_root: Path, cookie_file: Path) -> Path:
     return _save_local_config(path, updated)
 
 
-def configure_ytdlp_path(project_root: Path, ytdlp_path: Path) -> Path:
-    project_root = project_root.resolve()
-    ytdlp_path = ytdlp_path.expanduser().resolve()
-    if not ytdlp_path.is_file():
-        raise ConfigurationError("ytdlp_path_invalid", f"yt-dlp 路径不存在或不是文件：{ytdlp_path}")
+def find_ytdlp(project_root: Path, local_config: dict[str, str] | None = None) -> ExecutableResolution:
+    """Only the repository-bundled Windows executable may be used.
 
-    path, local_config = _load_local_config(project_root)
-    updated = dict(local_config)
-    updated["ytdlp"] = str(ytdlp_path)
-    return _save_local_config(path, updated)
-
-
-def find_ytdlp(project_root: Path, local_config: dict[str, str]) -> ExecutableResolution:
-    checked = ["environment:BILI_LEARNING_YTDLP", f"local_config:{LOCAL_CONFIG_RELATIVE_PATH}", "PATH:yt-dlp"]
-    configured = os.environ.get("BILI_LEARNING_YTDLP")
-    if configured:
-        return ExecutableResolution(Path(configured).expanduser(), "environment", tuple(checked))
-    local_value = local_config.get("ytdlp")
-    if local_value:
-        return ExecutableResolution(_resolve_path(project_root, local_value), "local_config", tuple(checked))
-    on_path = shutil.which("yt-dlp")
-    if on_path:
-        return ExecutableResolution(Path(on_path), "path", tuple(checked))
-    return ExecutableResolution(None, "missing", tuple(checked))
+    The local_config argument is retained for old callers, but the legacy ytdlp
+    key and BILI_LEARNING_YTDLP environment variable are deliberately ignored.
+    """
+    path = project_root / YTDLP_RELATIVE_PATH
+    checked = (f"project:{YTDLP_RELATIVE_PATH.as_posix()}",)
+    if path.is_file():
+        return ExecutableResolution(path, "project", checked)
+    return ExecutableResolution(None, "missing", checked)
 
 
 def _resolve_local_asr_base_url(local_config: dict[str, Any]) -> str:

@@ -10,7 +10,6 @@ from .config import (
     ConfigurationError,
     configure_cookie_file,
     configure_obsidian,
-    configure_ytdlp_path,
     load_settings,
 )
 from .doctor import doctor_report, onboarding_report, run_doctor
@@ -70,8 +69,6 @@ def main() -> None:
     )
     cookie_parser = subparsers.add_parser("configure-cookie", help="把 Bilibili Cookie 文件路径写入 config/local.json")
     cookie_parser.add_argument("--file", type=Path, required=True, help="Netscape 格式 Cookie 文件路径")
-    ytdlp_parser = subparsers.add_parser("configure-ytdlp", help="把自定义 yt-dlp 路径写入 config/local.json")
-    ytdlp_parser.add_argument("--path", type=Path, required=True, help="yt-dlp 可执行文件路径")
 
     subparsers.add_parser("build-nav", help="重建 Obsidian 导航")
     prepare_parser = subparsers.add_parser("prepare", help="采集资料并创建 runtime 草稿任务")
@@ -123,7 +120,7 @@ def main() -> None:
 
     project_root = args.project_root.resolve() if args.project_root else find_project_root()
 
-    if args.command in {"configure-obsidian", "configure-cookie", "configure-ytdlp"}:
+    if args.command in {"configure-obsidian", "configure-cookie"}:
         try:
             if args.command == "configure-obsidian":
                 config_path = configure_obsidian(project_root, args.vault, args.notes_subdir)
@@ -135,21 +132,13 @@ def main() -> None:
                     "vault_root": str(settings.vault_root),
                     "notes_root": str(settings.notes_root),
                 }
-            elif args.command == "configure-cookie":
+            else:
                 config_path = configure_cookie_file(project_root, args.file)
                 payload = {
                     "schema_version": 1,
                     "status": "configured",
                     "config_path": str(config_path),
                     "cookie_file": str(args.file.expanduser().resolve()),
-                }
-            else:
-                config_path = configure_ytdlp_path(project_root, args.path)
-                payload = {
-                    "schema_version": 1,
-                    "status": "configured",
-                    "config_path": str(config_path),
-                    "ytdlp": str(args.path.expanduser().resolve()),
                 }
         except ConfigurationError as error:
             print(

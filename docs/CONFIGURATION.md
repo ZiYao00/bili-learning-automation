@@ -50,21 +50,11 @@ CSS 则应该位于：
 D:\Notes\MyVault\.obsidian\snippets\
 ```
 
-### `ytdlp`（可选覆盖）
+### `yt-dlp`：固定项目内单文件 EXE
 
-普通用户**不需要**预先填写 `ytdlp`。程序会先检查 `BILI_LEARNING_YTDLP`、再检查 `config/local.json` 的自定义覆盖，最后自动查找系统 PATH 中的 `yt-dlp`。
+所有采集、简介和 ASR 临时音频流程只调用 `<repo-root>/tools/yt-dlp.exe`。项目不安装源码，不使用 `winget`，不查询系统 PATH，不使用 `BILI_LEARNING_YTDLP` 或 `local.json.ytdlp` 自定义路径。现有本机配置中的旧 `ytdlp` 字段可继续被解析，但**已失效且不会影响实际执行**；无需强制清除旧文件。
 
-项目不会内置 `yt-dlp.exe`，也不会自动下载安装。首次 doctor 如果没有检测到 yt-dlp，会给出 Windows 推荐命令：
-
-```powershell
-winget install yt-dlp
-```
-
-安装后重新运行 doctor 即可。只有 yt-dlp 位于自定义目录且没有加入 PATH 时，才建议配置例如：
-
-```json
-"ytdlp": "D:\\Tools\\yt-dlp.exe"
-```
+如果 EXE 缺失，Agent 应从经过校验的官方来源或完整项目副本恢复，确认 `tools/yt-dlp.release.json` 的 SHA-256 与可执行版本，然后重新运行 onboarding。不得把文件放进 Skill 安装目录，也不得静默下载或替换现有 EXE。
 
 ### `local_asr_base_url`（可选外部能力）
 
@@ -188,8 +178,6 @@ python .\scripts\run_bili_learning.py configure-obsidian --vault 'D:\Notes\MyVau
 # Netscape Cookie 文件路径；不要把 Cookie 内容传给 Agent
 python .\scripts\run_bili_learning.py configure-cookie --file 'D:\Private\bilibili_cookies.txt'
 
-# 仅当 yt-dlp 位于自定义目录且未加入 PATH 时使用
-python .\scripts\run_bili_learning.py configure-ytdlp --path 'D:\Tools\yt-dlp.exe'
 ```
 
 ### 第一次绑定 Vault
@@ -200,18 +188,14 @@ python .\scripts\run_bili_learning.py configure-ytdlp --path 'D:\Tools\yt-dlp.ex
 python .\scripts\run_bili_learning.py configure-obsidian --vault 'D:\Notes\MyVault' --notes-subdir 'bilibili'
 ```
 
-它会检查 Vault 与 `.obsidian`，保留 `local.json` 中已有的 `notes_root`、Cookie、yt-dlp 等值，只更新 `vault_root / notes_subdir`。因此：
+该命令由 Agent 调用。全新配置时自动设置 `notes_root = notes/bilibili`，使用 Hybrid 模式；已有 `notes_root` 的位置不变；已有 direct-vault 配置也不会被静默迁移。旧 `ytdlp` 字段仅作为兼容数据保留，实际调用始终使用项目内 EXE。
 
-- 已有 `notes_root`：保持 hybrid 模式，真实文件继续写入项目内 `notes_root`；
-- 没有 `notes_root`：保持 direct-vault 兼容模式，真实文件直接写入 `<vault_root>/<notes_subdir>`。
+Agent 推荐执行顺序：
 
-推荐 hybrid 模式的初始化步骤是：
-
-1. 把真实笔记放到 `<repo-root>\notes\bilibili`；
-2. 把 `<vault_root>\bilibili` 建为指向项目 notes 的 Junction；
-3. 在 `config/local.json` 保存 `"notes_root": "notes/bilibili"`；
-4. 运行 `configure-obsidian` 写入 Vault 元数据；
-5. 运行 onboarding，确认 `obsidian_notes_mapping = OK`。
+1. 运行 `configure-obsidian` 写入本机配置；全新安装会自动使用项目内 `notes/bilibili`；
+2. 核对 Vault 和项目 notes 的实际绝对路径，在获得目标目录写入授权后，使用 `scripts/ensure_junction.ps1` 先计划、再 `-Apply` 创建 Vault → 项目 notes 的 Junction；
+3. 若 Vault 已有真实目录或笔记，立即停止，不覆盖或移动；
+4. 重新运行 onboarding，确认 `obsidian_notes_mapping = OK`。
 
 ---
 
@@ -257,7 +241,6 @@ Taxonomy 仍保留 `notes/bilibili` 作为未配置时的 repository fallback；
 
 | 环境变量 | 用途 |
 | --- | --- |
-| `BILI_LEARNING_YTDLP` | yt-dlp 可执行文件 |
 | `BILI_LEARNING_VAULT_ROOT` | Obsidian Vault 根目录 |
 | `BILI_LEARNING_NOTES_SUBDIR` | Vault 内笔记相对子目录 |
 | `BILI_LEARNING_NOTES_ROOT` | 真实笔记根目录；可与 Vault 元数据组合为 hybrid 模式 |
@@ -269,12 +252,12 @@ Taxonomy 仍保留 `notes/bilibili` 作为未配置时的 repository fallback；
 推荐的 hybrid 环境变量方式：
 
 ```powershell
-$env:BILI_LEARNING_NOTES_ROOT = 'notesilibili'
+$env:BILI_LEARNING_NOTES_ROOT = 'notes/bilibili'
 $env:BILI_LEARNING_VAULT_ROOT = 'D:\Notes\MyVault'
 $env:BILI_LEARNING_NOTES_SUBDIR = 'bilibili'
 ```
 
-环境变量也支持同一混合模型：`BILI_LEARNING_NOTES_ROOT` 可以与 `BILI_LEARNING_VAULT_ROOT` / `BILI_LEARNING_NOTES_SUBDIR` 同时使用；此时前者决定真实写入位置，后两者用于 Vault / Junction 校验。单独设置 `BILI_LEARNING_NOTES_SUBDIR` 仍然无效，必须同时提供 Vault 根目录。
+环境变量也支持同一混合模型：`BILI_LEARNING_NOTES_ROOT` 可以与 `BILI_LEARNING_VAULT_ROOT` / `BILI_LEARNING_NOTES_SUBDIR` 同时使用；此时前者决定真实写入位置，后两者用于 Vault / Junction 校验。单独设置 `BILI_LEARNING_NOTES_SUBDIR` 仍然无效，必须同时提供 Vault 根目录。旧的 `BILI_LEARNING_YTDLP` 环境变量已不参与运行时解析。
 
 ---
 
@@ -292,13 +275,7 @@ $env:BILI_LEARNING_NOTES_SUBDIR = 'bilibili'
 
 当 `notes_root` 与 Vault 元数据同时存在时，`notes_root` 是物理存储真源，Vault 只用于 Obsidian/CSS/Junction 校验。
 
-`yt-dlp` 的顺序是：
-
-```text
-BILI_LEARNING_YTDLP
-→ local.json 的 ytdlp
-→ 系统 PATH
-```
+`yt-dlp` 没有路径搜索优先级：始终固定为 `<repo-root>/tools/yt-dlp.exe`，环境变量与旧配置覆盖不生效。
 
 ---
 
@@ -361,14 +338,15 @@ Doctor 不访问 Bilibili，也不读取 Cookie 内容。
 当前支持：
 
 ```text
-ytdlp
 notes_root
 vault_root
 notes_subdir
 cookie_file
 taxonomy
 workflow_mode
-siliconflow
+local_asr_base_url
+siliconflow (历史可选字段)
+ytdlp (旧配置兼容字段，忽略)
 ```
 
 推荐新配置：

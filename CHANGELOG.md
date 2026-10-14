@@ -4,6 +4,11 @@
 
 ### Added
 
+- 新增项目固定的官方 Windows x64 单文件 `tools/yt-dlp.exe`（当前 2026.08.19），记录官方发布来源和 SHA-256，并保留对应许可证文本；取消系统 PATH / 环境变量 / 自定义路径的运行时搜索。
+- 新增 Agent 专用的 `scripts/install_agent_skill.ps1` 和 `scripts/ensure_junction.ps1`：默认只读规划，经目标目录授权后应用；正确链接幂等、冲突不覆盖。
+- 新用户 `configure-obsidian` 默认设置项目内真实笔记路径，保持旧 direct-vault 配置不迁移；本机 JSON 保存改为原子替换。
+- 文档重新以 Agent 安装为唯一推荐入口，不提供双击安装器；`local-ASR-service` 明确为可选独立工具。
+
 - 新增外部 `local-ASR-service` 接口：`asr-health` 负责结构化健康检查，`prepare-asr` 仅在用户明确授权后临时下载音轨、调用本机 ASR，并把真实纯文本回流现有 `prepare-transcript / asr_text` Job lifecycle；默认 `prepare` 仍保持字幕优先且不下载媒体。
 - 新增 `local_asr_base_url` / `BILI_LEARNING_LOCAL_ASR_BASE_URL` 可选配置；外部 ASR 未运行不会阻塞 onboarding 或普通字幕流程。
 

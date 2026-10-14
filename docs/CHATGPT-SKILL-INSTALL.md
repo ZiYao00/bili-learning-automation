@@ -6,9 +6,9 @@ ChatGPT Web 使用项目唯一的独立 Skill ZIP。本地 Codex、Hermes、Work
 
 ChatGPT Skill 负责识别意图、通过已授权的本地工作区桥接访问项目、调用共享 `bili-learning` 核心、读取当前 Job 来源并完成笔记 AI 区域，最后调用 finalizer 发布。
 
-ChatGPT 远程沙箱不能直接访问本机 Windows 项目。端到端运行必须连接能够打开工作区、读写文本文件并运行项目命令的本地桥接；已连接 CodexPro 时可直接使用。
+ChatGPT 远程沙箱不能直接访问本机 Windows 项目。端到端运行必须连接能够打开工作区、读写文本文件并运行项目命令的本地桥接，例如用户实际已授权的桥接工具；**不能假定所有用户都安装 CodexPro**。
 
-没有本地桥接时，Skill 可以安装，但不能操作本机项目或 Obsidian。
+没有本地桥接时，Skill 可以安装，但不能操作本机项目或 Obsidian。项目内的 `tools/yt-dlp.exe` 不随 ChatGPT Skill ZIP 打包；它留在用户本机项目内，由授权桥接调用。
 
 ## 2. 真源与安装包
 
@@ -62,7 +62,7 @@ dist\bili-learning-automation-chatgpt.zip
 
 ## 4. 安装
 
-在 ChatGPT 的插件 / 技能界面通过 ZIP 安装：
+**Agent 负责检查并生成 ZIP，不要求普通用户手工打包。** ChatGPT 平台的安装与桥接连接需要平台实际支持的权限与操作入口；如果没有可供 Agent 代办的安装动作，应由用户在 ChatGPT 的技能界面完成必要的授权/安装确认，不能声称 ZIP 已自动安装：
 
 ```text
 bili-learning-automation-chatgpt.zip
