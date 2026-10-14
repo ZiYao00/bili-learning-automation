@@ -13,6 +13,8 @@ python -m pip install -e ".[dev]"
 
 `.venv` 是项目本机的开发/测试环境，已被 Git 忽略；不要向 Hermes 的运行环境、全局 Python 或仓库提交任何依赖目录。普通 Hermes 使用者不需要安装 `pytest` 或 `ruff`。
 
+Windows Agent 安装和日常运行统一使用 `scripts/python_runtime.ps1` 的解释器校验。推荐由 Agent 运行 `scripts/run_bili_learning.ps1 -ProbeOnly` 后使用 `scripts/run_bili_learning.ps1 onboarding`；canonical `local_bridge.ps1` 调用相同解析器，不依赖默认 PATH 中的 `python`。可信外部解释器可通过临时 `BILI_LEARNING_PYTHON` 显式指定；指定错误必须失败，不隐式回退。正式用户无需创建 `.venv`。
+
 ## 本地验证
 
 ```powershell

@@ -23,7 +23,7 @@ ChatGPT Web 不使用本地 Junction，需安装独立 ZIP + 授权本地工作�
 ## 2. Agent 推荐执行顺序
 
 1. 确认用户授权的本地项目根目录（至少 `AGENTS.md`、`pyproject.toml`、`scripts/run_bili_learning.py`、taxonomy）。
-2. 阅读根 `AGENTS.md` 和本教程，运行 `python scripts/run_bili_learning.py onboarding` 收集缺失信息。
+2. 阅读根 `AGENTS.md` 和本教程，先运行 `scripts/run_bili_learning.ps1 -ProbeOnly`，只在 `ready` 后运行 `scripts/run_bili_learning.ps1 onboarding`；若没有 Python，则 Agent 在获得用户授权后处理 Python 3.12 前置环境。不要要求普通用户安装 `.venv`。
 3. 确定用户选择的宿主；**不要擅自为所有 Agent 安装**。
 4. 调用下述安装脚本（默认只读）查看目标和冲突；目标在项目目录之外时，取得用户对该**具体路径**的写入授权。
 5. 经授权使用 `-Apply`，脚本自行创建父目录和 Junction，随即验证目标。
@@ -73,7 +73,7 @@ skill/bili-learning-automation/scripts/local_bridge.ps1
 bridge 只处理宿主的路径、Junction 和进程兼容；业务命令统一调用：
 
 ```powershell
-python <repo-root>\scripts\run_bili_learning.py onboarding
+& '<repo-root>\scripts\run_bili_learning.ps1' onboarding
 ```
 
 ## 4. Obsidian 目录映射也由 Agent 执行

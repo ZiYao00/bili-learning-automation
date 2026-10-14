@@ -1281,8 +1281,9 @@ def test_reservation_spans_job_lifecycle_and_cleanup_releases_it(tmp_path: Path)
     assert claim_reservation(runtime, "BV1TXua68EYi").path.is_file()
 
 
+@pytest.mark.parametrize("_attempt", range(12))
 def test_reservation_claim_is_atomic_across_concurrent_callers(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _attempt: int
 ) -> None:
     import bili_learning.runtime as runtime_module
 

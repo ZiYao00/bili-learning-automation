@@ -23,6 +23,7 @@
 ## 代码分层
 
 - `tools/yt-dlp.exe`：唯一固定执行的官方 Windows x64 单文件 yt-dlp；不搜索系统其它安装，也不内置于 ChatGPT Skill ZIP；版本、哈希和许可证随项目维护。
+- `scripts/python_runtime.ps1` 与 `scripts/run_bili_learning.ps1`：Windows Agent 的只读 Python 预检与统一 CLI 入口；无内置 Python 运行时。canonical `local_bridge.ps1` 使用相同解析器，防止不同宿主选择不同解释器。
 - `scripts/install_agent_skill.ps1` 和 `scripts/ensure_junction.ps1`：Agent 安装的只读计划/受控应用层；不包含笔记业务逻辑，不能覆盖目标目录。
 - `src/bili_learning/`：可测试的核心逻辑和 agent-neutral CLI。`prepare`、`prepare-transcript`、`prepare-description` 只是清晰的外部入口，内部共用 `_prepare_materials`；`source.py` 定义三种 Source Mode，`transcript.py` 生成统一 source manifest；`pinned_comment.py` 负责条件触发/白名单置顶一级评论补充；`workflow.py` 只为 `strict` 模式创建并校验三份 runtime 工作文件。
 - `skill/bili-learning-automation/`：唯一需要人工维护的 canonical 本地 Skill；Codex、Hermes、WorkBuddy 的用户级 Skill 目录直接 Junction 到这里。`scripts/local_bridge.py` / `.ps1` 只处理宿主路径、Python 与 `PYTHONPATH` 兼容，不复制业务规则。

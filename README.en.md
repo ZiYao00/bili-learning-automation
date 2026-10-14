@@ -2,6 +2,8 @@
 
 [简体中文](README.md) | [English](README.en.md)
 
+**Current code version: v2.0.0 (GitHub Release pending)**
+
 `bili-learning-automation` converts Bilibili subtitles, explicitly authorized ASR text, or explicitly requested description-only resource information into Obsidian notes.
 
 The default `prepare` route is subtitle-first and uses `yt-dlp --skip-download`, so **video and audio are not downloaded**. `prepare-transcript` imports explicitly authorized ASR text, while `prepare-description` is used only when the current request explicitly asks for a pure resource / description-only note. All three routes share one Job lifecycle, validation, publication, recovery, concurrency protection, and retire flow.
@@ -49,7 +51,7 @@ If those materials are too incomplete to support a reliable note, the Agent may 
 
 ## 2. Requirements
 
-Windows 10/11 x64, Python 3.10+, an Obsidian vault, a private Netscape-format Bilibili cookie file, and at least one local-capable agent (Codex, Hermes, WorkBuddy, or ChatGPT with an authorized local workspace bridge).
+Windows 10/11 x64, Python 3.10+, an Obsidian vault, a private Netscape-format Bilibili cookie file, and at least one local-capable agent (Codex, Hermes, WorkBuddy, or ChatGPT with an authorized local workspace bridge). Python and `.venv` are **not** shipped with the repository: an authorized Agent runs `scripts/run_bili_learning.ps1 -ProbeOnly` first and, only with permission, installs Python 3.12 if required.
 
 The repository bundles the **official standalone `tools/yt-dlp.exe`**; all runtime calls use that fixed path exclusively. No yt-dlp source installation, global PATH search, or `winget` install is needed. Release provenance and SHA-256 are recorded in `tools/yt-dlp.release.json`. Subtitle-first collection uses `--skip-download` and does not download media.
 

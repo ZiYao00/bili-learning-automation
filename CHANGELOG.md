@@ -2,7 +2,12 @@
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-15
+
 ### Added
+
+- Agent-first Python preflight/launcher: use a validated Python >=3.10 without bundling Python; the Windows canonical Skill bridge and project PowerShell entrypoint share one interpreter resolver. Explicit `BILI_LEARNING_PYTHON` may select a validated external interpreter without changing system PATH.
+- Windows clean-room acceptance test for fresh projects without `.venv` or private credentials; added Python missing/invalid and Unicode path coverage.
 
 - 新增项目固定的官方 Windows x64 单文件 `tools/yt-dlp.exe`（当前 2026.08.19），记录官方发布来源和 SHA-256，并保留对应许可证文本；取消系统 PATH / 环境变量 / 自定义路径的运行时搜索。
 - 新增 Agent 专用的 `scripts/install_agent_skill.ps1` 和 `scripts/ensure_junction.ps1`：默认只读规划，经目标目录授权后应用；正确链接幂等、冲突不覆盖。
@@ -22,6 +27,10 @@
 
 - 退役旧 Chrome/CDP collector、Hermes 子命令 wrappers、WorkBuddy 独立 bridge 目录、Codex 仓库级生成副本以及旧多宿主 package builder；本地三 Agent 统一复用 canonical Skill。
 - 退役仓库自定义 source snapshot 备份脚本；源码回滚以 Git / tag / release 为准。已确认无主链依赖的本机历史目录移入 Windows 系统回收站，由维护者自行清理。
+
+### Fixed
+
+- Prevent first-use Windows reservation lock contention by acquiring the OS lock before initializing the lock file; concurrency regression coverage expanded.
 
 ## [1.4.0] - 2026-09-10
 

@@ -10,6 +10,8 @@
 | Obsidian Vault | 是 | 优先 Hybrid：真实笔记在项目内，Vault 用 Junction 指向它 |
 | Codex / Hermes / WorkBuddy / 已连接本机的 ChatGPT | 至少一种 | Agent 读取来源和完成内容；ChatGPT Web 需本地工作区桥接 |
 
+**Python 运行环境不随仓库分发，`.venv` 是开发者本地环境并被 Git 忽略。** 新电脑由有本地权限的 Agent 运行 `scripts/run_bili_learning.ps1 -ProbeOnly` 检测 Python 3.10+；无可用 Python 时，应先询问用户对系统安装的授权，推荐官方 Python 3.12。若 Python 存在但 PATH 不可用，Agent 可以在当前会话显式设置 `BILI_LEARNING_PYTHON` 为可信解释器绝对路径，启动器与 Skill 桥接将执行同一验证。没有 Python 不可能直接执行主 Python CLI，但预检本身可以独立运行。
+
 项目**不安装 yt-dlp 源码、不在 PATH/环境变量或配置文件中寻找其他 EXE、不执行 winget、不下载或静默更新工具**。所有正常采集和可选 ASR 临时音频下载都使用：
 
 ```text

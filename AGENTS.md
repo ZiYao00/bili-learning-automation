@@ -20,7 +20,7 @@
 
 ## Agent 主导安装（不提供双击向导）
 
-- 安装/初始化任务先读 `docs/QUICKSTART.md` 与 `docs/LOCAL-AGENT-INSTALL.md`，由具备当前环境权限的 Agent 完成检测、配置、Junction 创建和 onboarding 验收，不要求普通用户执行 PowerShell 或编辑 JSON；不要假设每位用户都有 CodexPro。
+- 安装/初始化任务先读 `docs/QUICKSTART.md` 与 `docs/LOCAL-AGENT-INSTALL.md`，由具备当前环境权限的 Agent 完成检测、配置、Junction 创建和 onboarding 验收，不要求普通用户执行 PowerShell 或编辑 JSON；不要假设每位用户都有 CodexPro。**必须先执行 `scripts/run_bili_learning.ps1 -ProbeOnly`**，再运行 `scripts/run_bili_learning.ps1 onboarding`。Python 和 `.venv` 不随仓库分发；缺少 Python 时，需取得明确的系统安装授权后由 Agent 准备 Python 3.12，禁止无授权静默安装。共享的 `scripts/python_runtime.ps1` 负责验证解释器，可信外部 Python 可临时通过 `BILI_LEARNING_PYTHON` 指定；指定失效须停下，不可悄然切换解释器。
 - Windows 本地 Codex/Hermes/WorkBuddy 的 Skill 安装：`scripts/install_agent_skill.ps1 -Agent <Codex|Hermes|WorkBuddy>` 默认只输出计划；确认具体用户级目录写入权限和用户授权后才使用 `-Apply`。Vault → 项目 notes 只使用 `scripts/ensure_junction.ps1` 进行有保护的计划/安装。
 - `planned` 不等于安装成功；`conflict` 时停止，禁止自动删除或迁移现有目录/笔记/Skill。新用户通过 `configure-obsidian` 建立推荐 Hybrid 配置，旧 direct-vault 不做静默迁移。ChatGPT Web 的 Skill ZIP 和本地连接须按其平台权限单独安装/授权。
 - `local-ASR-service` 是独立可选服务，不进入首次安装，不复制/安装/启动它的源码和模型；只在用户明确授权 ASR 后检查并调用。

@@ -15,7 +15,7 @@ description: Use in a supported local Agent host to turn a Bilibili copied link,
 4. 默认通过项目共享启动器执行：
 
    ```powershell
-   python <repo-root>\scripts\run_bili_learning.py <command> [args]
+   & '<repo-root>\scripts\run_bili_learning.ps1' <command> [args]
    ```
 
    Codex、Hermes、WorkBuddy 通过目录链接安装本 Skill。宿主需要清除注入的 `PYTHONPATH`、从 Junction 反查项目根目录或提供稳定 cleanup runner 时，可调用 `scripts/local_bridge.ps1` / `scripts/local_bridge.py`；bridge 只解决宿主路径与进程兼容，不得另写业务规则。
@@ -26,7 +26,7 @@ description: Use in a supported local Agent host to turn a Bilibili copied link,
 用户要求安装、检查、初始化、确认可用，或准备转换链接时，先运行：
 
 ```powershell
-python <repo-root>\scripts\run_bili_learning.py onboarding
+& '<repo-root>\scripts\run_bili_learning.ps1' onboarding
 ```
 
 - `ready`：分别报告 Skill/项目访问与运行环境状态；仅验收任务到此结束，生成任务继续。
@@ -37,7 +37,7 @@ python <repo-root>\scripts\run_bili_learning.py onboarding
 
 ### 安装任务：由 Agent 执行，不要求用户手工安装
 
-安装前按项目 `docs/QUICKSTART.md` 与 `docs/LOCAL-AGENT-INSTALL.md` 操作。只使用项目内 `tools/yt-dlp.exe`，不得搜索系统 PATH、读取旧 `ytdlp` 配置作为可执行路径或安装源码/winget。Codex/Hermes/WorkBuddy 用户级 Skill 链接使用 `scripts/install_agent_skill.ps1`：默认只读计划，取得外部目录写入许可后才 `-Apply`；Obsidian Vault → 项目 notes 使用 `scripts/ensure_junction.ps1` 同样先计划再按授权应用。遇到已有目录、旧副本或不同目标的 Junction 返回 `conflict` 时停止，不自动删除/搬迁。首次 `configure-obsidian` 建立 Hybrid 配置，不迁移旧 direct-vault。ChatGPT Web 单独构建 ZIP 并需要有效本地桥接。`local-ASR-service` 是独立可选项目，不属于默认安装任务。
+安装前按项目 `docs/QUICKSTART.md` 与 `docs/LOCAL-AGENT-INSTALL.md` 操作。先运行 `scripts/run_bili_learning.ps1 -ProbeOnly` 验证 Python，只有 `ready` 才进入 onboarding。Python 不随仓库打包；如缺失，由 Agent 在得到用户明确授权后准备官方 Python 3.12，不能要求用户手动安装或自动触发商店安装。可临时指定 `BILI_LEARNING_PYTHON` 使用外部可信解释器，必须验证版本。只使用项目内 `tools/yt-dlp.exe`，不得搜索系统 PATH、读取旧 `ytdlp` 配置作为可执行路径或安装源码/winget。Codex/Hermes/WorkBuddy 用户级 Skill 链接使用 `scripts/install_agent_skill.ps1`：默认只读计划，取得外部目录写入许可后才 `-Apply`；Obsidian Vault → 项目 notes 使用 `scripts/ensure_junction.ps1` 同样先计划再按授权应用。遇到已有目录、旧副本或不同目标的 Junction 返回 `conflict` 时停止，不自动删除/搬迁。首次 `configure-obsidian` 建立 Hybrid 配置，不迁移旧 direct-vault。ChatGPT Web 单独构建 ZIP 并需要有效本地桥接。`local-ASR-service` 是独立可选项目，不属于默认安装任务。
 
 ## 2. 来源路由与重复笔记
 

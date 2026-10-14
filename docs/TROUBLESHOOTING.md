@@ -7,13 +7,13 @@
 先运行：
 
 ```powershell
-python .\scripts\run_bili_learning.py doctor
+.\scripts\run_bili_learning.ps1 doctor
 ```
 
 如果需要给智能体分析：
 
 ```powershell
-python .\scripts\run_bili_learning.py doctor --json
+.\scripts\run_bili_learning.ps1 doctor --json
 ```
 
 doctor 不访问 Bilibili，也不读取 Cookie 内容。
@@ -32,6 +32,12 @@ doctor 不访问 Bilibili，也不读取 Cookie 内容。
 | 长视频处理慢 | [第 10 节](#10-长视频读取很慢) |
 | Obsidian 有内容但没样式 | [第 11 节](#11-obsidian-笔记有内容但没有样式) |
 | `organize` 失败 | [第 13 节](#13-organize-失败) |
+
+---
+
+### Python 缺失或版本不符合要求
+
+运行 `scripts/run_bili_learning.ps1 -ProbeOnly`。如果返回 `python_required`，说明 Python 尚不可用，不能直接运行 `python scripts/run_bili_learning.py`。Agent 应先检查现有 Python 3.10+；如确实不存在，则在取得用户授权后准备官方 Python 3.12，并重新检测。已有 `.venv` 如果无效会被跳过；若系统环境无法发现可信 Python，Agent 可仅在当前 PowerShell 会话设置 `$env:BILI_LEARNING_PYTHON` 为正确的解释器绝对路径。这个变量只影响 Python 解析器，不会改变项目内固定的 yt-dlp EXE。不得无授权安装软件或修改用户系统 PATH。
 
 ---
 

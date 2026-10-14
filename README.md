@@ -2,6 +2,8 @@
 
 [简体中文](README.md) | [English](README.en.md)
 
+**项目代码版本：v2.0.0（正式 GitHub Release 待发布）**
+
 `bili-learning-automation` 用于把 Bilibili 视频的字幕、明确授权后的 ASR 纯文本，或明确指定的 UP 主简介资源信息整理为 Obsidian 笔记。
 
 默认 `prepare` 使用字幕优先，并通过 `yt-dlp --skip-download` **不下载视频或音频**。用户明确授权 ASR 时用 `prepare-transcript` 回流纯文本；用户当前消息明确要求“纯资源分享 / 只整理简介 / 不用字幕”时用 `prepare-description`。三个入口共用同一 Job、校验、发布、恢复、并发保护与 retire 生命周期。
@@ -49,7 +51,7 @@ B站链接 / BV号
 
 ## 2. 运行条件
 
-本项目面向 Windows 10/11 x64，以 **Agent 代替普通用户完成安装**。运行需要 Python 3.10+、Obsidian Vault、有效的 Bilibili Netscape Cookie 文件，以及至少一种能操作本地项目的 Agent（Codex、Hermes、WorkBuddy 或具备本地桥接的 ChatGPT）。
+本项目面向 Windows 10/11 x64，以 **Agent 代替普通用户完成安装**。运行需要 Python 3.10+、Obsidian Vault、有效的 Bilibili Netscape Cookie 文件，以及至少一种能操作本地项目的 Agent（Codex、Hermes、WorkBuddy 或具备本地桥接的 ChatGPT）。**项目不携带 Python 环境或 `.venv`**：由 Agent 先执行 `scripts/run_bili_learning.ps1 -ProbeOnly`，确认 Python 可用；缺失时取得用户授权后准备官方 Python 3.12。
 
 仓库自带官方单文件 `tools/yt-dlp.exe`，只调用该固定路径；无需安装 yt-dlp 源码、运行 `winget` 或配置系统 PATH。当前随仓库固定版本与校验值记录于 `tools/yt-dlp.release.json`。默认字幕优先，调用 `yt-dlp --skip-download`，不会下载视频或音频。
 
@@ -64,7 +66,7 @@ B站链接 / BV号
 https://github.com/ZiYao00/bili-learning-automation
 
 请先阅读项目 AGENTS.md、docs/QUICKSTART.md 和 docs/LOCAL-AGENT-INSTALL.md。
-由你检测环境、配置本地路径、安装需要的 Skill 并运行 onboarding。
+先运行 `scripts/run_bili_learning.ps1 -ProbeOnly` 检测 Python，必要时在授权后安装官方 Python 3.12；再配置本地路径、安装需要的 Skill 并通过共享 PowerShell 入口运行 onboarding。
 不要让我手工编辑 JSON 或执行命令。
 操作现有 Vault 目录、用户级 Skill 目录之前先检查是否冲突，得到授权后再修改。
 只接受 Cookie 文件路径，不索取 Cookie 内容；不要覆盖旧笔记或已有目录。

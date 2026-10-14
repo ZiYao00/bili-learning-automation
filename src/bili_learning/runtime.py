@@ -327,13 +327,15 @@ def file_lock(lock_path: Path, stale_seconds: int = LOCK_STALE_SECONDS) -> Itera
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     file_obj = lock_path.open("a+b")
     try:
-        file_obj.seek(0, os.SEEK_END)
-        if file_obj.tell() == 0:
-            file_obj.write(b"0")
-            file_obj.flush()
         if not _try_os_lock(file_obj):
             raise LockBusyError(f"已有任务正在处理：{lock_path.stem}")
         try:
+            # The OS lock must be acquired before writing an initial sentinel.
+            # Concurrent Windows openers may otherwise encounter PermissionError.
+            file_obj.seek(0, os.SEEK_END)
+            if file_obj.tell() == 0:
+                file_obj.write(b"0")
+                file_obj.flush()
             yield
         finally:
             _unlock_os_file(file_obj)

@@ -155,6 +155,8 @@ prepare-description -> description_only，必须由当前消息明确要求跳�
 
 ## 6. 接手后的第一组检查
 
+正式 Windows Agent 安装先运行 `scripts/run_bili_learning.ps1 -ProbeOnly`，无需 Python 也能报告 `python_required`；经明确授权才安装 Python 3.12。项目内 `.venv` 不是新用户分发产物，可信外部 Python 可由 Agent 临时设置 `BILI_LEARNING_PYTHON`，和 canonical Skill 桥接共用 `scripts/python_runtime.ps1`。不可让一个宿主未经验证地选用其他解释器。
+
 如果任务涉及安装、生成笔记、环境状态或结构修改，优先执行：
 
 ```powershell
@@ -195,7 +197,7 @@ git diff --check
 python .\scripts\build_chatgpt_skill.py
 ```
 
-正式 commit / push / Release 前再阅读 `docs/RELEASE-CHECKLIST.md`。
+正式 commit / push / Release 前再阅读 `docs/RELEASE-CHECKLIST.md`；本次 `v2.0.0` 的本地模拟验收、测试结果及仍待完成的独立 Windows / GitHub CI 门禁记录在 `docs/reports/2026-10-15-v2.0.0-release-candidate.md`。不得把此本地模拟报告当作已正式发布的证明。
 
 ## 8. 安全与操作边界
 

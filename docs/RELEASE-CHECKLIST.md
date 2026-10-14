@@ -26,12 +26,14 @@ A release candidate is ready when all applicable checks below are true:
 - [x] Ruff passes in the existing project virtual environment.
 - [x] Public pytest suite passes.
 - [x] Source, shared launchers, and canonical Skill bridge scripts compile successfully.
+- [x] Windows Python preflight is available without a Python interpreter; launcher and canonical Skill bridge validate the same Python 3.10+ interpreter. Missing Python never silently installs or opens the Store; unsupported/broken `.venv` is not trusted. A real no-Python host remains part of clean-room acceptance.
 - [x] `skill/bili-learning-automation/SKILL.md` is the single maintained local Skill source; Codex/Hermes/WorkBuddy use user-level Junctions to that directory, and `build_chatgpt_skill.py --check` validates the only distributable Skill ZIP. The ChatGPT archive contains only the generated Skill metadata and approved documentation reference snapshot, with no local credentials or machine configuration.
 - [x] Historical clean-room walkthrough completed in August 2026; see `docs/reports/2026-08-23-v1.0-cleanroom-acceptance.md`.
-- [ ] Repeat clean-room **Agent-led** installation on a fresh Windows 10/11 x64 environment, including authorized Junction linking, cookie-path setup and no-overwrite conflict cases.
+- [x] Isolated Windows clean-room simulation passed: a copied workspace without `.venv`, private config or Cookie can use an explicitly validated external Python, configure Vault and Cookie path, install Junction safely, and return onboarding `ready`; repeated install and occupied targets remain non-destructive.
+- [ ] Repeat **independent** Agent-led installation on a genuinely fresh Windows 10/11 x64 host (including no-Python handling, explicit OS-install authorization, real Agent discovery, and a permissioned Bilibili smoke run). Local isolated simulation does not count as this separate release gate.
 - [ ] Confirm Linux CI uses deterministic fake executable tests rather than treating the Windows EXE as Linux-supported.
-- [ ] `pyproject.toml` version matches the intended release version before tagging.
-- [ ] Changelog contains the final release entry/date for that version.
+- [x] `pyproject.toml` release candidate version is `2.0.0`, and both READMEs and CHANGELOG agree. Published Git Tag and Release `v2.0.0` are still pending.
+- [x] CHANGELOG includes the `2.0.0` candidate with date `2026-10-15`; reconfirm the actual release date immediately before creating the tag.
 - [ ] For the next release commit, review full staged paths and verify no local credentials, private notes, runtime jobs, captured materials, or machine-specific configuration are staged. Current read-only review is not a staged release gate.
 - [x] Public tracked documentation contains no maintainer-specific absolute paths, Vault/backup locations, private identifiers, or machine-only examples; generic placeholders are used instead.
 - [ ] Git author/committer identity for the release commit uses an email address the maintainer intentionally wants to expose publicly (for privacy, prefer a GitHub `noreply` address when appropriate).
@@ -50,10 +52,10 @@ Use a fresh clone or otherwise isolated checkout and verify only the documented 
 1. With an authorized Agent, clone or download the repository in a fresh Windows 10/11 x64 environment.
 2. Confirm `config/local.json` does not already exist; never import the maintainer's private config.
 3. The Agent follows `docs/QUICKSTART.md` without remembered local settings or manual JSON edits by the novice user.
-4. Confirm project `tools/yt-dlp.exe --version` runs, version and SHA-256 match `tools/yt-dlp.release.json`, and no global executable lookup occurs.
+4. Run `scripts/run_bili_learning.ps1 -ProbeOnly` **before** any Python CLI command; exercise no-Python and incompatible-Python branches, then use a validated Python 3.10+ or an explicitly authorized official Python 3.12 install. Confirm `tools/yt-dlp.exe --version` runs, version and SHA-256 match `tools/yt-dlp.release.json`, and no global yt-dlp lookup occurs.
 5. Agent configures the Vault and Cookie **file path** using shared CLI. New hybrid installations must create workspace notes root safely and plan Vault → notes Junction; only apply after external target permission.
 6. Verify `scripts/ensure_junction.ps1` returns `planned` on read-only inspection, `installed` on permitted creation, `already_installed` on a repeat, and `conflict` on an occupied unrelated target; never remove existing data.
-7. Run doctor/onboarding before any real collection; missing EXE, Vault, Cookie or broken hybrid mapping must report structured actions without collecting media.
+7. Run doctor/onboarding through `scripts/run_bili_learning.ps1` before any real collection; missing EXE, Vault, Cookie or broken hybrid mapping must report structured actions without collecting media. Verify Chinese/space-containing paths, valid external Python without a local `.venv`, and invalid interpreter selection.
 8. Confirm missing CSS is a non-blocking warning; only copy from its upstream project with permission.
 9. Agent installs only one selected host Skill through `scripts/install_agent_skill.ps1` plan/apply; confirm the host can read canonical SKILL.md. ChatGPT Web requires separate ZIP and authorized workspace bridge.
 10. Convert one normal Bilibili video with usable Chinese subtitles.
@@ -73,7 +75,7 @@ A failure in steps 3-16 is a release blocker if it prevents the documented defau
 Do not add features during this sequence.
 
 1. Complete the clean-room walkthrough.
-2. Fix only release-blocking defects or documentation mismatches found by that walkthrough.
+2. Fix only release-blocking defects or documentation mismatches found by that walkthrough; if the version candidate date differs from the actual release date, synchronize CHANGELOG and metadata before tagging.
 3. Set `pyproject.toml` to the intended release version.
 4. Add the final `## [X.Y.Z] - YYYY-MM-DD` changelog entry for that version.
 5. Run:
