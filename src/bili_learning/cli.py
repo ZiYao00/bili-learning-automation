@@ -23,7 +23,9 @@ from .lifecycle import (
 )
 from .local_asr import health_report as local_asr_health_report
 from .navigation import build_navigation
-from .organizer import find_duplicate_bvid_notes, organize_note, organize_resource_note
+from .organization_batch import list_inbox, organize_batch
+from .organization_duplicates import duplicates_inventory, recycle_duplicates
+from .organizer import OrganizerNavigationPending, find_duplicate_bvid_notes, organize_note, organize_resource_note
 
 
 def find_project_root() -> Path:
@@ -100,9 +102,9 @@ def main() -> None:
         "--mode",
         choices=("archive", "resource"),
         default="archive",
-        help="archive=只改文件名和路径；resource=将纯资源笔记压缩并合并进资源集合页",
+        help="archive=默认仅移动且保留文件名和全部内容；resource=单独授权后压缩资源笔记",
     )
-    organize_parser.add_argument("--filename", help="archive 模式的新简短文件名；可省略 .md")
+    organize_parser.add_argument("--filename", help="可选的旧版显式重命名参数；默认保持来源文件名不变")
     organize_parser.add_argument("--destination", help="archive 模式下 notes_root 的目标相对目录，推荐“领域/对象”")
     organize_parser.add_argument("--collection", help="resource 模式的资源集合页名称，例如“Skills”或“网站与灵感”")
     organize_parser.add_argument(
@@ -116,6 +118,18 @@ def main() -> None:
         required=True,
         help="用户已明确选择指定单篇（single）、最近一篇（latest）或全部待整理笔记（all）",
     )
+    list_parser = subparsers.add_parser("organize-list", help="只读枚举待整理笔记及哈希，由 Agent 阅读后制定分类计划")
+    list_parser.add_argument("--scope", choices=("single", "latest", "all"), required=True)
+    list_parser.add_argument("--note", type=Path, help="single 时必须指定现有笔记路径")
+    batch_parser = subparsers.add_parser("organize-batch", help="按 Agent 已审阅的 JSON 计划安全批量归档，默认仅预览")
+    batch_parser.add_argument("--plan", type=Path, required=True)
+    batch_parser.add_argument("--confirmed-scope", choices=("single", "latest", "all"), required=True)
+    batch_parser.add_argument("--apply", action="store_true", help="执行明确授权范围内的归档，记录可恢复检查点")
+    duplicate_parser = subparsers.add_parser("organize-duplicates", help="查询重复版本或按精确文件清单移入 Windows 回收站")
+    duplicate_group = duplicate_parser.add_mutually_exclusive_group(required=True)
+    duplicate_group.add_argument("--bvid", help="只读查询该 BVID 的重复文件")
+    duplicate_group.add_argument("--plan", type=Path, help="用户确认保留/回收文件及哈希的 JSON 计划")
+    duplicate_parser.add_argument("--apply", action="store_true", help="只按计划列出的文件执行回收站清理")
     args = parser.parse_args()
 
     project_root = args.project_root.resolve() if args.project_root else find_project_root()
@@ -178,6 +192,23 @@ def main() -> None:
         build_navigation(settings)
         print(f"导航已刷新：{settings.notes_root / settings.navigation_dir}")
         return
+    if args.command in {"organize-list", "organize-batch", "organize-duplicates"}:
+        try:
+            if args.command == "organize-list":
+                result = list_inbox(settings, args.scope, note=args.note)
+            elif args.command == "organize-batch":
+                result = organize_batch(settings, args.plan, confirmed_scope=args.confirmed_scope, apply=args.apply)
+            elif args.bvid is not None:
+                if args.apply:
+                    raise ValueError("--bvid 是只读查询；执行删除必须提供显式 JSON --plan")
+                result = duplicates_inventory(settings, args.bvid)
+            else:
+                result = recycle_duplicates(settings, args.plan, apply=args.apply)
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            raise SystemExit(0 if result["status"] not in {"partial", "failed"} else 2)
+        except (OSError, ValueError, TypeError, KeyError) as error:
+            print(json.dumps({"schema_version": 1, "status": "failed", "message": str(error)}, ensure_ascii=False, indent=2))
+            raise SystemExit(1)
     if args.command == "prepare":
         payload, code = prepare_note(
             project_root,
@@ -254,8 +285,8 @@ def main() -> None:
                     "card_cleanup_warning": result["card_cleanup_warning"],
                 }
             else:
-                if args.filename is None or args.destination is None:
-                    raise ValueError("archive 模式必须同时提供 --filename 与 --destination")
+                if args.destination is None:
+                    raise ValueError("archive 模式必须指定 --destination；默认保留原文件名")
                 bvid, duplicates = find_duplicate_bvid_notes(settings, args.note)
                 note_path = organize_note(
                     settings,
@@ -280,6 +311,14 @@ def main() -> None:
                     "duplicate_bvid_notes": logical_duplicates,
                 }
             print(json.dumps(payload, ensure_ascii=False, indent=2))
+        except OrganizerNavigationPending as error:
+            print(json.dumps({
+                "schema_version": 1,
+                "status": "organized_navigation_pending",
+                "note_path": str(error.target),
+                "message": str(error),
+            }, ensure_ascii=False, indent=2))
+            raise SystemExit(2)
         except Exception as error:
             print(json.dumps({"schema_version": 1, "status": "failed", "message": str(error)}, ensure_ascii=False, indent=2))
             raise SystemExit(1)

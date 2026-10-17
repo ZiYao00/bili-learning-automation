@@ -250,7 +250,7 @@ config/local.json    # 本机路径配置
 - [本地 Agent Skill 安装](docs/LOCAL-AGENT-INSTALL.md)：用同一个 canonical Skill 安装 Codex、Hermes、WorkBuddy；
 - [ChatGPT Skill 安装教程](docs/CHATGPT-SKILL-INSTALL.md)：构建并安装 ChatGPT Web 专用 ZIP；
 - [Obsidian 样式教程](docs/OBSIDIAN-STYLING.md)：安装 CSS、启用样式和排查显示问题；
-- [学习后归档](docs/NOTE-ORGANIZATION.md)：只改文件名和路径，采用最多两层的“领域 / 对象”目录，并保留原笔记内容不变。
+- [学习后归档](docs/NOTE-ORGANIZATION.md)：默认只调整“领域 / 对象”目录，**原文件名、标题、Frontmatter 和正文一字不改**；支持批量预览、带哈希检查的恢复执行，以及单独授权的重复版本回收站清理。
 
 ### 使用说明与参考
 

@@ -83,12 +83,12 @@ python <repo-root>\scripts\run_bili_learning.py finalize --job '<job_dir>' --not
 
 ## 5. 学习后整理
 
-整理默认关闭。指定一篇用 `single`，最近一篇用 `latest`，全部待整理笔记用 `all`；只有用户明确要求并确认 `single / latest / all` 范围后，才完整读取 `docs/NOTE-ORGANIZATION.md` 并调用 `organize`。
+整理默认关闭。指定一篇用 `single`，最近一篇用 `latest`，全部待整理笔记用 `all`；只有用户明确要求并确认范围后，才完整读取 `docs/NOTE-ORGANIZATION.md`。普通整理只归档完整笔记，**不得修改笔记内容**，也不修改标题、原文件名、正文、元信息、Frontmatter、资源链接或排版。
 
-知识型 / 混合型默认归档命令需要显式提供 `--filename`、`--destination` 与 `--confirmed-scope`；核心只负责安全重命名、移动和导航刷新，不得修改笔记内容。完整阅读目标笔记后再判断长期价值：
-
-- 知识型 / 混合型：使用默认 `archive`，只改文件名和路径；
-- 纯资源型：仅在整理阶段生成 runtime 资源卡，再使用 `--mode resource` 合并进 `05-资源` 集合页。
+- 单篇：`organize --note <现有笔记> --destination <领域/对象> --confirmed-scope single`；默认保留文件名并校验 SHA-256。`--filename` 仅为旧版显式改名兼容，普通整理不要使用。
+- 批量：先 `organize-list --scope all` 获取清单；Agent 完整阅读每篇，按知识主题判断目标目录，在 `runtime/organize-plans` 写带源文件相对路径、目标目录、原 SHA-256 的 JSON。先 `organize-batch --plan <路径> --confirmed-scope all` 预览；已授权后添加 `--apply` 执行。重复、哈希冲突、目标同名、目录逃逸、潜在断链均跳过并报告。中断后保留同计划及检查点重试。
+- 重复版本：`organize-duplicates --bvid <BV号>` 仅查询；只有用户明确指明保留对象及待回收文件并授权后，才可使用 `organize-duplicates --plan <路径> --apply`，必须移入 Windows 回收站且不得永久删除。
+- 原有纯资源 `--mode resource` 有损压缩仍可独立使用，但**不是普通整理的自动分支**；只有用户另行明确授权才执行，原文件同样使用回收站，不可用时停止。
 
 不要把类型判断提前到生成阶段，也不要手工移动、重命名或删除正式笔记。
 

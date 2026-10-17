@@ -111,7 +111,7 @@ ChatGPT Web 使用 `dist/bili-learning-automation-chatgpt.zip`，不是用户级
 https://www.bilibili.com/video/BVxxxxxxxxxx/
 ```
 
-默认先取字幕且**不下载音视频**。如果没有可用字幕，Agent 会报告 `subtitle_unavailable`，不会自动 ASR。已转换过的 BVID 默认先询问是否更新、重做或取消；成功发布以 `note_ready` 为准，笔记保存在 `00-待整理`。
+默认先取字幕且**不下载音视频**。如果没有可用字幕，Agent 会报告 `subtitle_unavailable`，不会自动 ASR。已转换过的 BVID 默认先询问是否更新、重做或取消；成功发布以 `note_ready` 为准，笔记保存在 `00-待整理`。此后若明确要求整理，Agent 可以用 `organize-list` 检查、逐篇阅读并制定分类计划，使用 `organize-batch` 预览并经授权执行；普通整理绝不改变笔记文件名或任何内容。详见 [学习后整理](NOTE-ORGANIZATION.md)。
 
 `local-ASR-service` 是可选独立服务；本项目**不安装、不启动、不复制 ASR 模型**。用户主动要求 ASR 时，Agent 按 [配置手册](CONFIGURATION.md) 检查已部署的服务；如果没有安装，提供其独立项目的安装说明，不影响正常字幕流程。
 

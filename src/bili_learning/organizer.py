@@ -10,13 +10,27 @@ from pathlib import Path, PurePosixPath
 from .config import Settings
 from .frontmatter import parse_frontmatter
 from .navigation import atomic_write, build_navigation
-from .note_library import RESOURCE_COLLECTION_MARKER, extract_bvid, find_notes_by_bvid
+from .note_library import RESOURCE_COLLECTION_MARKER, extract_bvid, find_notes_by_bvid, note_sha256
 from .note_template import note_filename, safe_title
+from .organize_safety import affected_backlinks, recycle_file, safe_target_directory
+from .runtime import waiting_file_lock
 
 ORGANIZE_SCOPES = {"single", "latest", "all"}
 RESOURCE_CARD_MAX_CHARS = 8000
 RESOURCE_CARD_RUNTIME_DIR = "resource-cards"
 ORGANIZE_BACKUP_RUNTIME_DIR = "organize-backups"
+
+
+class OrganizerNavigationPending(RuntimeError):
+    """The note was moved successfully, but navigation still needs a refresh."""
+
+    def __init__(self, target: Path, error: Exception) -> None:
+        self.target = target
+        super().__init__(f"笔记已归档至 {target}，但导航刷新失败：{error}")
+
+
+def organizer_lock(settings: Settings):
+    return waiting_file_lock(settings.runtime_root / "locks" / "organizer.lock", timeout_seconds=30.0)
 
 
 def find_duplicate_bvid_notes(settings: Settings, source: Path) -> tuple[str | None, list[Path]]:
@@ -54,6 +68,8 @@ def _validate_confirmed_scope(settings: Settings, source: Path, confirmed_scope:
 
 
 def _validate_source_note(settings: Settings, source: Path, confirmed_scope: str) -> Path:
+    if source.is_symlink():
+        raise ValueError("不允许整理符号链接笔记")
     source = source.resolve()
     _validate_confirmed_scope(settings, source, confirmed_scope)
     notes_root = settings.notes_root.resolve()
@@ -88,6 +104,7 @@ def _validated_destination(settings: Settings, value: str) -> tuple[str, ...]:
     }
     if destination[0] in reserved:
         raise ValueError("目标目录不能是待整理目录或导航目录")
+    safe_target_directory(settings, destination)
     return destination
 
 
@@ -121,12 +138,27 @@ def _available_path(directory: Path, filename: str, source: Path) -> Path:
         sequence += 1
 
 
-def _move_without_rewriting(source: Path, target: Path) -> None:
+def _move_without_rewriting(source: Path, target: Path, *, expected_sha256: str | None = None) -> None:
     if target == source:
         return
+    if target.exists() or target.is_symlink():
+        raise FileExistsError(f"归档目标已存在，不能覆盖或自动改名：{target}")
+    source_hash = note_sha256(source)
+    if expected_sha256 and source_hash != expected_sha256:
+        raise ValueError("笔记自生成整理计划以来已发生变化，拒绝移动")
     target.parent.mkdir(parents=True, exist_ok=True)
     os.link(source, target)
-    source.unlink()
+    try:
+        # Both names must still resolve to the SAME inode before removing the old name.
+        if not source.exists() or not os.path.samefile(source, target) or note_sha256(target) != source_hash:
+            raise ValueError("归档期间文件发生变化，已保留原路径")
+        source.unlink()  # Rename semantics: remove only the old hardlink, not the note.
+    except Exception:
+        if target.exists() and source.exists() and os.path.samefile(source, target):
+            target.unlink()  # Roll back only the link created by this call.
+        raise
+    if note_sha256(target) != source_hash:
+        raise ValueError("归档后文件哈希发生变化，目标文件已保留供人工核验")
 
 
 def _resource_card_input(settings: Settings, card_path: Path) -> tuple[Path, str]:
@@ -192,23 +224,35 @@ def _merge_resource_collection(collection_path: Path, collection_title: str, sta
 def organize_note(
     settings: Settings,
     source: Path,
-    filename: str,
+    filename: str | None = None,
     *,
     destination: str,
     confirmed_scope: str,
+    expected_sha256: str | None = None,
+    refresh_navigation: bool = True,
 ) -> Path:
-    source = _validate_source_note(settings, source, confirmed_scope)
-    notes_root = settings.notes_root.resolve()
-    filename_clean = _clean_note_name(filename, empty_message="整理后的文件名不能为空")
+    """Preserve filenames and all bytes by default; explicit old rename API stays usable."""
+    with organizer_lock(settings):
+        source = _validate_source_note(settings, source, confirmed_scope)
+        target_destination = _validated_destination(settings, destination)
+        directory = safe_target_directory(settings, target_destination)
+        if filename is None:
+            target = directory / source.name
+        else:
+            filename_clean = _clean_note_name(filename, empty_message="整理后的文件名不能为空")
+            target = _available_path(directory, filename_clean, source)
+        if affected_backlinks(settings, source, target):
+            raise ValueError("存在可能因移动而失效的 Obsidian 内部链接，已跳过该笔记")
+        _move_without_rewriting(source, target, expected_sha256=expected_sha256)
+        if refresh_navigation:
+            try:
+                build_navigation(settings)
+            except Exception as error:
+                raise OrganizerNavigationPending(target, error) from error
+        return target
 
-    target_destination = _validated_destination(settings, destination)
-    target = _available_path(notes_root.joinpath(*target_destination), filename_clean, source)
-    _move_without_rewriting(source, target)
-    build_navigation(settings)
-    return target
 
-
-def organize_resource_note(
+def _organize_resource_note(
     settings: Settings,
     source: Path,
     collection: str,
@@ -228,8 +272,7 @@ def organize_resource_note(
     card, card_text = _resource_card_input(settings, card_path)
     start, end, block = _resource_card_block(source_text, bvid, card_text)
 
-    notes_root = settings.notes_root.resolve()
-    collection_path = notes_root / _resource_root(settings) / note_filename(collection_clean)
+    collection_path = safe_target_directory(settings, (_resource_root(settings),)) / note_filename(collection_clean)
     if collection_path.resolve() == source:
         raise ValueError("资源集合页不能与待压缩的原笔记是同一个文件")
     before_collection = collection_path.read_text(encoding="utf-8-sig") if collection_path.is_file() else None
@@ -239,7 +282,7 @@ def organize_resource_note(
     collection_path.parent.mkdir(parents=True, exist_ok=True)
     atomic_write(collection_path, merged)
     try:
-        source.unlink()
+        recycle_file(source)  # Never fall back to permanent deletion of a user note.
     except Exception:
         if before_collection is None:
             if collection_path.is_file():
@@ -254,7 +297,10 @@ def organize_resource_note(
     except OSError as error:
         card_cleanup_warning = str(error)
 
-    build_navigation(settings)
+    try:
+        build_navigation(settings)
+    except Exception as error:
+        raise OrganizerNavigationPending(collection_path, error) from error
     return {
         "bvid": bvid,
         "collection_path": collection_path,
@@ -262,3 +308,16 @@ def organize_resource_note(
         "updated_existing_card": updated_existing_card,
         "card_cleanup_warning": card_cleanup_warning,
     }
+
+
+def organize_resource_note(
+    settings: Settings,
+    source: Path,
+    collection: str,
+    *,
+    card_path: Path,
+    confirmed_scope: str,
+) -> dict[str, object]:
+    """Legacy opt-in lossy mode, serialized and Recycle-Bin-only."""
+    with organizer_lock(settings):
+        return _organize_resource_note(settings, source, collection, card_path=card_path, confirmed_scope=confirmed_scope)

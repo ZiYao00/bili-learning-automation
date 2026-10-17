@@ -91,4 +91,4 @@ taxonomy 的 route.path 不直接决定新文件的路径。新笔记统一先�
 - 不同 BVID 可并行处理；导航重建使用独占 OS 文件锁串行执行，避免多个 finalizer 交叉覆盖同一组导航页。当前不会自动删除旧导航页，以免误删用户手写内容。
 - 外部 yt-dlp 调用有超时。
 - runtime lifecycle 只允许作用于 runtime root 的子目录；活动 Job 通过 rename/replace retire 到 `retired/`，正常主链不要求物理删除。
-- `organize` 只接收 notes root 内的现有 Markdown；它先原子创建目标文件，确认成功后才删除旧位置，再重建导航。
+- 默认普通 `organize` 保留原文件名和全部字节：目标为 notes_root 内相对目录，归档前后检查 SHA-256；文件名冲突、Junction 路径逃逸、潜在断链均停止。核心先创建目标硬链接并确认同 inode 后移除旧路径，再刷新导航；若导航失败，必须报告文件已移动。`organize-batch` 按已审核的 runtime 计划逐篇执行并持久化检查点，失败可安全续跑；`organize-duplicates` 仅按明确保留/回收清单与单独 `--apply` 走 Windows 回收站。`resource` 压缩保留为独立可选的有损功能，绝不作为普通整理默认操作。

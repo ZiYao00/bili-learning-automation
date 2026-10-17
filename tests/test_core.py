@@ -2212,8 +2212,9 @@ def test_organize_note_rejects_more_than_two_destination_levels(tmp_path: Path, 
     assert source.exists()
 
 
-def test_organize_resource_note_compacts_into_collection_and_keeps_recovery_backup(tmp_path: Path, taxonomy: dict) -> None:
+def test_organize_resource_note_compacts_into_collection_and_keeps_recovery_backup(tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch) -> None:
     settings = _settings(tmp_path, taxonomy)
+    monkeypatch.setattr("bili_learning.organizer.recycle_file", lambda path: path.rename(tmp_path / "recycled-resource.md"))
     source = settings.notes_root / "00-待整理" / "纯资源分享.md"
     source.parent.mkdir(parents=True)
     source.write_text(
@@ -2250,8 +2251,14 @@ def test_organize_resource_note_compacts_into_collection_and_keeps_recovery_back
     assert "05-资源]]（1）" in (settings.notes_root / "99-导航" / "首页.md").read_text(encoding="utf-8")
 
 
-def test_organize_resource_note_updates_same_bvid_card_without_duplication(tmp_path: Path, taxonomy: dict) -> None:
+def test_organize_resource_note_updates_same_bvid_card_without_duplication(tmp_path: Path, taxonomy: dict, monkeypatch: pytest.MonkeyPatch) -> None:
     settings = _settings(tmp_path, taxonomy)
+    recycled = []
+    def fake_recycle(path: Path) -> None:
+        target = tmp_path / f"recycled-{len(recycled)}.md"
+        path.rename(target)
+        recycled.append(target)
+    monkeypatch.setattr("bili_learning.organizer.recycle_file", fake_recycle)
     inbox = settings.notes_root / "00-待整理"
     inbox.mkdir(parents=True)
 

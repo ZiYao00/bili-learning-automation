@@ -62,7 +62,7 @@
 - `config\local.json`、`notes\**`、`key\*`、`.runtime\*` 都是本机数据，禁止提交；只允许跟踪空目录占位文件和公开 example。onboarding 出现 `obsidian_notes_mapping_invalid` 时停止采集，先修复 Junction。
 - 视频简介抓取失败不能当作视频没有简介。
 - finalizer 返回 `note_ready` 即表示业务完成；临时数据采用 retire/维护语义，`temporary_data_retired` 或 `cleanup_warning` 不得覆盖已成功的发布结果。
-- 学习后整理默认关闭。只有用户明确要求并确认 `single / latest / all` 范围后才读取 `docs\NOTE-ORGANIZATION.md`。整理阶段完整阅读笔记后再判断长期价值：知识型/混合型继续 `archive`，只改文件名与路径；纯资源型才使用 `resource` 压缩进 `05-资源` 集合页。不得把该判断提前到生成阶段，也不得自动整理。
+- 学习后整理默认关闭。用户明确要求并确认 `single / latest / all` 范围后才读取 `docs\NOTE-ORGANIZATION.md`；默认只在 notes_root 内调整归档目录，保留原文件名、Markdown 全部字节、原始标题与 Frontmatter，并刷新导航。批量 `organize-list` → Agent 逐篇阅读/制定 runtime 计划 → `organize-batch` 预览 → 授权后 `--apply`；哈希变化、重名、同 BVID 重复和潜在断链一律跳过。重复版本仅通过独立 `organize-duplicates` 的精确保留/回收计划、明确授权和 Windows 回收站清理。旧 `resource` 有损压缩仅在单独授权后可用，默认不得启动，也不回退永久删除。
 
 ## 共享 Obsidian 样式依赖
 

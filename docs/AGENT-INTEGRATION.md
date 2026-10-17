@@ -30,10 +30,10 @@
 
 范围确认后，适配层必须完整阅读目标笔记，再判断长期价值。不要在生成阶段提前写入 `knowledge / resource / mixed` 分类，也不得根据旧文件名或旧 Tags 机械批量判断。
 
-- 知识型 / 混合型：调用默认 `archive`，提供 `--filename` 与 `--destination`。核心只移动/改名并重建导航，不改正文、H1、Summary、Frontmatter 或 Tags。
-- 纯资源型：仅在整理阶段生成短资源卡。适配层先把卡片写到 `<runtime_root>/resource-cards/`，再调用 `--mode resource --collection <集合页> --card-file <card>`。核心将卡片合并进 `05-资源` 集合页，备份原独立笔记后再移除该独立笔记，并重建导航。
+- 默认普通整理：调用 `archive`，只需 `--destination`，保留原文件名和全部字节；不修改正文、H1、Summary、Frontmatter、Tags、资源或排版。显式 `--filename` 为旧版兼容参数，普通整理不得使用。
+- 纯资源型：普通整理仍保留完整文件。只有用户另外明确授权有损压缩后，才允许 `--mode resource --collection <集合页> --card-file <卡片>`；核心保留恢复备份，原笔记只能移入 Windows 回收站，失败即停止，不退化为永久删除。
 
-`--confirmed-scope` 必须与用户选择一致。不得绕过 Organizer 手工移动、重命名或删除正式笔记。纯资源的判断参考 `docs/NOTE-ORGANIZATION.md`，最重要的问题是：去掉资源链接后，这篇内容是否仍有长期学习价值。
+`--confirmed-scope` 必须与用户选择一致。批量工作入口为 `organize-list` → Agent 逐篇阅读并写入 `runtime/organize-plans/` → `organize-batch --plan ... --confirmed-scope ...` 预览 → 授权后 `--apply`。不变更文件名、字节、H1、Tags 和资源；每项携带原 SHA-256，冲突/重复/断链默认跳过，执行后用同计划与 runtime 检查点恢复。`organize-duplicates --bvid ...` 仅查看，同 BVID 版本需用户明确指定保留与逐篇回收清单，并用 `--plan ... --apply` 移入 Windows 回收站。不得绕过 Organizer 手工移动、重命名或删除正式笔记。
 
 ## 数据契约
 
@@ -132,12 +132,12 @@ subtitle / ASR 来源可能存在自动转写噪声。遇到不确定专名时�
 只有用户明确要求“整理笔记”后，智能体才可调用统一核心入口：
 
 ```powershell
-bili-learning organize --note '<现有笔记路径>' --filename '<短文件名>' --destination '<领域/对象>' --confirmed-scope '<single|latest|all>'
+bili-learning organize --note '<现有笔记路径>' --destination '<领域/对象>' --confirmed-scope '<single|latest|all>'
 ```
 
-- 知识型 / 混合型使用上面的默认 `archive`；核心只改文件名和路径，不改正文、H1、Summary、Frontmatter 或 Tags。
-- 纯资源型先在 `<runtime_root>/resource-cards/` 写短资源卡，再调用 `organize --mode resource --note '<现有笔记路径>' --collection '<集合页>' --card-file '<card.md>' --confirmed-scope '<single|latest|all>'`，合并进 `05-资源`。
-- 核心负责路径验证、安全写入、原笔记备份（纯资源模式）和导航刷新；适配层不得自行移动、重命名或删除正式笔记。生成阶段与 finalizer 不承担资源类型判断。
+- 普通归档默认适用于所有笔记类型：只移动目标目录，不改文件名或 Markdown 字节；核验文件 SHA-256 和可能断链的引用。
+- **仅单独授权**纯资源压缩时，才在 `<runtime_root>/resource-cards/` 写短资源卡并调用 `organize --mode resource --note '<现有笔记路径>' --collection '<集合页>' --card-file '<card.md>' --confirmed-scope '<single|latest|all>'`；原笔记走 Windows 回收站而非永久删除。
+- 核心负责路径校验、哈希保护、并发限制、可恢复检查点和导航刷新；适配层不得绕过核心自行移动、重命名或删除正式笔记。生成阶段与 finalizer 不承担资源类型判断。
 
 ## 统一 Skill 与安装边界
 

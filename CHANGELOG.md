@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Changed
+- Organizer 默认仅移动目录，保留源 Markdown 原文件名和全部字节；旧 `--filename` 仍作为显式重命名兼容入口。目标重名不覆盖也不静默生成新序号，遇到内链、Junction 路径与 SHA-256 冲突会阻止归档。
+- 纯资源 `resource` 有损压缩保持独立、默认关闭，原笔记改为仅移入 Windows 回收站；失败不会退化成永久删除。
+
+### Added
+- `organize-list` 只读枚举，`organize-batch` 基于 Agent 审阅后的 runtime JSON 计划支持只读预览、一次授权批次、逐项检查点和中断恢复。
+- `organize-duplicates` 根据 BVID 检索重复版，并只按显式保留/回收计划与 `--apply` 进行回收站清理；不自动猜保留版本。
+- 新增批量冲突、断链、硬链接中断恢复、重复保护及回收站失败测试。
+
+
 ## [2.0.0] - 2026-10-15
 
 ### Added
