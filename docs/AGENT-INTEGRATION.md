@@ -90,7 +90,7 @@
 
 subtitle / ASR 来源可能存在自动转写噪声。遇到不确定专名时：可确认就使用可确认写法；高度疑似但无法确认就保留“转写原音 / 名称未确认 / 待核实”等线索；完全无法判断时保留仍可确认的用途、关系、参数或实测结果并省略具体拼写。不得把低置信名称静默升级成确定事实。description-only 没有音频来源，不得用此规则反推视频口播。
 
-长字幕或知识密集内容允许按 transcript chunk / 自然主题分段提取，但必须遵循 Fact Ledger → Semantic Draft → Layout Pass → Source Recheck。Fact Ledger 先保全原子事实；Semantic Draft 再自然聚类成文；Layout Pass 只转换表达形式。具体成员及其来源、继承、步数、适用条件、冲突和兼容关系不能被压成一个类别名或名称列表；来源明确讲解的运行路线、版本/插件安装条件、组件职责，以及“配置 → 耗时 / 质量变化 / 失败表现”的实测证据，也不能只剩一句泛化结论。正文在事实、参数、比较和实测证据已经完整保留后，可以额外提炼由当前来源共同支持的能力边界、因果关系或选择原则；这种提炼只能作为增量解释，不能替代支撑证据、删减原始条件或引入来源之外的新知识。不要把固定 Map-Reduce 流程强加给所有短视频。
+长字幕或知识密集内容可按 transcript chunk / 自然主题分段阅读或提取，但必须遵循当前 Job 的 `workflow_mode`：`light` 直接完成完整笔记，再独立排版、回看来源；`strict` 才依次使用 Fact Ledger → Semantic Draft → Layout Pass → Source Recheck。严格模式下 Fact Ledger 先保全原子事实、Semantic Draft 再自然聚类、Layout Pass 只转换表达形式；轻量模式不强制创建这些文件。具体成员及其来源、继承、步数、适用条件、冲突和兼容关系不能被压成一个类别名或名称列表；来源明确讲解的运行路线、版本/插件安装条件、组件职责，以及“配置 → 耗时 / 质量变化 / 失败表现”的实测证据，也不能只剩一句泛化结论。正文在事实、参数、比较和实测证据已经完整保留后，可以额外提炼由当前来源共同支持的能力边界、因果关系或选择原则；这种提炼只能作为增量解释，不能替代支撑证据、删减原始条件或引入来源之外的新知识。不要把固定 Map-Reduce 流程强加给所有短视频。
 
 ## 最终笔记结构
 
@@ -123,7 +123,7 @@ subtitle / ASR 来源可能存在自动转写噪声。遇到不确定专名时�
 
 ## 笔记内容边界
 
-必须阅读 `docs\standards\CODEX-VIDEO-NOTE-GUIDE.md`。长字幕、百科型、参数密集或实测证据多的内容还必须阅读 `docs\standards\KNOWLEDGE-DENSE-WORKFLOW.md`。`docs\standards\STANDARD-VIDEO-NOTE-EXAMPLE.md` 是语法与局部结构片段参考，不再作为每次任务的强制目录示例；只有需要确认 Table / Grid / Card / Callout 等具体写法时再读取相关片段，且不得复制其中的章节集合、顺序、数量或组件组合。
+`light` 只需读取 `docs\standards\LIGHT-WORKFLOW.md` 和 Job 当前来源，独立写作、排版、复核，不要求读取严格工作流文档；`strict` 才必须阅读 `docs\standards\CODEX-VIDEO-NOTE-GUIDE.md`，并根据该模式读取 `docs\standards\KNOWLEDGE-DENSE-WORKFLOW.md`。`docs\standards\STANDARD-VIDEO-NOTE-EXAMPLE.md` 只是语法与局部结构片段参考；需要确认 Table / Grid / Card / Callout 写法时才按需查看相关片段，不能照搬章节集合、顺序、数量或组件组合。
 
 所有新笔记先进入 `00-待整理`。H1 默认使用 B站原视频标题；程序在 H1 下方生成“作者 · 发布日期 · 时长 · BVID”的紧凑元信息行。相同 BVID 已发布时默认先返回 `existing_note_found`；只有用户明确选择 rerun 才创建 `（2）`、`（3）` 等独立序号笔记，update 则保留原路径并使用冲突保护。分类建议和 tags 由程序确定；智能体不得自行跳过 `00-待整理`。
 

@@ -144,20 +144,27 @@ Agent 会根据知识关系选择 Table / Grid / Card / Chip / Risk / Meta / Res
 
 ## Layout Pass：内容完成后再排版
 
-知识密集型笔记先完成 `fact-ledger.md` 与 `semantic-draft.md`，再使用 `layout-plan.md` 做独立 Layout Pass。排版的职责是改善扫描、比较和回查，不是第二次摘要。
+两种工作模式都要求**内容完成后再独立排版**，但不共享同一套中间文件：
+
+- **`light`（默认）：** 直接完成“先看结论 + 动态知识正文”，只在现有草稿上独立优化整篇阅读体验，不创建 `fact-ledger.md`、`semantic-draft.md` 或 `layout-plan.md`。
+- **`strict`（可选）：** 先完成 `fact-ledger.md` 与 `semantic-draft.md`，再使用 `layout-plan.md` 执行有阶段记录的 Layout Pass。
+
+两者的排版职责相同：帮助首次阅读、扫描比较与日后回查；不是第二次摘要，也不能为了整齐而删减来源事实。
 
 必须遵守：
 
-- Semantic Draft 内容未完整前，不要为了“好看”提前卡片化；
+- 内容正文（`strict` 模式为 Semantic Draft）未完整前，不要为了“好看”提前卡片化；
 - H2 数量减少不能连带删除参数、成员、关系、可直接使用值或实测证据；
-- 2 个核心对象可用 `grid-2 + card`，3 个平级入口可用 `grid-3 + card`；
+- 只有真实的并列关系需要空间比较时，才考虑 `grid-2 + card` 或 `grid-3 + card`；不是每篇笔记都需要 Card；
 - 4 个以上对象或包含配置、耗时、质量结果等固定字段时优先 Table；
 - 一组名称需要保留检索但不逐项展开时使用 Chip；
 - 冲突、互斥、兼容性和失败模式使用 Risk；来源损坏或无法确认的边界使用 Meta；
 - 整页只保留一个最高优先级 Summary；
-- Layout Pass 前后的高价值事实必须一一对应，关闭 CSS 后仍应保持基本可读。
+- 先判断现有内容还欠缺哪种视觉表达：长段落可改善留白，流程可理顺步骤层次，参数可按用途分组，重要风险可突出，但不必全部采用；
+- 不能为了增加 H3、缩窄表格或提高 Callout 数量而机械拆分内容；排版应完整覆盖正文，而不是只装饰新增章节；
+- 排版前后的高价值事实必须一一对应，关闭 CSS 后仍应保持基本可读。
 
-完整流程见 `docs/standards/KNOWLEDGE-DENSE-WORKFLOW.md`。
+`strict` 模式的完整阶段流程见 `docs/standards/KNOWLEDGE-DENSE-WORKFLOW.md`；`light` 模式只需遵循 `docs/standards/LIGHT-WORKFLOW.md`。
 
 ## 更新项目后如何同步 CSS
 
