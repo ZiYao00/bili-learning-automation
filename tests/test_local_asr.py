@@ -37,7 +37,7 @@ def test_local_asr_health_accepts_expected_service(monkeypatch: pytest.MonkeyPat
     }
     monkeypatch.setattr(local_asr.request, "urlopen", lambda request, timeout: _Response(payload))
 
-    result = local_asr.check_local_asr_health("http://127.0.0.1:8001")
+    result = local_asr.check_local_asr_health("http://127.0.0.1:8191")
 
     assert result["status"] == "ok"
     assert result["service"] == "local-ASR-service"
@@ -54,7 +54,7 @@ def test_local_asr_health_rejects_wrong_service(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(local_asr.request, "urlopen", lambda request, timeout: _Response(payload))
 
     with pytest.raises(local_asr.LocalAsrError) as exc:
-        local_asr.check_local_asr_health("http://127.0.0.1:8001")
+        local_asr.check_local_asr_health("http://127.0.0.1:8191")
 
     assert exc.value.code == "local_asr_not_ready"
 
@@ -66,8 +66,9 @@ def test_transcribe_local_file_posts_verbose_json(monkeypatch: pytest.MonkeyPatc
 
     def fake_urlopen(req, timeout):
         captured["url"] = req.full_url
-        captured["data"] = req.data
+        captured["chunks"] = list(req.data)
         captured["content_type"] = req.headers.get("Content-type")
+        captured["content_length"] = req.headers.get("Content-length")
         return _Response(
             {
                 "status": "ok",
@@ -79,12 +80,15 @@ def test_transcribe_local_file_posts_verbose_json(monkeypatch: pytest.MonkeyPatc
 
     monkeypatch.setattr(local_asr.request, "urlopen", fake_urlopen)
 
-    result = local_asr.transcribe_local_file("http://127.0.0.1:8001", audio)
+    result = local_asr.transcribe_local_file("http://127.0.0.1:8191", audio)
 
     assert result["text"] == "测试转录"
-    assert captured["url"] == "http://127.0.0.1:8001/v1/audio/transcriptions"
-    body = captured["data"]
-    assert isinstance(body, bytes)
+    assert captured["url"] == "http://127.0.0.1:8191/v1/audio/transcriptions"
+    chunks = captured["chunks"]
+    assert isinstance(chunks, list)
+    body = b"".join(chunks)
+    assert all(len(chunk) <= 1024 * 1024 for chunk in chunks)
+    assert int(str(captured["content_length"])) == len(body)
     assert b'name="model"' in body and b"custom" in body
     assert b'name="language"' in body and b"zh" in body
     assert b'name="response_format"' in body and b"verbose_json" in body
@@ -96,10 +100,14 @@ def test_prepare_local_asr_note_routes_plain_text_into_standard_job(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    settings = SimpleNamespace(local_asr_base_url="http://127.0.0.1:8001")
+    settings = SimpleNamespace(
+        local_asr_base_url="http://127.0.0.1:8191",
+        runtime_root=tmp_path / ".runtime" / "bilibili-learning",
+    )
     captured: dict[str, str] = {}
 
     monkeypatch.setattr(lifecycle, "load_settings", lambda project_root: settings)
+    monkeypatch.setattr(lifecycle, "find_notes_by_bvid", lambda *_args: [])
     monkeypatch.setattr(
         lifecycle,
         "onboarding_report",

@@ -5,6 +5,7 @@ import mimetypes
 import secrets
 import subprocess
 import tempfile
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 from urllib import error, request
@@ -18,8 +19,8 @@ from .input_resolver import ResolvedInput, resolve_input
 
 LOCAL_ASR_SERVICE_NAME = "local-ASR-service"
 HEALTH_TIMEOUT_SECONDS = 3
-TRANSCRIBE_TIMEOUT_SECONDS = 600
-DOWNLOAD_TIMEOUT_SECONDS = 300
+TRANSCRIBE_TIMEOUT_SECONDS = 3 * 60 * 60 + 60
+DOWNLOAD_TIMEOUT_SECONDS = 900
 
 
 class LocalAsrError(RuntimeError):
@@ -94,6 +95,7 @@ def health_report(settings: Settings, *, timeout: int = HEALTH_TIMEOUT_SECONDS) 
             "ffmpeg": health.get("ffmpeg"),
             "vad": health.get("vad"),
             "punctuation": health.get("punctuation"),
+            "queue": health.get("queue"),
         },
         0,
     )
@@ -154,35 +156,30 @@ def _download_audio(settings: Settings, canonical_url: str, temp_dir: Path) -> P
     return candidates[0]
 
 
-def _multipart_body(audio: Path) -> tuple[bytes, str]:
+def _multipart_body(audio: Path) -> tuple[Iterable[bytes], str, int]:
+    """Stream a known-length multipart upload without materializing the media in RAM."""
     boundary = f"----bili-local-asr-{secrets.token_hex(12)}"
     mime = mimetypes.guess_type(audio.name)[0] or "application/octet-stream"
-    chunks: list[bytes] = []
+    filename = audio.name.replace('"', "_").replace("\r", "_").replace("\n", "_")
+    fields = [
+        f'--{boundary}\r\nContent-Disposition: form-data; name="{key}"\r\n\r\n{value}\r\n'
+        for key, value in (("model", "custom"), ("language", "zh"), ("response_format", "verbose_json"))
+    ]
+    prefix = ("".join(fields) + (
+        f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+        f"Content-Type: {mime}\r\n\r\n"
+    )).encode("utf-8")
+    suffix = f"\r\n--{boundary}--\r\n".encode()
+    total_bytes = len(prefix) + audio.stat().st_size + len(suffix)
 
-    def field(name: str, value: str) -> None:
-        chunks.extend(
-            [
-                f"--{boundary}\r\n".encode(),
-                f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode(),
-                value.encode("utf-8"),
-                b"\r\n",
-            ]
-        )
+    def chunks() -> Iterable[bytes]:
+        yield prefix
+        with audio.open("rb") as stream:
+            while block := stream.read(1024 * 1024):
+                yield block
+        yield suffix
 
-    field("model", "custom")
-    field("language", "zh")
-    field("response_format", "verbose_json")
-    chunks.extend(
-        [
-            f"--{boundary}\r\n".encode(),
-            f'Content-Disposition: form-data; name="file"; filename="{audio.name}"\r\n'.encode(),
-            f"Content-Type: {mime}\r\n\r\n".encode(),
-            audio.read_bytes(),
-            b"\r\n",
-            f"--{boundary}--\r\n".encode(),
-        ]
-    )
-    return b"".join(chunks), boundary
+    return chunks(), boundary, total_bytes
 
 
 def transcribe_local_file(
@@ -191,13 +188,14 @@ def transcribe_local_file(
     *,
     timeout: int = TRANSCRIBE_TIMEOUT_SECONDS,
 ) -> dict[str, Any]:
-    body, boundary = _multipart_body(audio)
+    body, boundary, content_length = _multipart_body(audio)
     req = request.Request(
         _endpoint(base_url, "/v1/audio/transcriptions"),
         data=body,
         method="POST",
         headers={
             "Content-Type": f"multipart/form-data; boundary={boundary}",
+            "Content-Length": str(content_length),
             "Accept": "application/json",
         },
     )
@@ -209,7 +207,11 @@ def transcribe_local_file(
         raise LocalAsrError("local_asr_http_error", f"local-ASR-service 返回 HTTP {exc.code}：{detail}") from exc
     except (error.URLError, TimeoutError, OSError) as exc:
         reason = getattr(exc, "reason", exc)
-        raise LocalAsrError("local_asr_request_failed", f"无法调用 local-ASR-service：{reason}") from exc
+        raise LocalAsrError(
+            "local_asr_outcome_unknown",
+            f"ASR 请求连接中断或超时，无法确认服务端是否已完成转录：{reason}。"
+            "请先检查 /health.queue 和服务状态，不得直接重复提交。",
+        ) from exc
 
     try:
         data = json.loads(payload)

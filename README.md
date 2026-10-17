@@ -2,11 +2,11 @@
 
 [简体中文](README.md) | [English](README.en.md)
 
-**项目代码版本：v2.0.0（正式 GitHub Release 待发布）**
+**项目代码版本：v2.0.1（本地候选版本，尚未发布 GitHub Release）**
 
 `bili-learning-automation` 用于把 Bilibili 视频的字幕、明确授权后的 ASR 纯文本，或明确指定的 UP 主简介资源信息整理为 Obsidian 笔记。
 
-默认 `prepare` 使用字幕优先，并通过 `yt-dlp --skip-download` **不下载视频或音频**。用户明确授权 ASR 时用 `prepare-transcript` 回流纯文本；用户当前消息明确要求“纯资源分享 / 只整理简介 / 不用字幕”时用 `prepare-description`。三个入口共用同一 Job、校验、发布、恢复、并发保护与 retire 生命周期。
+默认 `prepare` 使用字幕优先，并通过 `yt-dlp --skip-download` **不下载视频或音频**。用户在无可用字幕后明确授权 ASR 时，`prepare-asr` 先查重并调用独立服务，再通过 `prepare-transcript` 回流纯文本；用户当前消息明确要求“纯资源分享 / 只整理简介 / 不用字幕”时用 `prepare-description`。三个入口共用同一 Job、校验、发布、恢复、并发保护与 retire 生命周期。
 
 > 第一次使用：直接阅读 **[新手快速上手](docs/QUICKSTART.md)**。
 > 不知道该看哪份文档：打开 **[文档中心](docs/README.md)**。
@@ -55,7 +55,7 @@ B站链接 / BV号
 
 仓库自带官方单文件 `tools/yt-dlp.exe`，只调用该固定路径；无需安装 yt-dlp 源码、运行 `winget` 或配置系统 PATH。当前随仓库固定版本与校验值记录于 `tools/yt-dlp.release.json`。默认字幕优先，调用 `yt-dlp --skip-download`，不会下载视频或音频。
 
-`local-ASR-service` 是**可选的独立服务**，不是基础安装项。只有默认入口发现无可用字幕且用户明确同意 ASR 后才会调用。使用说明见 [配置手册](docs/CONFIGURATION.md)。
+`local-ASR-service` 是**可选的独立服务**，不是基础安装项。当前默认使用本机 `127.0.0.1:8191`（支持本地配置或环境变量覆盖）；只有默认入口发现无可用字幕且用户明确同意 ASR 后才会调用。使用说明见 [配置手册](docs/CONFIGURATION.md)。
 
 ## 3. 安装：直接交给 Agent
 

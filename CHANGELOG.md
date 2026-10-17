@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-10-17
+
+### ASR improvements
+- `prepare-asr` 先用既有 BVID 查重/更新策略确认目标并取得同一 reservation，再下载音轨和调用独立 `local-ASR-service`；保持原 Job lifecycle、重复保护和恢复状态。
+- 可选 ASR 任务的 reservation 不因长转录超过普通两小时 stale 窗口而被正在运行的第二个 Agent 抢占；普通任务与历史无主 reservation 行为不变。
+- ASR 客户端改为标准库分块 multipart 上传（明确 Content-Length）、适配服务端最长排队窗口，超时/断线报告 `asr_outcome_unknown`，不自动重试或伪造任务恢复。
+- 与 `local-ASR-service` 当前部署规范对齐：默认连接端口从 `8001` 更新为 `8191`；仍允许在 `local.json` 或 `BILI_LEARNING_LOCAL_ASR_BASE_URL` 中显式覆盖。
+- 统一可选 ASR 安装、健康检查、故障排查和 Agent Skill 说明；正常字幕流程、Obsidian 笔记及新增整理工作流保持原样。
+
 ### Changed
 - Organizer 默认仅移动目录，保留源 Markdown 原文件名和全部字节；旧 `--filename` 仍作为显式重命名兼容入口。目标重名不覆盖也不静默生成新序号，遇到内链、Junction 路径与 SHA-256 冲突会阻止归档。
 - 纯资源 `resource` 有损压缩保持独立、默认关闭，原笔记改为仅移入 Windows 回收站；失败不会退化成永久删除。

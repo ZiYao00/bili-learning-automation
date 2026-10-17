@@ -32,8 +32,8 @@ A release candidate is ready when all applicable checks below are true:
 - [x] Isolated Windows clean-room simulation passed: a copied workspace without `.venv`, private config or Cookie can use an explicitly validated external Python, configure Vault and Cookie path, install Junction safely, and return onboarding `ready`; repeated install and occupied targets remain non-destructive.
 - [ ] Repeat **independent** Agent-led installation on a genuinely fresh Windows 10/11 x64 host (including no-Python handling, explicit OS-install authorization, real Agent discovery, and a permissioned Bilibili smoke run). Local isolated simulation does not count as this separate release gate.
 - [ ] Confirm Linux CI uses deterministic fake executable tests rather than treating the Windows EXE as Linux-supported.
-- [x] `pyproject.toml` release candidate version is `2.0.0`, and both READMEs and CHANGELOG agree. Published Git Tag and Release `v2.0.0` are still pending.
-- [x] CHANGELOG includes the `2.0.0` candidate with date `2026-10-15`; reconfirm the actual release date immediately before creating the tag.
+- [x] `pyproject.toml` local candidate version is `2.0.1`, and both READMEs and CHANGELOG agree. This is a local candidate, not a pushed tag or GitHub Release; the prior `v2.0.0` Git tag already exists.
+- [x] CHANGELOG includes the `2.0.1` candidate with date `2026-10-17`; reconfirm the actual release date immediately before creating the tag.
 - [ ] For the next release commit, review full staged paths and verify no local credentials, private notes, runtime jobs, captured materials, or machine-specific configuration are staged. Current read-only review is not a staged release gate.
 - [x] Public tracked documentation contains no maintainer-specific absolute paths, Vault/backup locations, private identifiers, or machine-only examples; generic placeholders are used instead.
 - [ ] Git author/committer identity for the release commit uses an email address the maintainer intentionally wants to expose publicly (for privacy, prefer a GitHub `noreply` address when appropriate).

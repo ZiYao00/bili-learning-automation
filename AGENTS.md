@@ -27,7 +27,7 @@
 
 ## 先选择来源，再读取任务模式
 
-不得根据标题、历史 memory 或模型猜测自动跳过字幕。默认“转换链接”使用 `prepare / subtitle_srt`；当前消息明确要求“纯资源分享 / 只整理简介 / 不用字幕 / 跳过字幕”才使用 `prepare-description / description_only`；默认入口返回 `subtitle_unavailable` 后，只有用户明确授权 ASR 才先运行 `asr-health`，服务 `ready` 时使用 `prepare-asr / asr_text` 调用外部 `local-ASR-service`。`prepare-asr` 只在明确授权后临时下载音轨，转录完成即清理临时媒体，再把真实纯文本回流现有 `prepare-transcript` Job lifecycle；服务不可用时停止，不在本项目安装、复制或启动另一套 ASR Pipeline。用户已经通过其它授权工具取得真实纯文本时，仍可直接使用 `prepare-transcript / asr_text`。
+不得根据标题、历史 memory 或模型猜测自动跳过字幕。默认“转换链接”使用 `prepare / subtitle_srt`；当前消息明确要求“纯资源分享 / 只整理简介 / 不用字幕 / 跳过字幕”才使用 `prepare-description / description_only`；默认入口返回 `subtitle_unavailable` 后，只有用户明确授权 ASR 才先运行 `asr-health`，服务 `ready` 时使用 `prepare-asr / asr_text` 调用外部 `local-ASR-service`。`prepare-asr` 先查重、确认更新目标并取得既有 BVID reservation，之后才在明确授权下临时下载音轨、分块调用 ASR，转录完成清理临时媒体，再把真实纯文本回流现有 `prepare-transcript` Job lifecycle；服务不可用时停止，不在本项目安装、复制或启动另一套 ASR Pipeline。用户已经通过其它授权工具取得真实纯文本时，仍可直接使用 `prepare-transcript / asr_text`。
 
 三个入口在采集前都会按 BVID 检查已发布笔记。默认发现重复时返回 `existing_note_found`，Agent 必须先让用户选择更新、重新执行或取消；重新执行用 `--on-existing rerun`，更新用 `--on-existing update --update-target <path>`，并始终复用触发提示时的原始完整消息。多篇重复笔记不得自动猜更新目标。更新 Job 会保存旧笔记快照并做 SHA-256 冲突检查，`update_conflict` 时不得强制覆盖。
 

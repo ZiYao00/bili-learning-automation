@@ -6,7 +6,7 @@
 已授权智能体入口中的复制链接 / BV 号 / 受支持短链
 → input_resolver 规范化 BVID 与 canonical URL
 → 适配层只根据当前消息的明确意图选择 source_mode：默认 `subtitle_srt`；明确授权 ASR 后使用 `asr_text`；明确“纯资源分享 / 只整理简介 / 不用字幕”使用 `description_only`
-→ `prepare` / `prepare-transcript` / `prepare-description` 先按 BVID 检查已发布笔记；默认重复返回 `existing_note_found`，用户明确选择 rerun / update 后才继续 `_prepare_materials`
+→ `prepare` / `prepare-transcript` / `prepare-description` 先按 BVID 检查已发布笔记；可选 `prepare-asr` 同样先查重、取得长转录保护的 BVID reservation 再下载音轨、分块请求 ASR；默认重复返回 `existing_note_found`，用户明确选择 rerun / update 后才继续 `_prepare_materials`
 → rerun 继续创建独立新笔记并使用递增序号；update 绑定既有路径、保存旧笔记快照与 SHA-256，再由 SourceMaterial + source manifest 生成标准 Job
 → taxonomy 生成 tags 与后续整理建议；原视频标题的新笔记进入 00-待整理
 → Python 在 runtime 写入确定性 Markdown 草稿、analysis.json 与统一 source package

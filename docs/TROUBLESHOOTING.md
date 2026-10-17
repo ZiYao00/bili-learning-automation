@@ -220,34 +220,15 @@ bili-learning prepare-description "https://www.bilibili.com/video/BV..."
 
 该入口只采集 metadata 与 UP 主简介，不请求字幕、不下载媒体、不调用 ASR。它创建 `source_mode = description_only` 的标准 Job，并继续走 handoff / finalizer；不得根据视频标题或历史偏好自动选择，也不得直接修改已发布笔记。简介不足时应返回来源不足，而不是推断视频口播或画面内容。
 
-### 已确认视频完全无字幕：显式 ASR 旁路
+### 已确认无字幕：按授权调用本地 ASR
 
-只有在人工确认视频确实没有可提取字幕，且用户明确要求继续 ASR 时，才考虑项目级辅助脚本：
+默认 `prepare` 返回 `subtitle_unavailable` 后，只有用户明确授权本次 ASR，Agent 才先运行 `scripts/run_bili_learning.ps1 asr-health`，确认 `ready` 后运行 `scripts/run_bili_learning.ps1 prepare-asr '<原始完整消息>'`。此入口先按 BVID 查重并取得 reservation，之后才临时下载音轨、分块提交本机 `local-ASR-service`，回流标准 Job 并继续 finalizer；不伪造 SRT 或时间戳。
 
-```powershell
-python .\scripts\bili_asr_fallback.py "https://www.bilibili.com/video/BV..." `
-  --output "$env:TEMP\BV-transcript.txt"
-```
+当服务未启动时，参照 [独立服务文档](DEPENDENCIES.md) 在获得操作授权后检查 `service.bat status`、必要时启动已安装的服务，不应重新安装模型或停止其它使用者的任务。
 
-该脚本不属于 collector / finalizer 的正常执行链，也不会改变 `subtitle_unavailable` 的含义。它只做：
+`asr_outcome_unknown` 表示客户端断线或超时，**服务端可能仍在执行**。先检查 `/health.queue`、服务日志；当前没有任务 ID 可找回断开的转录结果，不能自动再次 POST。`asr_unavailable` 则优先排查健康状态、FFmpeg/VAD/标点；音频下载失败应检查 B站权限和 Cookie，而不是改 ASR 模型。
 
-```text
-B站链接 → yt-dlp 临时下载低码率音轨 → SiliconFlow STT → transcript.txt
-```
-
-默认使用 `FunAudioLLM/SenseVoiceSmall`，优先读取 `config/local.json` 中现有的 yt-dlp 路径，并可复用项目 `key/` 下已有 Cookie。API Key 默认读取本机 `config/local.json` 的 `siliconflow.api_key`；也可由 `SILICONFLOW_API_KEY` 或显式 `--api-key-file` 覆盖。`config/local.json` 已被 Git 忽略，公开仓库只能提交 `config/local.json.example` 中的占位符，真实 Key 不得进入 README、日志或 Git。
-
-音频默认存放在系统临时目录并在脚本结束后自动清理；只有显式传入 `--keep-audio` 才会保留。输出文本和可选保留音频如果目标文件已存在都会停止，不会覆盖。当前 SiliconFlow STT 单文件限制为不超过 50MB、时长不超过 1 小时，脚本会在上传前检查这两个条件。
-
-输出是无伪造时间戳的纯文本 transcript。不要把整段文本伪装成单条 SRT，也不要制造时间戳。
-
-如果目标是继续生成正式笔记，不再手工组装 `job.json` / draft。把已经取得的纯文本交给共享核心：
-
-```powershell
-bili-learning prepare-transcript "https://www.bilibili.com/video/BV..." --transcript "$env:TEMP\BV-transcript.txt"
-```
-
-该命令只负责重新取得 metadata / UP 主简介、把纯文本复制进 runtime，并通过与 `prepare`、`prepare-description` 相同的 `_prepare_materials` lifecycle 生成标准 source manifest / draft / analysis / handoff。它本身不会下载音频或调用 ASR。完整 ASR Job 可按 `source_mode = asr_text` 恢复，不依赖外部临时 transcript 长期存在。
+历史脚本 `scripts/bili_asr_fallback.py` 保留为可选 SiliconFlow 手动兼容路径，不属于默认 Skill 工作流；新用户无需配置 SiliconFlow API Key。
 
 ---
 

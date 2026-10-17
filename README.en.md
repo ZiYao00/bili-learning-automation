@@ -2,11 +2,11 @@
 
 [简体中文](README.md) | [English](README.en.md)
 
-**Current code version: v2.0.0 (GitHub Release pending)**
+**Current code version: v2.0.1 (local release candidate; GitHub Release pending)**
 
 `bili-learning-automation` converts Bilibili subtitles, explicitly authorized ASR text, or explicitly requested description-only resource information into Obsidian notes.
 
-The default `prepare` route is subtitle-first and uses `yt-dlp --skip-download`, so **video and audio are not downloaded**. `prepare-transcript` imports explicitly authorized ASR text, while `prepare-description` is used only when the current request explicitly asks for a pure resource / description-only note. All three routes share one Job lifecycle, validation, publication, recovery, concurrency protection, and retire flow.
+The default `prepare` route is subtitle-first and uses `yt-dlp --skip-download`, so **video and audio are not downloaded**. After subtitles are unavailable, explicitly authorized `prepare-asr` checks for existing notes before calling the independent ASR service; `prepare-transcript` imports the resulting text, while `prepare-description` is used only when the current request explicitly asks for a pure resource / description-only note. All three routes share one Job lifecycle, validation, publication, recovery, concurrency protection, and retire flow.
 
 > First installation: start with **[Quick Start](docs/QUICKSTART.md)**.
 > The detailed operating documentation is currently maintained in Chinese and is Windows-first.
@@ -55,7 +55,7 @@ Windows 10/11 x64, Python 3.10+, an Obsidian vault, a private Netscape-format Bi
 
 The repository bundles the **official standalone `tools/yt-dlp.exe`**; all runtime calls use that fixed path exclusively. No yt-dlp source installation, global PATH search, or `winget` install is needed. Release provenance and SHA-256 are recorded in `tools/yt-dlp.release.json`. Subtitle-first collection uses `--skip-download` and does not download media.
 
-`local-ASR-service` is an **optional, independent** tool. It is never installed or started by this project and is only used after explicit user authorization for ASR.
+`local-ASR-service` is an **optional, independent** tool. Its current default local endpoint is `127.0.0.1:8191` (configurable via local settings or environment override). It is never installed or started by this project and is only used after explicit user authorization for ASR.
 
 ## 3. Installation: ask your agent
 

@@ -3,6 +3,6 @@
   "vault_root": "D:\\YourObsidianVault",
   "notes_subdir": "bilibili",
   "cookie_file": "key/bilibili_cookies.txt",
-  "local_asr_base_url": "http://127.0.0.1:8001",
+  "local_asr_base_url": "http://127.0.0.1:8191",
   "workflow_mode": "light"
 }

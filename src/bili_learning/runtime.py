@@ -166,13 +166,17 @@ def _normalize_existing_reservation(path: Path, stale_seconds: int) -> dict[str,
 
     # Dead/incomplete reservations are reusable immediately. Legacy reservations
     # without a usable owner are also reusable after the stale window.
-    if owner_alive is False or age > stale_seconds:
+    if owner_alive is False or (
+        age > stale_seconds and not (payload.get("purpose") == "asr" and owner_alive is not False)
+    ):
         _release_payload(path, payload)
         return _read_reservation(path)
     return payload
 
 
-def claim_reservation(runtime_root: Path, bvid: str, stale_seconds: int = LOCK_STALE_SECONDS) -> Reservation:
+def claim_reservation(
+    runtime_root: Path, bvid: str, stale_seconds: int = LOCK_STALE_SECONDS, *, purpose: str = "note"
+) -> Reservation:
     path = _reservation_path(runtime_root, bvid)
     path.parent.mkdir(parents=True, exist_ok=True)
     with waiting_file_lock(_reservation_lock_path(runtime_root, bvid)):
@@ -191,6 +195,7 @@ def claim_reservation(runtime_root: Path, bvid: str, stale_seconds: int = LOCK_S
         payload: dict[str, object] = {
             "bvid": bvid,
             "state": "active",
+            "purpose": purpose,
             "pid": os.getpid(),
             "created_at": time.time(),
             "updated_at": time.time(),

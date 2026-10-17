@@ -18,9 +18,9 @@ from .collector import (
     select_subtitle,
     write_handoff,
 )
-from .config import DependencyError, load_settings
+from .config import DependencyError, Settings, load_settings
 from .doctor import onboarding_report
-from .input_resolver import extract_user_supplied_source, resolve_input
+from .input_resolver import ResolvedInput, extract_user_supplied_source, resolve_input
 from .local_asr import LOCAL_ASR_SERVICE_NAME, LocalAsrError, transcribe_bilibili
 from .navigation import build_navigation
 from .note_library import find_notes_by_bvid, note_sha256, validate_update_target
@@ -294,6 +294,66 @@ def _load_collected_metadata(job_dir: Path) -> tuple[dict[str, Any], str | None]
     return info, description_sidecar
 
 
+def _resolve_existing_note_action(
+    settings: Settings,
+    resolved: ResolvedInput,
+    *,
+    source_mode: str,
+    on_existing: str,
+    update_target: Path | None,
+    stale_removed: int = 0,
+) -> tuple[tuple[dict[str, Any], int] | None, Path | None, str | None]:
+    """Use one duplicate/update policy both before ASR and during normal Job preparation."""
+    existing_notes = find_notes_by_bvid(settings, resolved.bvid)
+    if existing_notes and on_existing == "ask":
+        return _status(
+            {
+                "status": "existing_note_found",
+                "bvid": resolved.bvid,
+                "canonical_url": resolved.canonical_url,
+                "source_mode": source_mode,
+                "existing_note_count": len(existing_notes),
+                "existing_notes": [item.as_dict() for item in existing_notes],
+                "allowed_actions": ["update", "rerun", "cancel"],
+                "update_target_required": len(existing_notes) > 1,
+                "message": "这条 B站视频已经转换过；请确认更新已有笔记、重新执行一次或取消。",
+                "stale_jobs_removed": stale_removed,
+            },
+            2,
+        ), None, None
+
+    selected_update_target: Path | None = None
+    selected_update_hash: str | None = None
+    if on_existing == "update":
+        if not existing_notes:
+            return _status(
+                {
+                    "status": "existing_note_not_found",
+                    "bvid": resolved.bvid,
+                    "message": "未找到相同 BVID 的已发布笔记，不能执行更新。",
+                },
+                2,
+            ), None, None
+        if update_target is None:
+            if len(existing_notes) > 1:
+                return _status(
+                    {
+                        "status": "update_target_required",
+                        "bvid": resolved.bvid,
+                        "existing_notes": [item.as_dict() for item in existing_notes],
+                        "message": "找到多篇相同 BVID 笔记；请选择要更新的具体目标。",
+                    },
+                    2,
+                ), None, None
+            selected_update_target = validate_update_target(settings, resolved.bvid, existing_notes[0].path)
+        else:
+            selected_update_target = validate_update_target(settings, resolved.bvid, update_target)
+            if selected_update_target.resolve() not in {item.path.resolve() for item in existing_notes}:
+                raise ValueError("更新目标不在当前 BVID 的已发布笔记列表中")
+        selected_update_hash = note_sha256(selected_update_target)
+    return None, selected_update_target, selected_update_hash
+
+
 def _prepare_materials(
     project_root: Path,
     message: str | None,
@@ -304,6 +364,7 @@ def _prepare_materials(
     cleanup_runner: Path | None = None,
     on_existing: str = "ask",
     update_target: Path | None = None,
+    preclaimed_reservation: Reservation | None = None,
 ) -> tuple[dict[str, Any], int]:
     settings = load_settings(project_root)
     if source_mode not in SOURCE_MODES:
@@ -318,6 +379,8 @@ def _prepare_materials(
     if not dry_run:
         onboarding = onboarding_report(settings)
         if onboarding["status"] == "action_required":
+            if preclaimed_reservation is not None:
+                release_reservation(settings.runtime_root, preclaimed_reservation.bvid)
             return _status(
                 {
                     "status": "onboarding_required",
@@ -328,6 +391,8 @@ def _prepare_materials(
                 2,
             )
     if settings.notes_is_fallback and not dry_run:
+        if preclaimed_reservation is not None:
+            release_reservation(settings.runtime_root, preclaimed_reservation.bvid)
         return _status(
             {
                 "status": "configuration_required",
@@ -341,65 +406,26 @@ def _prepare_materials(
 
     external_source = source_path.expanduser().resolve() if source_path is not None else None
     job_dir: Path | None = None
-    reservation: Reservation | None = None
+    reservation: Reservation | None = preclaimed_reservation
     ready = False
     try:
         settings.runtime_root.mkdir(parents=True, exist_ok=True)
         stale_removed = cleanup_stale_jobs(settings)
         resolved = resolve_input(message)
-        existing_notes = find_notes_by_bvid(settings, resolved.bvid)
-        selected_update_target: Path | None = None
-        selected_update_hash: str | None = None
-
-        if existing_notes and on_existing == "ask":
-            ready = True
-            return _status(
-                {
-                    "status": "existing_note_found",
-                    "bvid": resolved.bvid,
-                    "canonical_url": resolved.canonical_url,
-                    "source_mode": source_mode,
-                    "existing_note_count": len(existing_notes),
-                    "existing_notes": [item.as_dict() for item in existing_notes],
-                    "allowed_actions": ["update", "rerun", "cancel"],
-                    "update_target_required": len(existing_notes) > 1,
-                    "message": "这条 B站视频已经转换过；请确认更新已有笔记、重新执行一次或取消。",
-                    "stale_jobs_removed": stale_removed,
-                },
-                2,
-            )
-        if on_existing == "update":
-            if not existing_notes:
-                ready = True
-                return _status(
-                    {
-                        "status": "existing_note_not_found",
-                        "bvid": resolved.bvid,
-                        "message": "未找到相同 BVID 的已发布笔记，不能执行更新。",
-                    },
-                    2,
-                )
-            if update_target is None:
-                if len(existing_notes) > 1:
-                    ready = True
-                    return _status(
-                        {
-                            "status": "update_target_required",
-                            "bvid": resolved.bvid,
-                            "existing_notes": [item.as_dict() for item in existing_notes],
-                            "message": "找到多篇相同 BVID 笔记；请选择要更新的具体目标。",
-                        },
-                        2,
-                    )
-                selected_update_target = validate_update_target(settings, resolved.bvid, existing_notes[0].path)
-            else:
-                selected_update_target = validate_update_target(settings, resolved.bvid, update_target)
-                if selected_update_target.resolve() not in {item.path.resolve() for item in existing_notes}:
-                    raise ValueError("更新目标不在当前 BVID 的已发布笔记列表中")
-            selected_update_hash = note_sha256(selected_update_target)
+        existing_response, selected_update_target, selected_update_hash = _resolve_existing_note_action(
+            settings,
+            resolved,
+            source_mode=source_mode,
+            on_existing=on_existing,
+            update_target=update_target,
+            stale_removed=stale_removed,
+        )
+        if existing_response is not None:
+            return existing_response
 
         requested_operation_mode = "update" if on_existing == "update" else ("rerun" if on_existing == "rerun" else "create")
-        reservation = claim_reservation(settings.runtime_root, resolved.bvid)
+        if reservation is None:
+            reservation = claim_reservation(settings.runtime_root, resolved.bvid)
         if dry_run:
             release_reservation(settings.runtime_root, reservation.bvid)
             ready = True
@@ -570,6 +596,7 @@ def prepare_transcript_note(
     cleanup_runner: Path | None = None,
     on_existing: str = "ask",
     update_target: Path | None = None,
+    _preclaimed_reservation: Reservation | None = None,
 ) -> tuple[dict[str, Any], int]:
     return _prepare_materials(
         project_root,
@@ -579,6 +606,7 @@ def prepare_transcript_note(
         cleanup_runner=cleanup_runner,
         on_existing=on_existing,
         update_target=update_target,
+        preclaimed_reservation=_preclaimed_reservation,
     )
 
 
@@ -593,6 +621,8 @@ def prepare_local_asr_note(
     settings = load_settings(project_root)
     if not message:
         return _status({"status": "failed", "message": "需要提供 B站复制链接、短链接或 BV 号。"}, 2)
+    if on_existing not in EXISTING_ACTIONS:
+        return _status({"status": "failed", "message": f"不支持的 on_existing：{on_existing}"}, 2)
 
     onboarding = onboarding_report(settings)
     if onboarding["status"] == "action_required":
@@ -606,11 +636,69 @@ def prepare_local_asr_note(
             2,
         )
 
+    reservation: Reservation | None = None
     try:
+        resolved = resolve_input(message)
+        # This fast path avoids touching the ASR service for a known duplicate.
+        existing_response, selected_target, _ = _resolve_existing_note_action(
+            settings,
+            resolved,
+            source_mode=SOURCE_MODE_ASR,
+            on_existing=on_existing,
+            update_target=update_target,
+        )
+        if existing_response is not None:
+            return existing_response
+
+        settings.runtime_root.mkdir(parents=True, exist_ok=True)
+        try:
+            reservation = claim_reservation(settings.runtime_root, resolved.bvid, purpose="asr")
+        except ReservationBusyError as error:
+            requested_operation_mode = "update" if on_existing == "update" else (
+                "rerun" if on_existing == "rerun" else "create"
+            )
+            if error.recoverable and error.job_dir:
+                recovered = _recover_materials_ready(
+                    project_root,
+                    Path(error.job_dir),
+                    cleanup_runner=cleanup_runner,
+                    expected_source_mode=SOURCE_MODE_ASR,
+                    expected_operation_mode=requested_operation_mode,
+                    expected_update_target=selected_target,
+                )
+                if recovered is not None:
+                    return recovered
+            return _status(
+                {
+                    "status": "in_progress",
+                    "bvid": error.bvid,
+                    "message": "该视频已有活动任务，暂不重复处理或转录。",
+                    "requested_source_mode": SOURCE_MODE_ASR,
+                    "reservation_age_seconds": error.age_seconds,
+                    "job_dir": error.job_dir,
+                },
+                2,
+            )
+
+        # Close the initial read/claim race under the per-BVID reservation.
+        existing_response, _, _ = _resolve_existing_note_action(
+            settings,
+            resolved,
+            source_mode=SOURCE_MODE_ASR,
+            on_existing=on_existing,
+            update_target=update_target,
+        )
+        if existing_response is not None:
+            return existing_response
+
         _resolved, result = transcribe_bilibili(settings, message)
         with tempfile.TemporaryDirectory(prefix="bili-learning-asr-transcript-") as temp:
             transcript_path = Path(temp) / "transcript.txt"
             transcript_path.write_text(str(result["text"]).strip() + "\n", encoding="utf-8")
+            # The shared Job lifecycle takes ownership of this reservation, and
+            # retains it until finalize or its existing failsafe retires the Job.
+            preclaimed = reservation
+            reservation = None
             payload, code = prepare_transcript_note(
                 project_root,
                 message,
@@ -618,6 +706,7 @@ def prepare_local_asr_note(
                 cleanup_runner=cleanup_runner,
                 on_existing=on_existing,
                 update_target=update_target,
+                _preclaimed_reservation=preclaimed,
             )
         if payload.get("status") == "materials_ready":
             payload["asr_provider"] = LOCAL_ASR_SERVICE_NAME
@@ -628,7 +717,11 @@ def prepare_local_asr_note(
     except LocalAsrError as error:
         return _status(
             {
-                "status": "asr_unavailable" if error.code.startswith("local_asr_") else "failed",
+                "status": (
+                    "asr_outcome_unknown" if error.code == "local_asr_outcome_unknown"
+                    else "asr_unavailable" if error.code.startswith("local_asr_")
+                    else "failed"
+                ),
                 "code": error.code,
                 "provider": LOCAL_ASR_SERVICE_NAME,
                 "base_url": settings.local_asr_base_url,
@@ -638,6 +731,9 @@ def prepare_local_asr_note(
         )
     except Exception as error:
         return _status({"status": "failed", "message": str(error)}, 1)
+    finally:
+        if reservation is not None:
+            release_reservation(settings.runtime_root, reservation.bvid)
 
 
 def prepare_description_note(

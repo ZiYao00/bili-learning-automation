@@ -48,7 +48,7 @@ description: Use in a supported local Agent host to turn a Bilibili copied link,
 - 默认入口返回 `subtitle_unavailable` 后，只有用户明确授权 ASR，才先运行 `asr-health`；`ready` 时使用 `prepare-asr '<原始完整消息>'` 调用外部 `local-ASR-service`，服务不可用时停止并报告状态，不在本项目安装或启动另一套 ASR。
 - 用户已经通过其它已授权工具取得真实纯文本时，仍可使用 `prepare-transcript '<原始完整消息>' --transcript '<文件>'` 直接接入标准 Job。
 
-`prepare-asr` 仅在明确授权后临时下载音轨，转写结束即清理临时媒体；回流给 Job 的仍是真实纯文本，不得把纯文本伪造成 SRT，也不得制造时间戳。不要根据标题、历史记忆或模型猜测自动跳过字幕。
+`prepare-asr` 先在下载和转录前检查重复 BVID、更新目标和现有任务 reservation，再在明确授权后临时下载音轨、流式上传本地 ASR，完成后清理临时媒体。`in_progress` 或 `existing_note_found` 不得绕过、不得重复转录；`asr_outcome_unknown` 表示服务端结果不确定，须检查共享 ASR 的 Queue / 日志，不得自动重发 POST。回流给 Job 的仍是真实纯文本，不得把纯文本伪造成 SRT，也不得制造时间戳。不要根据标题、历史记忆或模型猜测自动跳过字幕。
 
 `existing_note_found` 时停止并让用户选择更新、重新执行或取消。重试必须继续使用原始完整消息；重新执行使用 `--on-existing rerun`，更新使用 `--on-existing update` 并在多篇候选时明确 `--update-target`。`update_conflict` 不得强制覆盖。
 

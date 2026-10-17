@@ -33,8 +33,8 @@ Windows EXE 不能在 Linux 上运行。Linux CI 只检查通用 Python 行为�
 默认字幕采集不会访问它。只有 `subtitle_unavailable` 后用户明确授权 ASR，Agent 才会：
 
 ```text
-GET http://127.0.0.1:8001/health
-POST http://127.0.0.1:8001/v1/audio/transcriptions
+GET http://127.0.0.1:8191/health
+POST http://127.0.0.1:8191/v1/audio/transcriptions
 ```
 
 未部署则停止 ASR 分支并提示独立安装文档，**不影响字幕优先的普通流程**。本机可用 `local_asr_base_url` 或 `BILI_LEARNING_LOCAL_ASR_BASE_URL` 改地址；外部网络地址应当由用户明确确认数据发送风险。
@@ -43,10 +43,10 @@ POST http://127.0.0.1:8001/v1/audio/transcriptions
 
 此步骤**不是 bili-learning-automation 的首次安装步骤**。在用户决定启用 ASR 且独立仓库可访问后，Agent 应单独取得 local-ASR-service 工作区操作权限，并以其 [README](https://github.com/ZiYao00/local-ASR-service) 和 `docs/INSTALL.md` 为准。当前官方项目说明的推荐 Windows CPU 安装顺序是：
 
-1. 检查 **Python 3.11**、FFmpeg、可用磁盘空间和模型下载网络；这些依赖属于 ASR 工程，不装进 bili-learning-automation。
-2. 在 **local-ASR-service 仓库根目录**由 Agent 运行 `scripts/install-cpu.ps1` 创建其独立 `.venv-cpu`；无需手动逐项 pip 安装。
-3. 经用户同意模型下载后运行 `scripts/start-server.ps1`，再运行 `scripts/health-check.ps1 -WaitSeconds 120`；确认 `status=ok` 且 FFmpeg、VAD、标点恢复全部 ready。
-4. 返回 bili-learning-automation 项目，由 Agent 运行 `python scripts/run_bili_learning.py asr-health`；只有服务 ready 且用户再次明确同意本次 ASR 才调用 `prepare-asr`。
+1. 先在 **local-ASR-service 仓库根目录**运行 `service.bat status`：已就绪则复用；已安装但停止时，在授权范围内运行 `service.bat start`。不得结束未知 ASR 端口监听者、重启正在被其它 Agent 使用的服务。
+2. 确实未安装时，另行确认 Python **3.11**、空间、下载授权，再由 Agent 执行 `scripts/install-cpu.ps1`；它准备独立 `.venv-cpu`、项目内 FFmpeg 和基础模型，不使用 B站项目的 Python / FFmpeg，也不修改系统 PATH。
+3. 在 ASR 仓库运行 `scripts/health-check.ps1 -WaitSeconds 120`，确认 `status=ok`、`ffmpeg`、`vad`、`punctuation` 全部就绪；必要时使用其 `scripts/smoke-test.ps1` 验证真实转写。Qwen3 Forced Aligner 是可选字幕对齐功能，B站笔记不需要安装。
+4. 返回 B站项目运行 `scripts/run_bili_learning.ps1 asr-health`；只有服务 `ready` 且用户已授权本次 ASR 才调用 `prepare-asr`。如请求断开后返回 `asr_outcome_unknown`，检查独立服务的 Queue，不能直接重复提交。
 
 若仓库尚未公开或用户无权获取，请向用户说明需要从独立项目取得访问权限，不能臆造下载地址、假装安装完成，也不能把另一套 ASR 源码或模型复制进本项目。
 
