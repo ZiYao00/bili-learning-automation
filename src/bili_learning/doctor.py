@@ -8,11 +8,10 @@ from pathlib import Path
 
 from .config import (
     DEFAULT_NOTES_SUBDIR,
-    OBSIDIAN_SNIPPET_NAMES,
-    OBSIDIAN_STYLE_REPOSITORY,
     YTDLP_RELATIVE_PATH,
     YTDLP_RELEASE_URL,
     Settings,
+    load_obsidian_style_contract,
 )
 
 MINIMUM_PYTHON = (3, 10)
@@ -33,6 +32,7 @@ def _write_probe(path: Path) -> tuple[bool, str]:
 
 
 def doctor_report(settings: Settings) -> dict[str, object]:
+    style_repository, style_names = load_obsidian_style_contract()
     checks: list[dict[str, object]] = []
 
     def add(status: str, code: str, label: str, detail: str = "", **extra: object) -> None:
@@ -71,7 +71,7 @@ def doctor_report(settings: Settings) -> dict[str, object]:
             str(settings.vault_root),
         )
         snippets_dir = obsidian_dir / "snippets"
-        for snippet_name in OBSIDIAN_SNIPPET_NAMES:
+        for snippet_name in style_names:
             snippet_path = snippets_dir / snippet_name
             add(
                 "OK" if snippet_path.is_file() else "WARN",
@@ -162,6 +162,7 @@ def doctor_report(settings: Settings) -> dict[str, object]:
 
 def onboarding_report(settings: Settings) -> dict[str, object]:
     report = doctor_report(settings)
+    style_repository, style_names = load_obsidian_style_contract()
     checks = {str(check["code"]): check for check in report["checks"]}  # type: ignore[index]
     actions: list[dict[str, object]] = []
     warnings: list[dict[str, object]] = []
@@ -233,7 +234,7 @@ def onboarding_report(settings: Settings) -> dict[str, object]:
         )
 
     missing_css: list[str] = []
-    for snippet_name in OBSIDIAN_SNIPPET_NAMES:
+    for snippet_name in style_names:
         code = f"obsidian_snippet_{snippet_name.removesuffix('.css').replace('-', '_')}"
         check = checks.get(code)
         if check and check["status"] == "WARN":
@@ -247,9 +248,9 @@ def onboarding_report(settings: Settings) -> dict[str, object]:
                 "code": "obsidian_css_missing",
                 "message": "Obsidian 样式缺失不会阻止笔记生成，但排版效果会不完整；程序不会静默复制或覆盖 CSS。",
                 "missing": missing_css,
-                "repository": OBSIDIAN_STYLE_REPOSITORY,
+                "repository": style_repository,
                 "destination": destination,
-                "activation": "Obsidian → 设置 → 外观 → CSS 代码片段，并启用 learning-lab 与 video-note。",
+                "activation": "Obsidian → 设置 → 外观 → CSS 代码片段，并启用 " + "、".join(n.removesuffix(".css") for n in style_names) + "。",
             }
         )
 

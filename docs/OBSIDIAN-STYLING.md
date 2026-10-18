@@ -1,6 +1,6 @@
 # Obsidian 视觉样式
 
-视频学习笔记使用共享 CSS 仓库：<https://github.com/ZiYao00/obsidian-learning-snippets>。本项目的具体依赖由 `config/obsidian-style.json` 声明：`learning-lab.css` 是 Core，`video-note.css` 是本项目所需 Extension。本项目不再维护这两份 CSS 的副本。
+视频学习笔记使用共享 CSS 仓库：<https://github.com/ZiYao00/obsidian-learning-snippets>。本项目的具体依赖由 `config/obsidian-style.json` 声明：`learning-lab.css` 是 Core，`video-note.css` 是本项目所需 Extension。本项目不再维护这两份 CSS 的副本。Doctor 运行时从本项目的 `config/obsidian-style.json` 读取文件清单和 GitHub 仓库地址，不需要本地共享仓库的固定目录名；远端仓库改名只需更新这一份消费契约。
 
 - `learning-lab.css`：Core Design System，负责阅读宽度、标题层级、Callout、Grid、Card、Badge、Chip、Table 和响应式布局。
 - `video-note.css`：Video Note Extension，依赖 Core，只处理长视频标题、Bilibili 播放器、来源附录等视频笔记特有样式。

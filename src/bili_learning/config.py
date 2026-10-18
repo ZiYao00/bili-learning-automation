@@ -13,8 +13,31 @@ DEFAULT_NOTES_SUBDIR = "bilibili"
 DEFAULT_WORKFLOW_MODE = "light"
 SUPPORTED_WORKFLOW_MODES = {"light", "strict"}
 DEFAULT_LOCAL_ASR_BASE_URL = "http://127.0.0.1:8191"
-OBSIDIAN_SNIPPET_NAMES = ("learning-lab.css", "video-note.css")
-OBSIDIAN_STYLE_REPOSITORY = "https://github.com/ZiYao00/obsidian-learning-snippets"
+def load_obsidian_style_contract(config_file: Path | None = None) -> tuple[str, tuple[str, ...]]:
+    """Read the checked-in consumer contract; never duplicate provider names in code."""
+    source = config_file or (Path(__file__).resolve().parents[2] / "config" / "obsidian-style.json")
+    contract = json.loads(source.read_text(encoding="utf-8-sig"))
+    if contract.get("schema_version") != 1:
+        raise ConfigurationError("obsidian_style_schema", "Unsupported Obsidian style contract schema")
+    repository = contract.get("repository")
+    raw_core = contract.get("core")
+    extensions = contract.get("extensions")
+    classes = contract.get("cssclasses")
+    if not isinstance(repository, str) or not repository.strip():
+        raise ConfigurationError("obsidian_style_repository", "Obsidian style repository is missing")
+    if not isinstance(raw_core, str) or not isinstance(extensions, list):
+        raise ConfigurationError("obsidian_style_snippets", "Invalid core or extensions declaration")
+    if not isinstance(classes, list) or not all(isinstance(c, str) and c.strip() for c in classes):
+        raise ConfigurationError("obsidian_style_classes", "Invalid cssclasses declaration")
+    declared = [raw_core, *extensions]
+    import re
+    if not all(isinstance(p, str) and re.fullmatch(r"snippets/[A-Za-z0-9-]+\.css", p) for p in declared):
+        raise ConfigurationError("obsidian_style_paths", "Unsafe or invalid CSS path in consumer contract")
+    names = tuple(Path(p).name for p in declared)
+    if len(names) != len(set(names)):
+        raise ConfigurationError("obsidian_style_duplicates", "Duplicate CSS in consumer contract")
+    return repository, names
+
 YTDLP_RELATIVE_PATH = Path("tools/yt-dlp.exe")
 YTDLP_RELEASE_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest"
 
